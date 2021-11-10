@@ -1,6 +1,3 @@
-import sys
-
-sys.path.extend(['../'])
 from graph import tools
 
 num_node = 25

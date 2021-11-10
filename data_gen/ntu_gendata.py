@@ -1,9 +1,10 @@
+import os
+import numpy as np
 import argparse
 import pickle
 from tqdm import tqdm
 import sys
 
-sys.path.extend(['../'])
 from data_gen.preprocess import pre_normalization
 
 training_subjects = [
@@ -14,9 +15,6 @@ max_body_true = 2
 max_body_kinect = 4
 num_joint = 25
 max_frame = 300
-
-import numpy as np
-import os
 
 
 def read_skeleton_filter(file):
@@ -64,7 +62,8 @@ def get_nonzero_std(s):  # tvc
     index = s.sum(-1).sum(-1) != 0  # select valid frames
     s = s[index]
     if len(s) != 0:
-        s = s[:, :, 0].std() + s[:, :, 1].std() + s[:, :, 2].std()  # three channels
+        s = s[:, :, 0].std() + s[:, :, 1].std() + \
+            s[:, :, 2].std()  # three channels
     else:
         s = 0
     return s
@@ -91,7 +90,7 @@ def read_xyz(file, max_body=4, num_joint=25):  # 取了前两个body
 
 
 def gendata(data_path, out_path, ignored_sample_path=None, benchmark='xview', part='eval'):
-    if ignored_sample_path != None:
+    if ignored_sample_path is not None:
         with open(ignored_sample_path, 'r') as f:
             ignored_samples = [
                 line.strip() + '.skeleton' for line in f.readlines()
@@ -131,10 +130,12 @@ def gendata(data_path, out_path, ignored_sample_path=None, benchmark='xview', pa
     with open('{}/{}_label.pkl'.format(out_path, part), 'wb') as f:
         pickle.dump((sample_name, list(sample_label)), f)
 
-    fp = np.zeros((len(sample_label), 3, max_frame, num_joint, max_body_true), dtype=np.float32)
+    fp = np.zeros((len(sample_label), 3, max_frame,
+                  num_joint, max_body_true), dtype=np.float32)
 
     for i, s in enumerate(tqdm(sample_name)):
-        data = read_xyz(os.path.join(data_path, s), max_body=max_body_kinect, num_joint=num_joint)
+        data = read_xyz(os.path.join(data_path, s),
+                        max_body=max_body_kinect, num_joint=num_joint)
         fp[i, :, 0:data.shape[1], :, :] = data
 
     fp = pre_normalization(fp)
@@ -143,10 +144,12 @@ def gendata(data_path, out_path, ignored_sample_path=None, benchmark='xview', pa
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='NTU-RGB-D Data Converter.')
-    parser.add_argument('--data_path', default='../data/nturgbd_raw/nturgb+d_skeletons/')
+    parser.add_argument('--data_path',
+                        default='../data/nturgbd_raw/nturgb+d_skeletons/')
     parser.add_argument('--ignored_sample_path',
                         default='../data/nturgbd_raw/samples_with_missing_skeletons.txt')
-    parser.add_argument('--out_folder', default='../data/ntu/')
+    parser.add_argument('--out_folder',
+                        default='../data/ntu/')
 
     benchmark = ['xsub', 'xview']
     part = ['train', 'val']

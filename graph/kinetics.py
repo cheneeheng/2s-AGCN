@@ -1,7 +1,4 @@
 import numpy as np
-import sys
-
-sys.path.extend(['../'])
 from graph import tools
 import networkx as nx
 
