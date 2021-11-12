@@ -198,13 +198,15 @@ class Processor():
             if not arg.train_feeder_args['debug']:
                 if os.path.isdir(arg.model_saved_name):
                     print('log_dir: ', arg.model_saved_name, 'already exist')
-                    answer = input('delete it? y/n:')
-                    if answer == 'y':
-                        shutil.rmtree(arg.model_saved_name)
-                        print('Dir removed: ', arg.model_saved_name)
-                        input('Refresh the website of tensorboard by pressing any keys')  # noqa
-                    else:
-                        print('Dir not removed: ', arg.model_saved_name)
+                    shutil.rmtree(arg.model_saved_name)
+                    print('Dir removed: ', arg.model_saved_name)
+                    # answer = input('delete it? y/n:')
+                    # if answer == 'y':
+                    #     shutil.rmtree(arg.model_saved_name)
+                    #     print('Dir removed: ', arg.model_saved_name)
+                    #     input('Refresh the website of tensorboard by pressing any keys')  # noqa
+                    # else:
+                    #     print('Dir not removed: ', arg.model_saved_name)
                 self.train_writer = SummaryWriter(
                     os.path.join(arg.model_saved_name, 'train'), 'train')
                 self.val_writer = SummaryWriter(
@@ -223,15 +225,13 @@ class Processor():
         Feeder = import_class(self.arg.feeder)
         self.data_loader = dict()
         if self.arg.phase == 'train':
-            f = Feeder(**self.arg.train_feeder_args)
-            d = torch.utils.data.DataLoader(
-                dataset=f,
+            self.data_loader['train'] = torch.utils.data.DataLoader(
+                dataset=Feeder(**self.arg.train_feeder_args),
                 batch_size=self.arg.batch_size,
                 shuffle=True,
                 num_workers=self.arg.num_worker,
                 drop_last=True,
                 worker_init_fn=init_seed)
-            self.data_loader['train'] = d
         self.data_loader['test'] = torch.utils.data.DataLoader(
             dataset=Feeder(**self.arg.test_feeder_args),
             batch_size=self.arg.test_batch_size,
