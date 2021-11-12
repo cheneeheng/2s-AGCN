@@ -1,5 +1,15 @@
-work_dir: ./work_dir/ntu/xsub/aagcn_joint
-model_saved_name: ./runs/ntu_cs_aagcn_joint
+work_dir: ./data/ntu_result/xsub/aagcn_joint/run1
+model_saved_name: ./data/ntu_result/xsub/aagcn_joint/run1/ntu_cv_aagcn_joint
+
+phase: train
+save_score: True
+
+seed: 1
+log_interval: 100  # iter
+save_interval: 2  # iter
+eval_interval: 5  # iter
+print_log: true
+
 # feeder
 feeder: feeders.feeder.Feeder
 train_feeder_args:
@@ -27,17 +37,20 @@ model_args:
     labeling_mode: 'spatial'
 
 #optim
-weight_decay: 0.0001
+# device: [0, 1 ,2, 3]
+device: [0]
+batch_size: 8  #64
+test_batch_size: 1  #64
+
+optimizer: SGD
+nesterov: True
 base_lr: 0.1
 step: [30, 40]
-warm_up_epoch: 5
+weight_decay: 0.0001
 
-# training
-device: [0, 1, 2, 3]
-batch_size: 64
-test_batch_size: 64
+start_epoch: 0
 num_epoch: 50
-nesterov: True
+warm_up_epoch: 5
 
 only_train_part: True
 only_train_epoch: 5
