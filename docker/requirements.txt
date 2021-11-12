@@ -16,8 +16,6 @@ ipympl
 
 nbformat
 
-psycopg2
-pdvega
 configobj
 
 sklearn
@@ -35,3 +33,7 @@ pycodestyle
 cython
 
 networkx
+
+PyYAML
+tensorboardX
+tensorboard

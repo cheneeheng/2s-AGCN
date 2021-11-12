@@ -4,6 +4,7 @@ import argparse
 import pickle
 from tqdm import tqdm
 
+from utils.multiprocessing import parallel_processing
 from data_gen.preprocess import pre_normalization
 
 training_subjects = [
@@ -88,6 +89,16 @@ def read_xyz(file, max_body=4, num_joint=25):  # 取了前两个body
     return data
 
 
+def gendata_func(data_path, sample_name, pid=1):
+    fp = np.zeros((len(sample_name), 3, max_frame,
+                   num_joint, max_body_true), dtype=np.float32)
+    for i, s in enumerate(tqdm(sample_name, position=pid)):
+        data = read_xyz(os.path.join(data_path, s),
+                        max_body=max_body_kinect, num_joint=num_joint)
+        fp[i, :, 0:data.shape[1], :, :] = data
+    return fp
+
+
 def gendata(data_path, out_path, ignored_sample_path=None,
             benchmark='xview', part='eval'):
     if ignored_sample_path is not None:
@@ -95,6 +106,7 @@ def gendata(data_path, out_path, ignored_sample_path=None,
             ignored_samples = [
                 line.strip() + '.skeleton' for line in f.readlines()
             ]
+        print("Loaded ignore list.")
     else:
         ignored_samples = []
     sample_name = []
@@ -130,16 +142,14 @@ def gendata(data_path, out_path, ignored_sample_path=None,
     with open('{}/{}_label.pkl'.format(out_path, part), 'wb') as f:
         pickle.dump((sample_name, list(sample_label)), f)
 
-    fp = np.zeros((len(sample_label), 3, max_frame,
-                  num_joint, max_body_true), dtype=np.float32)
+    NP = 4
+    fps = parallel_processing(gendata_func, NP, sample_name, data_path)
+    print("Finished reading skeleton data.")
 
-    for i, s in enumerate(tqdm(sample_name)):
-        data = read_xyz(os.path.join(data_path, s),
-                        max_body=max_body_kinect, num_joint=num_joint)
-        fp[i, :, 0:data.shape[1], :, :] = data
-
-    fp = pre_normalization(fp)
+    fp = np.concatenate(fps, axis=0)
+    fp = pre_normalization(fp, NP)
     np.save('{}/{}_data_joint.npy'.format(out_path, part), fp)
+    print("Finished generating skeleton data.")
 
 
 if __name__ == '__main__':

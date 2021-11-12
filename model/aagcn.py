@@ -95,6 +95,7 @@ class ChannelAttention(nn.Module):
 
 class NonAdaptiveGCN(nn.Module):
     def __init__(self, A, conv_d, num_subset=3):
+        super().__init__()
         self.num_subset = num_subset
         self.A = Variable(torch.from_numpy(
             A.astype(np.float32)), requires_grad=False)
@@ -115,6 +116,7 @@ class NonAdaptiveGCN(nn.Module):
 
 class AdaptiveGCN(nn.Module):
     def __init__(self, in_channels, out_channels, A, conv_d, num_subset=3):
+        super().__init__()
         self.num_subset = num_subset
         self.PA = nn.Parameter(torch.from_numpy(A.astype(np.float32)))  # Bk
         self.alpha = nn.Parameter(torch.zeros(1))  # G
@@ -260,7 +262,7 @@ class Model(nn.Module):
     def __init__(self, num_class=60, num_point=25, num_person=2,
                  graph=None, graph_args=dict(), in_channels=3,
                  drop_out=0, adaptive=True, attention=True):
-        super(Model, self).__init__()
+        super().__init__()
 
         if graph is None:
             raise ValueError()
