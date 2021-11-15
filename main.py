@@ -197,9 +197,9 @@ class Processor():
         if arg.phase == 'train':
             if not arg.train_feeder_args['debug']:
                 if os.path.isdir(arg.model_saved_name):
-                    print('log_dir: ', arg.model_saved_name, 'already exist')
-                    shutil.rmtree(arg.model_saved_name)
-                    print('Dir removed: ', arg.model_saved_name)
+                    if self.arg.weights is None:
+                        raise ValueError(f'log_dir: {arg.model_saved_name} already exist')
+                    # print('log_dir: ', arg.model_saved_name, 'already exist')
                     # answer = input('delete it? y/n:')
                     # if answer == 'y':
                     #     shutil.rmtree(arg.model_saved_name)
