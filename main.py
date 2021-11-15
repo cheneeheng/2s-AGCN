@@ -529,8 +529,8 @@ class Processor():
             self.global_step = self.arg.start_epoch * \
                 len(self.data_loader['train']) / self.arg.batch_size
             for epoch in range(self.arg.start_epoch, self.arg.num_epoch):
-                if self.lr < 1e-3:
-                    break
+                # if self.lr < 1e-3:
+                #     break
                 save_model = ((epoch + 1) % self.arg.save_interval == 0) or (
                     epoch + 1 == self.arg.num_epoch)
 
