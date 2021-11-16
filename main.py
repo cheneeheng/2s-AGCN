@@ -198,7 +198,8 @@ class Processor():
             if not arg.train_feeder_args['debug']:
                 if os.path.isdir(arg.model_saved_name):
                     if self.arg.weights is None:
-                        raise ValueError(f'log_dir: {arg.model_saved_name} already exist')
+                        raise ValueError(
+                            f'log_dir: {arg.model_saved_name} already exist')
                     # print('log_dir: ', arg.model_saved_name, 'already exist')
                     # answer = input('delete it? y/n:')
                     # if answer == 'y':
@@ -253,7 +254,7 @@ class Processor():
 
         if self.arg.weights:
             self.global_step = int(arg.weights[:-3].split('-')[-1])
-            self.print_log('Load weights from {}.'.format(self.arg.weights))
+            self.print_log(f'Load weights from {self.arg.weights}')
             if '.pkl' in self.arg.weights:
                 with open(self.arg.weights, 'r') as f:
                     weights = pickle.load(f)
@@ -270,10 +271,9 @@ class Processor():
                     if w in key:
                         if weights.pop(key, None) is not None:
                             self.print_log(
-                                'Sucessfully Remove Weights: {}.'.format(key))
+                                f'Sucessfully Remove Weights: {key}')
                         else:
-                            self.print_log(
-                                'Can Not Remove Weights: {}.'.format(key))
+                            self.print_log(f'Can Not Remove Weights: {key}')
 
             try:
                 self.model.load_state_dict(weights)
@@ -316,15 +316,14 @@ class Processor():
             self.optimizer,
             total_epoch=self.arg.warm_up_epoch,
             after_scheduler=lr_scheduler_pre)
-        self.print_log('using warm up, epoch: {}'.format(
-            self.arg.warm_up_epoch))
+        self.print_log(f'using warm up, epoch: {self.arg.warm_up_epoch}')
 
     def save_arg(self):
         # save arg
         arg_dict = vars(self.arg)
         if not os.path.exists(self.arg.work_dir):
             os.makedirs(self.arg.work_dir)
-        with open('{}/config.yaml'.format(self.arg.work_dir), 'w') as f:
+        with open(f'{self.arg.work_dir}/config.yaml', 'w') as f:
             yaml.dump(arg_dict, f)
 
     def adjust_learning_rate(self, epoch):
@@ -350,7 +349,7 @@ class Processor():
             str = "[ " + localtime + ' ] ' + str
         print(str)
         if self.arg.print_log:
-            with open('{}/log.txt'.format(self.arg.work_dir), 'a') as f:
+            with open(f'{self.arg.work_dir}/log.txt', 'a') as f:
                 print(str, file=f)
 
     def record_time(self):
@@ -364,7 +363,7 @@ class Processor():
 
     def train(self, epoch, save_model=False):
         self.model.train()
-        self.print_log('Training epoch: {}'.format(epoch + 1))
+        self.print_log(f'Training epoch: {epoch + 1}')
         loader = self.data_loader['train']
         self.adjust_learning_rate(epoch)
         # for name, param in self.model.named_parameters():
@@ -433,14 +432,15 @@ class Processor():
 
         # statistics of time consumption and loss
         proportion = {
-            k: '{:02d}%'.format(int(round(v * 100 / sum(timer.values()))))
+            k: f'{int(round(v * 100 / sum(timer.values()))):02d}%'
             for k, v in timer.items()
         }
         self.print_log(
-            '\tMean training loss: {:.4f}.'.format(np.mean(loss_value)))
+            f'\tMean training loss: {np.mean(loss_value):.4f}.'.format())
         self.print_log(
-            '\tTime consumption: [Data]{dataloader}, [Network]{model}'.format(
-                **proportion))
+            f'\tTime consumption: '
+            f'[Data]{proportion["dataloader"]}, '
+            f'[Network]{proportion["model"]}')
 
         if save_model:
             state_dict = self.model.state_dict()
@@ -457,7 +457,7 @@ class Processor():
         if result_file is not None:
             f_r = open(result_file, 'w')
         self.model.eval()
-        self.print_log('Eval epoch: {}'.format(epoch + 1))
+        self.print_log(f'Eval epoch: {epoch + 1}')
         for ln in loader_name:
             loss_value = []
             score_frag = []
@@ -512,20 +512,21 @@ class Processor():
 
             score_dict = dict(
                 zip(self.data_loader[ln].dataset.sample_name, score))
-            self.print_log('\tMean {} loss of {} batches: {}.'.format(
-                ln, len(self.data_loader[ln]), np.mean(loss_value)))
+            self.print_log(f'\tMean {ln} '
+                           f'loss of {len(self.data_loader[ln])} '
+                           f'batches: {np.mean(loss_value)}')
             for k in self.arg.show_topk:
-                self.print_log('\tTop{}: {:.2f}%'.format(
-                    k, 100 * self.data_loader[ln].dataset.top_k(score, k)))
+                top_k = 100 * self.data_loader[ln].dataset.top_k(score, k)
+                self.print_log(f'\tTop{k}: {top_k:.2f}%')
 
             if save_score:
-                with open('{}/epoch{}_{}_score.pkl'.format(
-                        self.arg.work_dir, epoch + 1, ln), 'wb') as f:
+                s_path = f'{self.arg.work_dir}/epoch{epoch + 1}_{ln}_score.pkl'
+                with open(s_path, 'wb') as f:
                     pickle.dump(score_dict, f)
 
     def start(self):
         if self.arg.phase == 'train':
-            self.print_log('Parameters:\n{}\n'.format(str(vars(self.arg))))
+            self.print_log(f'Parameters:\n{str(vars(self.arg))}\n')
             self.global_step = self.arg.start_epoch * \
                 len(self.data_loader['train']) / self.arg.batch_size
             for epoch in range(self.arg.start_epoch, self.arg.num_epoch):
@@ -541,8 +542,9 @@ class Processor():
                     save_score=self.arg.save_score,
                     loader_name=['test'])
 
-            print('best accuracy: ', self.best_acc,
-                  ' model_name: ', self.arg.model_saved_name)
+            self.print_log(f'Best Accuracy: {self.best_acc}\n')
+            self.print_log(f'Model Name: {self.arg.model_saved_name}\n')
+            self.print_log('Done.\n')
 
         elif self.arg.phase == 'test':
             if not self.arg.test_feeder_args['debug']:
@@ -553,8 +555,8 @@ class Processor():
             if self.arg.weights is None:
                 raise ValueError('Please appoint --weights.')
             self.arg.print_log = False
-            self.print_log('Model:   {}.'.format(self.arg.model))
-            self.print_log('Weights: {}.'.format(self.arg.weights))
+            self.print_log(f'Model:   {self.arg.model}')
+            self.print_log(f'Weights: {self.arg.weights}')
             self.eval(epoch=0, save_score=self.arg.save_score,
                       loader_name=['test'], wrong_file=wf, result_file=rf)
             self.print_log('Done.\n')
@@ -588,7 +590,7 @@ if __name__ == '__main__':
         key = vars(p).keys()
         for k in default_arg.keys():
             if k not in key:
-                print('WRONG ARG: {}'.format(k))
+                print(f'WRONG ARG: {k}')
                 assert (k in key)
         parser.set_defaults(**default_arg)
 
@@ -596,3 +598,4 @@ if __name__ == '__main__':
     init_seed(0)
     processor = Processor(arg)
     processor.start()
+    print()

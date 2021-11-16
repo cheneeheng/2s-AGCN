@@ -1,5 +1,5 @@
-work_dir: ./data/ntu_result/xsub/aagcn_joint/211112130001
-model_saved_name: ./data/ntu_result/xsub/aagcn_joint/211112130001/ntu_cs_aagcn_joint
+work_dir: ./data/ntu_result/xsub/aagcn_joint/211116110001
+model_saved_name: ./data/ntu_result/xsub/aagcn_joint/211116110001/ntu_cs_aagcn_joint
 
 phase: train
 save_score: True
@@ -36,21 +36,21 @@ model_args:
   graph: graph.ntu_rgb_d.Graph
   graph_args:
     labeling_mode: 'spatial'
-weights: ./data/ntu_result/xsub/aagcn_joint/211112130001/ntu_cs_aagcn_joint-39-25040.pt
+# weights: ./data/ntu_result/xsub/aagcn_joint/211112130001/ntu_cs_aagcn_joint-39-25040.pt
 
 #optim
 # device: [0, 1 ,2, 3]
 device: [0, 1]
-batch_size: 64  #64
-test_batch_size: 64  #64
+batch_size: 64
+test_batch_size: 64
 
 optimizer: SGD
 nesterov: True
-base_lr: 0.05
+base_lr: 0.1
 step: [30, 40]
 weight_decay: 0.0001
 
-start_epoch: 40
+start_epoch: 0
 num_epoch: 50
 warm_up_epoch: 5
 

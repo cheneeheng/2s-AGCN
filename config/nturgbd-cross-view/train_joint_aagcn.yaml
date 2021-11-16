@@ -1,5 +1,5 @@
-work_dir: ./data/ntu_result/xview/aagcn_joint/211115140001
-model_saved_name: ./data/ntu_result/xview/aagcn_joint/211115140001/ntu_cv_aagcn_joint
+work_dir: ./data/ntu_result/xview/aagcn_joint/211116110001
+model_saved_name: ./data/ntu_result/xview/aagcn_joint/211116110001/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
@@ -36,6 +36,7 @@ model_args:
   graph: graph.ntu_rgb_d.Graph
   graph_args:
     labeling_mode: 'spatial'
+# weights: None 
 
 #optim
 # device: [0, 1 ,2, 3]
