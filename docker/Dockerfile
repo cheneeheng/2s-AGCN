@@ -1,6 +1,8 @@
 # For more information, please refer to https://aka.ms/vscode-docker-python
 FROM nvidia/cuda:11.1.1-cudnn8-devel-ubuntu20.04
 
+ARG UIDPORT_ARG=1000
+
 RUN apt-get update -y
 RUN apt-get install git -y
 RUN apt-get install sudo -y
@@ -29,11 +31,11 @@ RUN python -m pip install -r requirements.txt
 
 # Creates a non-root user with an explicit UID and adds permission to access the /app folder
 # For more info, please refer to https://aka.ms/vscode-docker-python-configure-containers
-RUN adduser -u 1000 --disabled-password --gecos "" chen
+RUN adduser -u $UID_ARG --disabled-password --gecos "" chen
 RUN echo "chen:chen" | chpasswd 
 RUN usermod -aG sudo chen
 USER chen
-WORKDIR /home/chen
+WORKDIR /home/chen/2s-AGCN
 
 EXPOSE 5432
 
