@@ -1,9 +1,11 @@
 import math
-
 import numpy as np
+
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
+
+from .ghostbatchnorm import GhostBatchNorm1d, GhostBatchNorm2d
 
 
 def import_class(name):
@@ -148,7 +150,8 @@ class AdaptiveGCN(nn.Module):
 # Modules
 # ------------------------------------------------------------------------------
 class TCNUnit(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=9, stride=1):
+    def __init__(self, in_channels, out_channels, kernel_size=9, stride=1,
+                 ghostbatchnorm=True):
         super().__init__()
         pad = (kernel_size - 1) // 2
         self.conv = nn.Conv2d(in_channels,
@@ -156,7 +159,10 @@ class TCNUnit(nn.Module):
                               kernel_size=(kernel_size, 1),
                               padding=(pad, 0),
                               stride=(stride, 1))
-        self.bn = nn.BatchNorm2d(out_channels)
+        if ghostbatchnorm:
+            self.bn = GhostBatchNorm2d(out_channels)
+        else:
+            self.bn = nn.BatchNorm2d(out_channels)
         conv_init(self.conv)
         bn_init(self.bn, 1)
 
@@ -168,7 +174,8 @@ class TCNUnit(nn.Module):
 
 class GCNUnit(nn.Module):
     def __init__(self, in_channels, out_channels, A, coff_embedding=4,
-                 num_subset=3, adaptive=True, attention=True):
+                 num_subset=3, adaptive=True, attention=True,
+                 ghostbatchnorm=True):
         super().__init__()
         inter_channels = out_channels // coff_embedding
         self.inter_c = inter_channels
@@ -196,14 +203,24 @@ class GCNUnit(nn.Module):
 
         # if the residual does not have the same channel dimensions.
         if in_channels != out_channels:
-            self.down = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels, 1),
-                nn.BatchNorm2d(out_channels)
-            )
+            if ghostbatchnorm:
+                self.down = nn.Sequential(
+                    nn.Conv2d(in_channels, out_channels, 1),
+                    GhostBatchNorm2d(out_channels)
+                )
+            else:
+                self.down = nn.Sequential(
+                    nn.Conv2d(in_channels, out_channels, 1),
+                    nn.BatchNorm2d(out_channels)
+                )
         else:
             self.down = lambda x: x
 
-        self.bn = nn.BatchNorm2d(out_channels)
+        if ghostbatchnorm:
+            self.bn = GhostBatchNorm2d(out_channels)
+        else:
+            self.bn = nn.BatchNorm2d(out_channels)
+
         self.relu = nn.ReLU(inplace=True)
 
         for m in self.modules():
@@ -232,11 +249,14 @@ class GCNUnit(nn.Module):
 
 class TCNGCNUnit(nn.Module):
     def __init__(self, in_channels, out_channels, A, stride=1,
-                 residual=True, adaptive=True, attention=True):
+                 residual=True, adaptive=True, attention=True,
+                 ghostbatchnorm=True):
         super().__init__()
         self.gcn1 = GCNUnit(in_channels, out_channels, A,
-                            adaptive=adaptive, attention=attention)
-        self.tcn1 = TCNUnit(out_channels, out_channels, stride=stride)
+                            adaptive=adaptive, attention=attention,
+                            ghostbatchnorm=ghostbatchnorm)
+        self.tcn1 = TCNUnit(out_channels, out_channels, stride=stride,
+                            ghostbatchnorm=ghostbatchnorm)
         self.relu = nn.ReLU(inplace=True)
 
         if not residual:
@@ -247,8 +267,9 @@ class TCNGCNUnit(nn.Module):
 
         else:
             # if the residual does not have the same channel dimensions.
-            self.residual = TCNUnit(
-                in_channels, out_channels, kernel_size=1, stride=stride)
+            self.residual = TCNUnit(in_channels, out_channels,
+                                    kernel_size=1, stride=stride,
+                                    ghostbatchnorm=ghostbatchnorm)
 
     def forward(self, x):
         y = self.relu(self.tcn1(self.gcn1(x)) + self.residual(x))
@@ -261,7 +282,8 @@ class TCNGCNUnit(nn.Module):
 class Model(nn.Module):
     def __init__(self, num_class=60, num_point=25, num_person=2,
                  graph=None, graph_args=dict(), in_channels=3,
-                 drop_out=0, adaptive=True, attention=True):
+                 drop_out=0, adaptive=True, attention=True,
+                 ghostbatchnorm=True):
         super().__init__()
 
         if graph is None:
@@ -273,11 +295,15 @@ class Model(nn.Module):
         A = self.graph.A
         self.num_class = num_class
 
-        self.data_bn = nn.BatchNorm1d(num_person * in_channels * num_point)
+        if ghostbatchnorm:
+            self.data_bn = GhostBatchNorm1d(num_person*in_channels*num_point)
+        else:
+            self.data_bn = nn.BatchNorm1d(num_person*in_channels*num_point)
 
         def _TCNGCNUnit(_in, _out, stride=1, residual=True):
             return TCNGCNUnit(_in, _out, A, stride=stride, residual=residual,
-                              adaptive=adaptive, attention=attention)
+                              adaptive=adaptive, attention=attention,
+                              ghostbatchnorm=ghostbatchnorm)
 
         self.l1 = _TCNGCNUnit(3, 64, residual=False)
         self.l2 = _TCNGCNUnit(64, 64)

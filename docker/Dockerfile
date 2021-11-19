@@ -1,7 +1,7 @@
 # For more information, please refer to https://aka.ms/vscode-docker-python
 FROM nvidia/cuda:11.1.1-cudnn8-devel-ubuntu20.04
 
-ARG UIDPORT_ARG=1000
+ARG UID_ARG=1000
 
 RUN apt-get update -y
 RUN apt-get install git -y
