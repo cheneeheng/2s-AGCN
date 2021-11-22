@@ -29,6 +29,8 @@ WORKDIR /code
 COPY docker/requirements.txt /code/
 RUN python -m pip install -r requirements.txt
 
+ln -s /usr/bin/python3 /usr/bin/python3-chen
+
 # Creates a non-root user with an explicit UID and adds permission to access the /app folder
 # For more info, please refer to https://aka.ms/vscode-docker-python-configure-containers
 RUN adduser -u $UID_ARG --disabled-password --gecos "" chen
