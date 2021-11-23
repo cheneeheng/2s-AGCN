@@ -267,6 +267,7 @@ class TCNGCNUnit(nn.Module):
 
         else:
             # if the residual does not have the same channel dimensions.
+            # if stride > 1
             self.residual = TCNUnit(in_channels, out_channels,
                                     kernel_size=1, stride=stride,
                                     ghostbatchnorm=ghostbatchnorm)
