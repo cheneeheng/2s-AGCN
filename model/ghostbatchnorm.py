@@ -1,7 +1,5 @@
 import torch
 
-NUM_SPLITS = 32
-
 
 class BatchNorm1d(torch.nn.BatchNorm1d):
     def __init__(self, num_features, eps=1e-05, momentum=0.1,
@@ -17,7 +15,7 @@ class BatchNorm1d(torch.nn.BatchNorm1d):
 
 
 class GhostBatchNorm1d(BatchNorm1d):
-    def __init__(self, num_features, num_splits=NUM_SPLITS, **kw):
+    def __init__(self, num_features, num_splits=16, **kw):
         super().__init__(num_features, **kw)
         self.num_splits = num_splits
         self.register_buffer('running_mean', torch.zeros(
@@ -76,7 +74,7 @@ class BatchNorm2d(torch.nn.BatchNorm2d):
 
 
 class GhostBatchNorm2d(BatchNorm2d):
-    def __init__(self, num_features, num_splits=NUM_SPLITS, **kw):
+    def __init__(self, num_features, num_splits=16, **kw):
         super().__init__(num_features, **kw)
         self.num_splits = num_splits
         self.register_buffer('running_mean', torch.zeros(

@@ -151,7 +151,7 @@ class AdaptiveGCN(nn.Module):
 # ------------------------------------------------------------------------------
 class TCNUnit(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=9, stride=1,
-                 ghostbatchnorm=True):
+                 gbn_split=None):
         super().__init__()
         pad = (kernel_size - 1) // 2
         self.conv = nn.Conv2d(in_channels,
@@ -159,10 +159,11 @@ class TCNUnit(nn.Module):
                               kernel_size=(kernel_size, 1),
                               padding=(pad, 0),
                               stride=(stride, 1))
-        if ghostbatchnorm:
-            self.bn = GhostBatchNorm2d(out_channels)
-        else:
+        if gbn_split is None:
             self.bn = nn.BatchNorm2d(out_channels)
+        else:
+            self.bn = GhostBatchNorm2d(out_channels, gbn_split)
+
         conv_init(self.conv)
         bn_init(self.bn, 1)
 
@@ -175,7 +176,7 @@ class TCNUnit(nn.Module):
 class GCNUnit(nn.Module):
     def __init__(self, in_channels, out_channels, A, coff_embedding=4,
                  num_subset=3, adaptive=True, attention=True,
-                 ghostbatchnorm=True):
+                 gbn_split=None):
         super().__init__()
         inter_channels = out_channels // coff_embedding
         self.inter_c = inter_channels
@@ -203,23 +204,23 @@ class GCNUnit(nn.Module):
 
         # if the residual does not have the same channel dimensions.
         if in_channels != out_channels:
-            if ghostbatchnorm:
-                self.down = nn.Sequential(
-                    nn.Conv2d(in_channels, out_channels, 1),
-                    GhostBatchNorm2d(out_channels)
-                )
-            else:
+            if gbn_split is None:
                 self.down = nn.Sequential(
                     nn.Conv2d(in_channels, out_channels, 1),
                     nn.BatchNorm2d(out_channels)
                 )
+            else:
+                self.down = nn.Sequential(
+                    nn.Conv2d(in_channels, out_channels, 1),
+                    GhostBatchNorm2d(out_channels)
+                )
         else:
             self.down = lambda x: x
 
-        if ghostbatchnorm:
-            self.bn = GhostBatchNorm2d(out_channels)
-        else:
+        if gbn_split is None:
             self.bn = nn.BatchNorm2d(out_channels)
+        else:
+            self.bn = GhostBatchNorm2d(out_channels)
 
         self.relu = nn.ReLU(inplace=True)
 
@@ -250,13 +251,13 @@ class GCNUnit(nn.Module):
 class TCNGCNUnit(nn.Module):
     def __init__(self, in_channels, out_channels, A, stride=1,
                  residual=True, adaptive=True, attention=True,
-                 ghostbatchnorm=True):
+                 gbn_split=None):
         super().__init__()
         self.gcn1 = GCNUnit(in_channels, out_channels, A,
                             adaptive=adaptive, attention=attention,
-                            ghostbatchnorm=ghostbatchnorm)
+                            gbn_split=gbn_split)
         self.tcn1 = TCNUnit(out_channels, out_channels, stride=stride,
-                            ghostbatchnorm=ghostbatchnorm)
+                            gbn_split=gbn_split)
         self.relu = nn.ReLU(inplace=True)
 
         if not residual:
@@ -270,7 +271,7 @@ class TCNGCNUnit(nn.Module):
             # if stride > 1
             self.residual = TCNUnit(in_channels, out_channels,
                                     kernel_size=1, stride=stride,
-                                    ghostbatchnorm=ghostbatchnorm)
+                                    gbn_split=gbn_split)
 
     def forward(self, x):
         y = self.relu(self.tcn1(self.gcn1(x)) + self.residual(x))
@@ -284,7 +285,7 @@ class Model(nn.Module):
     def __init__(self, num_class=60, num_point=25, num_person=2,
                  graph=None, graph_args=dict(), in_channels=3,
                  drop_out=0, adaptive=True, attention=True,
-                 ghostbatchnorm=True):
+                 gbn_split=None):
         super().__init__()
 
         if graph is None:
@@ -296,15 +297,16 @@ class Model(nn.Module):
         A = self.graph.A
         self.num_class = num_class
 
-        if ghostbatchnorm:
-            self.data_bn = GhostBatchNorm1d(num_person*in_channels*num_point)
-        else:
+        if gbn_split is None:
             self.data_bn = nn.BatchNorm1d(num_person*in_channels*num_point)
+        else:
+            self.data_bn = GhostBatchNorm1d(
+                num_person*in_channels*num_point, gbn_split)
 
         def _TCNGCNUnit(_in, _out, stride=1, residual=True):
             return TCNGCNUnit(_in, _out, A, stride=stride, residual=residual,
                               adaptive=adaptive, attention=attention,
-                              ghostbatchnorm=ghostbatchnorm)
+                              gbn_split=gbn_split)
 
         self.l1 = _TCNGCNUnit(3, 64, residual=False)
         self.l2 = _TCNGCNUnit(64, 64)
