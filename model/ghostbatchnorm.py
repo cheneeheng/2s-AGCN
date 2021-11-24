@@ -119,8 +119,16 @@ class GhostBatchNorm2d(BatchNorm2d):
                 eps=self.eps)
 
 
+def bn_init(bn, scale):
+    torch.nn.init.constant_(bn.weight, scale)
+    torch.nn.init.constant_(bn.bias, 0)
+
+
 if __name__ == '__main__':
     gbn1 = GhostBatchNorm1d(10)
     gbn2 = GhostBatchNorm2d(10)
     assert isinstance(gbn1, torch.nn.BatchNorm1d)
     assert isinstance(gbn2, torch.nn.BatchNorm2d)
+
+    bn_init(gbn2, 10.1)
+    print(gbn2.weight.data)

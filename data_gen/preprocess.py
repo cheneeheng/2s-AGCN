@@ -1,16 +1,17 @@
-import sys
-
-sys.path.extend(['../'])
-from data_gen.rotation import *
+from .rotation import *
 from tqdm import tqdm
 
 
-def pre_normalization(data, zaxis=[0, 1], xaxis=[8, 4]):
+def pre_normalization(data, zaxis=[0, 1], xaxis=[8, 4], verbose=False):
     N, C, T, V, M = data.shape
     s = np.transpose(data, [0, 4, 2, 3, 1])  # N, C, T, V, M  to  N, M, T, V, C
 
-    print('pad the null frames with the previous frames')
-    for i_s, skeleton in enumerate(tqdm(s)):  # pad
+    if verbose:
+        print('pad the null frames with the previous frames')
+        s_list = tqdm(s)
+    else:
+        s_list = s
+    for i_s, skeleton in enumerate(s_list):  # pad
         if skeleton.sum() == 0:
             print(i_s, ' has no skeleton')
         for i_p, person in enumerate(skeleton):
@@ -26,12 +27,16 @@ def pre_normalization(data, zaxis=[0, 1], xaxis=[8, 4]):
                     if person[i_f:].sum() == 0:
                         rest = len(person) - i_f
                         num = int(np.ceil(rest / i_f))
-                        pad = np.concatenate([person[0:i_f] for _ in range(num)], 0)[:rest]
+                        pad = np.concatenate([person[0:i_f] for _ in range(num)], 0)[:rest]  # noqa
                         s[i_s, i_p, i_f:] = pad
                         break
 
-    print('sub the center joint #1 (spine joint in ntu and neck joint in kinetics)')
-    for i_s, skeleton in enumerate(tqdm(s)):
+    if verbose:
+        print('sub the center joint #1 (spine joint in ntu and neck joint in kinetics)')  # noqa
+        s_list = tqdm(s)
+    else:
+        s_list = s
+    for i_s, skeleton in enumerate(s_list):
         if skeleton.sum() == 0:
             continue
         main_body_center = skeleton[0][:, 1:2, :].copy()
@@ -41,8 +46,12 @@ def pre_normalization(data, zaxis=[0, 1], xaxis=[8, 4]):
             mask = (person.sum(-1) != 0).reshape(T, V, 1)
             s[i_s, i_p] = (s[i_s, i_p] - main_body_center) * mask
 
-    print('parallel the bone between hip(jpt 0) and spine(jpt 1) of the first person to the z axis')
-    for i_s, skeleton in enumerate(tqdm(s)):
+    if verbose:
+        print('parallel the bone between hip(jpt 0) and spine(jpt 1) of the first person to the z axis')  # noqa
+        s_list = tqdm(s)
+    else:
+        s_list = s
+    for i_s, skeleton in enumerate(s_list):
         if skeleton.sum() == 0:
             continue
         joint_bottom = skeleton[0, 0, zaxis[0]]
@@ -59,9 +68,12 @@ def pre_normalization(data, zaxis=[0, 1], xaxis=[8, 4]):
                 for i_j, joint in enumerate(frame):
                     s[i_s, i_p, i_f, i_j] = np.dot(matrix_z, joint)
 
-    print(
-        'parallel the bone between right shoulder(jpt 8) and left shoulder(jpt 4) of the first person to the x axis')
-    for i_s, skeleton in enumerate(tqdm(s)):
+    if verbose:
+        print('parallel the bone between right shoulder(jpt 8) and left shoulder(jpt 4) of the first person to the x axis')  # noqa
+        s_list = tqdm(s)
+    else:
+        s_list = s
+    for i_s, skeleton in enumerate(s_list):
         if skeleton.sum() == 0:
             continue
         joint_rshoulder = skeleton[0, 0, xaxis[0]]
@@ -78,7 +90,7 @@ def pre_normalization(data, zaxis=[0, 1], xaxis=[8, 4]):
                 for i_j, joint in enumerate(frame):
                     s[i_s, i_p, i_f, i_j] = np.dot(matrix_x, joint)
 
-    data = np.transpose(s, [0, 4, 2, 3, 1])
+    data = np.transpose(s, [0, 4, 2, 3, 1])  # N, M, T, V, C to N, C, T, V, M
     return data
 
 

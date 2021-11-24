@@ -169,7 +169,8 @@ class TCNUnit(nn.Module):
 
     def forward(self, x):
         # relu is done after residual.
-        x = self.bn(self.conv(x))
+        x = self.conv(x)
+        x = self.bn(x)
         return x
 
 
@@ -236,8 +237,7 @@ class GCNUnit(nn.Module):
     def forward(self, x):
         y = self.agcn(x)
 
-        y = self.bn(y)
-        y += self.down(x)
+        y = self.bn(y) + self.down(x)
         y = self.relu(y)
 
         if self.attention:
@@ -330,10 +330,10 @@ class Model(nn.Module):
     def forward(self, x):
         N, C, T, V, M = x.size()
 
-        x = x.permute(0, 4, 3, 1, 2).contiguous()
+        x = x.permute(0, 4, 3, 1, 2).contiguous()  # n,m,v,c,t
         x = x.view(N, -1, T)
         x = self.data_bn(x)
-        x = x.view(N, M, V, C, T).permute(0, 1, 3, 4, 2).contiguous()
+        x = x.view(N, M, V, C, T).permute(0, 1, 3, 4, 2).contiguous()  # n,m,c,t,v
         x = x.view(-1, C, T, V)
 
         x = self.l1(x)

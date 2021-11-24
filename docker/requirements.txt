@@ -1,39 +1,28 @@
-# To ensure app dependencies are ported from your virtual environment/host machine into your container, run 'pip freeze > requirements.txt' in the terminal to overwrite this file
-
-PyQt5
-
-numpy
-pillow
-pandas
-openpyxl
-matplotlib
-tqdm
-tables
-
-ipython
-ipykernel
-ipympl
-
-nbformat
-
-configobj
-
-sklearn
-
-natsort
-plotly
-seaborn
-joblib
+# To ensure app dependencies are ported from your virtual 
+# environment/host machine into your container, 
+# run 'pip freeze > requirements.txt' in the terminal to overwrite this file
 
 pylint
 pep8
 autopep8
 pycodestyle
 
-cython
-
-networkx
-
 PyYAML
 tensorboardX
 tensorboard
+networkx
+
+numpy
+tqdm
+matplotlib
+plotly
+pandas
+
+# pillow
+# opencv-python
+
+# sklearn
+
+# ipython
+# ipykernel
+# ipympl

@@ -29,6 +29,9 @@ WORKDIR /code
 COPY docker/requirements.txt /code/
 RUN python -m pip install -r requirements.txt
 
+RUN apt-get install python3-tk -y
+
+# python name link.
 RUN ln -s /usr/bin/python3 /usr/bin/python3-chen
 
 # Creates a non-root user with an explicit UID and adds permission to access the /app folder
