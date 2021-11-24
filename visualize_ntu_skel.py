@@ -38,10 +38,7 @@ JOINT_COLOR = [
 ]
 
 
-def draw_skeleton(data, pause_sec=10, action=""):
-
-    data[0, :, :, :] *= -1
-    data[2, :, :, :] *= -1
+def _plot_skel(p, i):
 
     # Determine which nodes are connected as bones according
     #  to NTU skeleton structure
@@ -56,113 +53,141 @@ def draw_skeleton(data, pause_sec=10, action=""):
     leftfeet = np.array([16, 15]) - 1
     body = np.array([4, 3, 21, 2, 1]) - 1  # body
 
-    def _plot_skel(p, i):
-        return [
-            # Bones
-            go.Scatter3d(
-                x=p[0, i, body, 0],
-                y=p[1, i, body, 0],
-                z=p[2, i, body, 0],
-                mode='lines',
-                line=dict(
-                    width=5,
-                    color=f'rgb{JOINT_COLOR[body[0]]}',
-                ),
+    return [
+        # Bones
+        go.Scatter3d(
+            x=p[0, i, body, 0],
+            y=p[1, i, body, 0],
+            z=p[2, i, body, 0],
+            mode='lines',
+            line=dict(
+                width=5,
+                color=f'rgb{JOINT_COLOR[body[0]]}',
             ),
-            go.Scatter3d(
-                x=p[0, i, rightarm, 0],
-                y=p[1, i, rightarm, 0],
-                z=p[2, i, rightarm, 0],
-                mode='lines',
-                line=dict(
-                    width=5,
-                    color=f'rgb{JOINT_COLOR[rightarm[0]]}',
-                ),
+        ),
+        go.Scatter3d(
+            x=p[0, i, rightarm, 0],
+            y=p[1, i, rightarm, 0],
+            z=p[2, i, rightarm, 0],
+            mode='lines',
+            line=dict(
+                width=5,
+                color=f'rgb{JOINT_COLOR[rightarm[0]]}',
             ),
-            go.Scatter3d(
-                x=p[0, i, leftarm, 0],
-                y=p[1, i, leftarm, 0],
-                z=p[2, i, leftarm, 0],
-                mode='lines',
-                line=dict(
-                    width=5,
-                    color=f'rgb{JOINT_COLOR[leftarm[0]]}',
-                ),
+        ),
+        go.Scatter3d(
+            x=p[0, i, leftarm, 0],
+            y=p[1, i, leftarm, 0],
+            z=p[2, i, leftarm, 0],
+            mode='lines',
+            line=dict(
+                width=5,
+                color=f'rgb{JOINT_COLOR[leftarm[0]]}',
             ),
-            go.Scatter3d(
-                x=p[0, i, righthand, 0],
-                y=p[1, i, righthand, 0],
-                z=p[2, i, righthand, 0],
-                mode='lines',
-                line=dict(
-                    width=5,
-                    color=f'rgb{JOINT_COLOR[righthand[0]]}',
-                ),
+        ),
+        go.Scatter3d(
+            x=p[0, i, righthand, 0],
+            y=p[1, i, righthand, 0],
+            z=p[2, i, righthand, 0],
+            mode='lines',
+            line=dict(
+                width=5,
+                color=f'rgb{JOINT_COLOR[righthand[0]]}',
             ),
-            go.Scatter3d(
-                x=p[0, i, lefthand, 0],
-                y=p[1, i, lefthand, 0],
-                z=p[2, i, lefthand, 0],
-                mode='lines',
-                line=dict(
-                    width=5,
-                    color=f'rgb{JOINT_COLOR[lefthand[0]]}',
-                ),
+        ),
+        go.Scatter3d(
+            x=p[0, i, lefthand, 0],
+            y=p[1, i, lefthand, 0],
+            z=p[2, i, lefthand, 0],
+            mode='lines',
+            line=dict(
+                width=5,
+                color=f'rgb{JOINT_COLOR[lefthand[0]]}',
             ),
-            go.Scatter3d(
-                x=p[0, i, rightleg, 0],
-                y=p[1, i, rightleg, 0],
-                z=p[2, i, rightleg, 0],
-                mode='lines',
-                line=dict(
-                    width=5,
-                    color=f'rgb{JOINT_COLOR[rightleg[0]]}',
-                ),
+        ),
+        go.Scatter3d(
+            x=p[0, i, rightleg, 0],
+            y=p[1, i, rightleg, 0],
+            z=p[2, i, rightleg, 0],
+            mode='lines',
+            line=dict(
+                width=5,
+                color=f'rgb{JOINT_COLOR[rightleg[0]]}',
             ),
-            go.Scatter3d(
-                x=p[0, i, leftleg, 0],
-                y=p[1, i, leftleg, 0],
-                z=p[2, i, leftleg, 0],
-                mode='lines',
-                line=dict(
-                    width=5,
-                    color=f'rgb{JOINT_COLOR[leftleg[0]]}',
-                ),
+        ),
+        go.Scatter3d(
+            x=p[0, i, leftleg, 0],
+            y=p[1, i, leftleg, 0],
+            z=p[2, i, leftleg, 0],
+            mode='lines',
+            line=dict(
+                width=5,
+                color=f'rgb{JOINT_COLOR[leftleg[0]]}',
             ),
-            go.Scatter3d(
-                x=p[0, i, rightfeet, 0],
-                y=p[1, i, rightfeet, 0],
-                z=p[2, i, rightfeet, 0],
-                mode='lines',
-                line=dict(
-                    width=5,
-                    color=f'rgb{JOINT_COLOR[rightfeet[0]]}',
-                ),
+        ),
+        go.Scatter3d(
+            x=p[0, i, rightfeet, 0],
+            y=p[1, i, rightfeet, 0],
+            z=p[2, i, rightfeet, 0],
+            mode='lines',
+            line=dict(
+                width=5,
+                color=f'rgb{JOINT_COLOR[rightfeet[0]]}',
             ),
-            go.Scatter3d(
-                x=p[0, i, leftfeet, 0],
-                y=p[1, i, leftfeet, 0],
-                z=p[2, i, leftfeet, 0],
-                mode='lines',
-                line=dict(
-                    width=5,
-                    color=f'rgb{JOINT_COLOR[leftfeet[0]]}',
-                ),
+        ),
+        go.Scatter3d(
+            x=p[0, i, leftfeet, 0],
+            y=p[1, i, leftfeet, 0],
+            z=p[2, i, leftfeet, 0],
+            mode='lines',
+            line=dict(
+                width=5,
+                color=f'rgb{JOINT_COLOR[leftfeet[0]]}',
             ),
-            # Joints
-            go.Scatter3d(
-                x=p[0, i, :, 0],
-                y=p[1, i, :, 0],
-                z=p[2, i, :, 0],
-                mode='markers',
-                marker=dict(
-                    size=5,
-                    color=[f'rgb{c}' for c in JOINT_COLOR],
-                    # colorscale='Viridis',   # choose a colorscale
-                    opacity=0.8
-                )
-            ),
-        ]
+        ),
+        # Joints
+        go.Scatter3d(
+            x=p[0, i, :, 0],
+            y=p[1, i, :, 0],
+            z=p[2, i, :, 0],
+            mode='markers',
+            marker=dict(
+                size=5,
+                color=[f'rgb{c}' for c in JOINT_COLOR],
+                # colorscale='Viridis',   # choose a colorscale
+                opacity=0.8
+            )
+        ),
+    ]
+
+
+def draw_single_skeleton(data, i, pause_sec=10, action=""):
+
+    camera = dict(
+        up=dict(x=0, y=1, z=0),
+        center=dict(x=0, y=0, z=0),
+        eye=dict(x=0, y=0, z=3.0)
+    )
+
+
+    fig = go.Figure(data=_plot_skel(data, i))
+
+    fig.update_layout(scene_camera=camera,
+                      autosize=False,
+                      showlegend=False,
+                      width=600,
+                      height=600,
+                      margin=dict(l=0, r=0, b=0, t=0),
+                      yaxis=dict(range=[-1, 1]),
+                      xaxis=dict(range=[-1, 1]))
+
+    return fig
+
+
+def draw_skeleton(data, pause_sec=10, action=""):
+
+    data[0, :, :, :] *= -1
+    data[2, :, :, :] *= -1
 
     camera = dict(
         up=dict(x=0, y=1, z=0),
