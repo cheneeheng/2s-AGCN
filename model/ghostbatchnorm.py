@@ -25,6 +25,7 @@ class GhostBatchNorm1d(BatchNorm1d):
 
     def train(self, mode=True):
         # lazily collate stats when we are going to use them
+        # This calculates the mean + var when the model.eval() is called.
         if (self.training is True) and (mode is False):
             self.running_mean = torch.mean(
                 self.running_mean.view(self.num_splits, self.num_features),
@@ -77,10 +78,10 @@ class GhostBatchNorm2d(BatchNorm2d):
     def __init__(self, num_features, num_splits=16, **kw):
         super().__init__(num_features, **kw)
         self.num_splits = num_splits
-        self.register_buffer('running_mean', torch.zeros(
-            num_features*self.num_splits))
-        self.register_buffer('running_var', torch.ones(
-            num_features*self.num_splits))
+        self.register_buffer('running_mean',
+                             torch.zeros(num_features*self.num_splits))
+        self.register_buffer('running_var',
+                             torch.ones(num_features*self.num_splits))
 
     def train(self, mode=True):
         # lazily collate stats when we are going to use them

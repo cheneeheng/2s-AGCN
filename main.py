@@ -277,7 +277,7 @@ class Processor():
 
             try:
                 self.model.load_state_dict(weights)
-            except:
+            except:  # noqa
                 state = self.model.state_dict()
                 diff = list(set(state.keys()).difference(set(weights.keys())))
                 print('Can not find these weights:')
