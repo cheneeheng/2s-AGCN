@@ -112,6 +112,7 @@ if __name__ == '__main__':
     with open(os.path.join(arg.model_path, 'index_to_name.json'), 'r') as f:
         MAPPING = {int(i): j for i, j in json.load(f).items()}
 
+    os.makedirs(arg.out_folder, exist_ok=True)
     output_file = os.path.join(
         arg.out_folder, datetime.now().strftime("%y%m%d%H%M%S") + '.txt')
 
