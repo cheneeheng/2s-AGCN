@@ -208,7 +208,7 @@ if __name__ == '__main__':
         output_file = os.path.join(output_dir, skel_file)
         with open(output_file, 'w+') as f:
             output_str = ",".join([str(logit) for logit in logits])
-            output_str = f'{skel_fol}/{skel_file},{pred},{output_str}\n'
+            output_str = f'{pred},{output_str}\n'
             f.write(output_str)
 
         if arg.timing:
