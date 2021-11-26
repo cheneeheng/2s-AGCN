@@ -95,10 +95,13 @@ if __name__ == '__main__':
 
     parser = get_parser()
     parser.add_argument(
+        '--timing',
+        default=False)
+    parser.add_argument(
         '--gpu',
         default=False)
     parser.add_argument(
-        '--inference_interval',
+        '--interval',
         default=30)
     parser.add_argument(
         '--data_path',
@@ -142,20 +145,24 @@ if __name__ == '__main__':
         # infer if
         # a. more than interval.
         # b. a valid skeleton is available.
-        if time.time() - start <= arg.inference_interval:
+        if time.time() - start <= arg.interval:
             continue
         else:
             if infer_flag:
                 start = time.time()
                 infer_flag = False
 
-        skel_path = os.path.join(skel_dir, sorted(os.listdir(skel_dir))[-1])
+        skel_file = sorted(os.listdir(skel_dir))[-1]
+        skel_path = os.path.join(skel_dir, skel_file)
 
         if skel_path == skel_path_mem:
             continue
         else:
             skel_path_mem = skel_path
             infer_flag = True
+
+        if arg.timing:
+            start_time = time.time()
 
         # 1. Read raw frames. --------------------------------------------------
         # M, T, V, C
@@ -172,3 +179,9 @@ if __name__ == '__main__':
         with open(output_file, 'a+') as f:
             output_str = ",".join([str(logit) for logit in logits])
             print(f'{prediction},{output_str}', file=f)
+
+        if arg.timing:
+            end_time = time.time() - start_time
+            print(f"Processed : {skel_file} in {end_time:.4f}s")
+        else:
+            print(f"Processed : {skel_file}")
