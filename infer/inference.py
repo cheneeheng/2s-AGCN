@@ -96,21 +96,27 @@ if __name__ == '__main__':
     parser = get_parser()
     parser.add_argument(
         '--timing',
+        type=bool,
         default=False)
     parser.add_argument(
         '--gpu',
+        type=bool,
         default=False)
     parser.add_argument(
         '--interval',
-        default=30)
+        type=int,
+        default=0)
     parser.add_argument(
         '--data_path',
+        type=str,
         default='/data/openpose/skeleton/')
     parser.add_argument(
         '--model_path',
+        type=str,
         default='/data/2s-agcn/model/211116110001/')
     parser.add_argument(
         '--out_folder',
+        type=str,
         default='/data/2s-agcn/prediction/211116110001/')
 
     # load arg form config file ------------------------------------------------
@@ -145,7 +151,7 @@ if __name__ == '__main__':
         # infer if
         # a. more than interval.
         # b. a valid skeleton is available.
-        if time.time() - start <= arg.interval:
+        if time.time() - start <= int(arg.interval):
             continue
         else:
             if infer_flag:
