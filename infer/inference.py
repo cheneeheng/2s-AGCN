@@ -95,6 +95,9 @@ if __name__ == '__main__':
 
     parser = get_parser()
     parser.add_argument(
+        '--gpu',
+        default=False)
+    parser.add_argument(
         '--inference_interval',
         default=30)
     parser.add_argument(
@@ -124,12 +127,16 @@ if __name__ == '__main__':
 
     # Prepare model ------------------------------------------------------------
     AAGCN = prepare_model(arg)
+    if arg.gpu:
+        AAGCN = AAGCN.cuda(0)
+    print("Model loaded...")
 
     # MAIN LOOP ----------------------------------------------------------------
     start = time.time()
     skel_path_mem = None
     infer_flag = False
 
+    print("Start loop...")
     while True:
 
         # infer if

@@ -49,6 +49,8 @@ RUN usermod -aG sudo ${UNAME_ARG}
 USER ${UNAME_ARG}
 WORKDIR /code/2s-AGCN
 
+ENV PYTHONPATH=/code/2s-AGCN
+
 EXPOSE 5432
 
 # During debugging, this entry point will be overridden. For more information, please refer to https://aka.ms/vscode-docker-python-debug
