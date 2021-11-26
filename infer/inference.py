@@ -96,27 +96,46 @@ if __name__ == '__main__':
 
     parser = get_parser()
     parser.add_argument(
-        '--timing',
-        type=bool,
-        default=False)
+        '--max-frame',
+        type=int,
+        default=max_frame)
+    parser.add_argument(
+        '--max-num-skeleton-true',
+        type=int,
+        default=max_body_true)
+    parser.add_argument(
+        '--max-num-skeleton',
+        type=int,
+        default=max_body_kinect)
+    parser.add_argument(
+        '--num-joint',
+        type=int,
+        default=num_joint)
+
     parser.add_argument(
         '--gpu',
+        type=bool,
+        default=False)
+
+    parser.add_argument(
+        '--timing',
         type=bool,
         default=False)
     parser.add_argument(
         '--interval',
         type=int,
         default=0)
+
     parser.add_argument(
-        '--data_path',
+        '--data-path',
         type=str,
         default='/data/openpose/skeleton/')
     parser.add_argument(
-        '--model_path',
+        '--model-path',
         type=str,
         default='/data/2s-agcn/model/211116110001/')
     parser.add_argument(
-        '--out_folder',
+        '--out-folder',
         type=str,
         default='/data/2s-agcn/prediction/211116110001/')
 
@@ -125,15 +144,14 @@ if __name__ == '__main__':
     with open(os.path.join(arg.model_path, 'index_to_name.json'), 'r') as f:
         MAPPING = {int(i): j for i, j in json.load(f).items()}
 
-    os.makedirs(arg.out_folder, exist_ok=True)
-    output_file = os.path.join(
-        arg.out_folder, datetime.now().strftime("%y%m%d%H%M%S") + '.txt')
-
     skel_fol = sorted(os.listdir(arg.data_path))[-1]
     skel_dir = os.path.join(arg.data_path, skel_fol)
 
+    output_dir = os.path.join(arg.out_folder, skel_fol)
+    os.makedirs(output_dir, exist_ok=True)
+
     # Data processor -----------------------------------------------------------
-    DataProc = DataPreprocessor(num_joint, max_frame)
+    DataProc = DataPreprocessor(arg.num_joint, arg.max_frame)
 
     # Prepare model ------------------------------------------------------------
     AAGCN = prepare_model(arg)
@@ -144,7 +162,7 @@ if __name__ == '__main__':
     append_data_and_predict_fn = partial(append_data_and_predict,
                                          preprocessor=DataProc,
                                          model=AAGCN,
-                                         num_skels=max_body_true)
+                                         num_skels=arg.max_num_skeleton_true)
 
     # MAIN LOOP ----------------------------------------------------------------
     start = time.time()
@@ -179,18 +197,19 @@ if __name__ == '__main__':
         # 1. Read raw frames. --------------------------------------------------
         # M, T, V, C
         data = read_xyz(skel_path,
-                        max_body=max_body_kinect,
-                        num_joint=num_joint)
+                        max_body=arg.max_num_skeleton,
+                        num_joint=arg.num_joint)
 
         # 2. Batch frames to fixed length. -------------------------------------
         # 3. Normalization. ----------------------------------------------------
         # 4. Inference. --------------------------------------------------------
         logits, pred = append_data_and_predict_fn(data=data)
 
-        with open(output_file, 'a+') as f:
+        output_file = os.path.join(output_dir, skel_file)
+        with open(output_file, 'w+') as f:
             output_str = ",".join([str(logit) for logit in logits])
-            output_str = f'{skel_fol}/{skel_file[:-4]},{pred},{output_str}'
-            print(output_str, file=f)
+            output_str = f'{skel_fol}/{skel_file},{pred},{output_str}\n'
+            f.write(output_str)
 
         if arg.timing:
             end_time = time.time() - start_time

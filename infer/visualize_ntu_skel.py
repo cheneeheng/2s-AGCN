@@ -38,7 +38,7 @@ JOINT_COLOR = [
 ]
 
 
-def _plot_skel(p, i):
+def _plot_skel(p, f, m=0):
 
     # Determine which nodes are connected as bones according
     #  to NTU skeleton structure
@@ -56,9 +56,9 @@ def _plot_skel(p, i):
     return [
         # Bones
         go.Scatter3d(
-            x=p[0, i, body, 0],
-            y=p[1, i, body, 0],
-            z=p[2, i, body, 0],
+            x=p[0, f, body, m],
+            y=p[1, f, body, m],
+            z=p[2, f, body, m],
             mode='lines',
             line=dict(
                 width=5,
@@ -66,9 +66,9 @@ def _plot_skel(p, i):
             ),
         ),
         go.Scatter3d(
-            x=p[0, i, rightarm, 0],
-            y=p[1, i, rightarm, 0],
-            z=p[2, i, rightarm, 0],
+            x=p[0, f, rightarm, m],
+            y=p[1, f, rightarm, m],
+            z=p[2, f, rightarm, m],
             mode='lines',
             line=dict(
                 width=5,
@@ -76,9 +76,9 @@ def _plot_skel(p, i):
             ),
         ),
         go.Scatter3d(
-            x=p[0, i, leftarm, 0],
-            y=p[1, i, leftarm, 0],
-            z=p[2, i, leftarm, 0],
+            x=p[0, f, leftarm, m],
+            y=p[1, f, leftarm, m],
+            z=p[2, f, leftarm, m],
             mode='lines',
             line=dict(
                 width=5,
@@ -86,9 +86,9 @@ def _plot_skel(p, i):
             ),
         ),
         go.Scatter3d(
-            x=p[0, i, righthand, 0],
-            y=p[1, i, righthand, 0],
-            z=p[2, i, righthand, 0],
+            x=p[0, f, righthand, m],
+            y=p[1, f, righthand, m],
+            z=p[2, f, righthand, m],
             mode='lines',
             line=dict(
                 width=5,
@@ -96,9 +96,9 @@ def _plot_skel(p, i):
             ),
         ),
         go.Scatter3d(
-            x=p[0, i, lefthand, 0],
-            y=p[1, i, lefthand, 0],
-            z=p[2, i, lefthand, 0],
+            x=p[0, f, lefthand, m],
+            y=p[1, f, lefthand, m],
+            z=p[2, f, lefthand, m],
             mode='lines',
             line=dict(
                 width=5,
@@ -106,9 +106,9 @@ def _plot_skel(p, i):
             ),
         ),
         go.Scatter3d(
-            x=p[0, i, rightleg, 0],
-            y=p[1, i, rightleg, 0],
-            z=p[2, i, rightleg, 0],
+            x=p[0, f, rightleg, m],
+            y=p[1, f, rightleg, m],
+            z=p[2, f, rightleg, m],
             mode='lines',
             line=dict(
                 width=5,
@@ -116,9 +116,9 @@ def _plot_skel(p, i):
             ),
         ),
         go.Scatter3d(
-            x=p[0, i, leftleg, 0],
-            y=p[1, i, leftleg, 0],
-            z=p[2, i, leftleg, 0],
+            x=p[0, f, leftleg, m],
+            y=p[1, f, leftleg, m],
+            z=p[2, f, leftleg, m],
             mode='lines',
             line=dict(
                 width=5,
@@ -126,9 +126,9 @@ def _plot_skel(p, i):
             ),
         ),
         go.Scatter3d(
-            x=p[0, i, rightfeet, 0],
-            y=p[1, i, rightfeet, 0],
-            z=p[2, i, rightfeet, 0],
+            x=p[0, f, rightfeet, m],
+            y=p[1, f, rightfeet, m],
+            z=p[2, f, rightfeet, m],
             mode='lines',
             line=dict(
                 width=5,
@@ -136,9 +136,9 @@ def _plot_skel(p, i):
             ),
         ),
         go.Scatter3d(
-            x=p[0, i, leftfeet, 0],
-            y=p[1, i, leftfeet, 0],
-            z=p[2, i, leftfeet, 0],
+            x=p[0, f, leftfeet, m],
+            y=p[1, f, leftfeet, m],
+            z=p[2, f, leftfeet, m],
             mode='lines',
             line=dict(
                 width=5,
@@ -147,9 +147,9 @@ def _plot_skel(p, i):
         ),
         # Joints
         go.Scatter3d(
-            x=p[0, i, :, 0],
-            y=p[1, i, :, 0],
-            z=p[2, i, :, 0],
+            x=p[0, f, :, m],
+            y=p[1, f, :, m],
+            z=p[2, f, :, m],
             mode='markers',
             marker=dict(
                 size=5,
@@ -161,7 +161,7 @@ def _plot_skel(p, i):
     ]
 
 
-def draw_single_skeleton(data, i, pause_sec=10, action=""):
+def draw_single_skeleton(data, f, pause_sec=10, action=""):
 
     camera = dict(
         up=dict(x=0, y=1, z=0),
@@ -169,8 +169,7 @@ def draw_single_skeleton(data, i, pause_sec=10, action=""):
         eye=dict(x=0, y=0, z=3.0)
     )
 
-
-    fig = go.Figure(data=_plot_skel(data, i))
+    fig = go.Figure(data=_plot_skel(data, f))
 
     fig.update_layout(scene_camera=camera,
                       autosize=False,
@@ -195,8 +194,8 @@ def draw_skeleton(data, pause_sec=10, action=""):
         eye=dict(x=1.25, y=1.25, z=2.25)
     )
 
-    i = 0
-    fig = go.Figure(_plot_skel(data, i))
+    f = 0
+    fig = go.Figure(_plot_skel(data, f))
     fig.update_layout(scene_camera=camera,
                       showlegend=False,
                       margin=dict(l=0, r=0, b=0, t=0),
@@ -204,8 +203,8 @@ def draw_skeleton(data, pause_sec=10, action=""):
                       xaxis=dict(range=[-1, 1]))
     fig.show()
 
-    for i in range(1, 50):
-        fig.update(data=_plot_skel(data, i))
+    for f in range(1, 50):
+        fig.update(data=_plot_skel(data, f))
         fig.update_layout(scene_camera=camera,
                           showlegend=False,
                           margin=dict(l=0, r=0, b=0, t=0),
