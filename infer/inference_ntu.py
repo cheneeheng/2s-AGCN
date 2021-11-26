@@ -1,14 +1,14 @@
-import argparse
 import json
 import os
 import numpy as np
 import torch
-import yaml
 import time
+
+from tqdm import tqdm
+from typing import Tuple
 
 from data_gen.ntu_gendata import (
     read_skeleton_filter,
-    get_nonzero_std,
     training_cameras,
     training_subjects,
     max_frame,
@@ -16,18 +16,17 @@ from data_gen.ntu_gendata import (
     max_body_kinect,
     num_joint
 )
-from data_gen.preprocess import pre_normalization
 
-from main import get_parser, import_class, init_seed
-
-from inference import DataPreprocessor, prepare_model, arg_parser
+from data_preprocess import DataPreprocessor
+from inference import prepare_model, arg_parser, append_data_and_predict
+from main import get_parser, init_seed
 
 
 def get_datasplit_and_labels(
         data_path: str,
         ignored_sample_path: str = None,
         benchmark: str = 'xview',
-        part: str = 'eval'):
+        part: str = 'eval') -> Tuple[list, list]:
 
     if ignored_sample_path is not None:
         with open(ignored_sample_path, 'r') as f:
@@ -39,7 +38,7 @@ def get_datasplit_and_labels(
 
     sample_name = []
     sample_label = []
-    for filename in os.listdir(data_path):
+    for filename in tqdm(sorted(os.listdir(data_path))):
         if filename in ignored_samples:
             continue
         action_class = int(
@@ -83,6 +82,79 @@ def read_xyz(file, max_body=4, num_joint=25):
     return data  # M, T, V, C
 
 
+def evaluate_sequence(data: np.ndarray,
+                      preprocessor: DataPreprocessor,
+                      model: torch.nn.Module,
+                      sample_label: int = 0) -> Tuple[list, list]:
+
+    logits_list = []
+    prediction_list = []
+
+    preprocessor.clear_data_array()
+
+    start = time.time()
+
+    # 1. Read raw frames. ------------------------------------------------------
+    # Loop through the sequence.
+    # Each sequence will be gradually added into the data processor.
+    # This mimics the real setting where the frame is
+    # continously fed into the system.
+    for i in range(data.shape[1]):
+
+        data_i = data[:, i:i+1, :, :]
+
+        # draw_skeleton(
+        #     data=np.transpose(data_i, [3, 1, 2, 0]),
+        #     action=MAPPING[sample_label+1]
+        # )
+
+        # 2. Batch frames to fixed length. -------------------------------------
+        # 3. Normalization. ----------------------------------------------------
+        # 4. Inference. --------------------------------------------------------
+        logits, prediction, = append_data_and_predict(
+            data_i, preprocessor, model, max_body_true)
+
+        if i % 10 == 0:
+            t = f"{(time.time() - start)/10:04.2f}s"
+            pred = f"{prediction}"
+            targ = f"{sample_label}"
+            print(f"{i:03d} :: {targ} :: {pred} :: {t}")
+            start = time.time()
+
+        # print(output.numpy().tolist())
+        # print(f"{sample_label} :: {predict_label.item()}")
+
+        # 5. View sequence + predicted action + GT action. ---------------------
+        logits_list.append(logits)
+        prediction_list.append(prediction)
+
+    return logits_list, prediction_list
+
+
+def evaluate_recordings(sample_names: list,
+                        sample_labels: list,
+                        preprocessor: DataPreprocessor,
+                        model: torch.nn.Module,) -> None:
+    """ Loop through the recorded sequences. Each sequence is in a file.
+
+    Args:
+        sample_names (list): path names, each name is a sequence.
+        sample_labels (list): labels
+    """
+    # Loop through the recorded sequences.
+    # Each sequence is in a file.
+    for sample_name, sample_label in zip(sample_names, sample_labels):
+        print(f"Processing : {sample_name}")
+
+        # M, T, V, C
+        data = read_xyz(file=sample_name,
+                        max_body=max_body_kinect,
+                        num_joint=num_joint)
+
+        logits_list, prediction_list = evaluate_sequence(
+            data, preprocessor, model, sample_label)
+
+
 if __name__ == '__main__':
     init_seed(0)
 
@@ -115,6 +187,7 @@ if __name__ == '__main__':
 
     # Prepare model ------------------------------------------------------------
     AAGCN = prepare_model(arg)
+    AAGCN = AAGCN.cuda(0)
 
     # Loop data ----------------------------------------------------------------
     for b in ['xsub', 'xview']:
@@ -130,56 +203,7 @@ if __name__ == '__main__':
                 arg.ignored_sample_path,
                 benchmark=b,
                 part=p)
+            sample_names = [os.path.join(arg.data_path, sample_name)
+                            for sample_name in sample_names]
 
-            # Loop through the recorded sequences.
-            # Each sequence is in a file.
-            for sample_name, sample_label in zip(sample_names, sample_labels):
-                print(f"Processing : {sample_name}")
-
-                # M, T, V, C
-                data = read_xyz(os.path.join(arg.data_path, sample_name),
-                                max_body=max_body_kinect,
-                                num_joint=num_joint)
-
-                DataProc.clear_data_array()
-
-                start = time.time()
-
-                # 1. Read raw frames. ------------------------------------------
-                # Loop through the sequence.
-                # Each sequence will be gradually added into the data processor.
-                # This mimics the real setting where the frame is
-                # continously fed into the system.
-                for i in range(data.shape[1]):
-
-                    # 2. Batch frames to fixed length.
-                    DataProc.append_data(data[:, i:i+1, :, :])
-
-                    # draw_skeleton(
-                    #     data=np.transpose(data[:, i:i+1, :, :], [3, 1, 2, 0]),
-                    #     action=MAPPING[sample_label+1]
-                    # )
-
-                    # 3. Normalization.
-                    input_data = DataProc.select_skeletons_and_normalize_data(
-                        max_body_true)
-
-                    # N, C, T, V, M
-                    input_data = np.transpose(input_data, [0, 4, 2, 3, 1])
-
-                    # 4. Inference.
-                    with torch.no_grad():
-                        output = AAGCN(torch.Tensor(input_data))
-                        _, predict_label = torch.max(output, 1)
-
-                    if i % 10 == 0:
-                        t = f"{(time.time() - start)/10:04.2f}s"
-                        pred = f"{predict_label.item()}"
-                        targ = f"{sample_label}"
-                        print(f"{i:03d} :: {targ} :: {pred} :: {t}")
-                        start = time.time()
-
-                    # print(output.numpy().tolist())
-                    # print(f"{sample_label} :: {predict_label.item()}")
-
-                    # 5. View sequence + predicted action + GT action.
+            evaluate_recordings(sample_names, sample_labels, DataProc, AAGCN)

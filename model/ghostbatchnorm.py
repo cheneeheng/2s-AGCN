@@ -23,10 +23,41 @@ class GhostBatchNorm1d(BatchNorm1d):
         self.register_buffer('running_var', torch.ones(
             num_features*self.num_splits))
 
-    def train(self, mode=True):
-        # lazily collate stats when we are going to use them
-        # This calculates the mean + var when the model.eval() is called.
-        if (self.training is True) and (mode is False):
+    # def train(self, mode=True):
+    #     # lazily collate stats when we are going to use them
+    #     # This calculates the mean + var when the model.eval() is called.
+    #     if (self.training is True) and (mode is False):
+    #         self.running_mean = torch.mean(
+    #             self.running_mean.view(self.num_splits, self.num_features),
+    #             dim=0
+    #         ).repeat(self.num_splits)
+    #         self.running_var = torch.mean(
+    #             self.running_var.view(self.num_splits, self.num_features),
+    #             dim=0
+    #         ).repeat(self.num_splits)
+    #     return super().train(mode)
+
+    def forward(self, input):
+        N, C, K = input.shape
+        if self.training or not self.track_running_stats:
+            # return torch.nn.functional.batch_norm(
+            #     input.view(-1, C*self.num_splits, K),
+            #     running_mean=self.running_mean,
+            #     running_var=self.running_var,
+            #     weight=self.weight.repeat(self.num_splits),
+            #     bias=self.bias.repeat(self.num_splits),
+            #     training=True,
+            #     momentum=self.momentum,
+            #     eps=self.eps).view(N, C, K)
+            bn = torch.nn.functional.batch_norm(
+                input.view(-1, C*self.num_splits, K),
+                running_mean=self.running_mean,
+                running_var=self.running_var,
+                weight=self.weight.repeat(self.num_splits),
+                bias=self.bias.repeat(self.num_splits),
+                training=True,
+                momentum=self.momentum,
+                eps=self.eps)
             self.running_mean = torch.mean(
                 self.running_mean.view(self.num_splits, self.num_features),
                 dim=0
@@ -35,20 +66,7 @@ class GhostBatchNorm1d(BatchNorm1d):
                 self.running_var.view(self.num_splits, self.num_features),
                 dim=0
             ).repeat(self.num_splits)
-        return super().train(mode)
-
-    def forward(self, input):
-        N, C, K = input.shape
-        if self.training or not self.track_running_stats:
-            return torch.nn.functional.batch_norm(
-                input.view(-1, C*self.num_splits, K),
-                running_mean=self.running_mean,
-                running_var=self.running_var,
-                weight=self.weight.repeat(self.num_splits),
-                bias=self.bias.repeat(self.num_splits),
-                training=True,
-                momentum=self.momentum,
-                eps=self.eps).view(N, C, K)
+            return bn.view(N, C, K)
         else:
             return torch.nn.functional.batch_norm(
                 input,
@@ -83,9 +101,40 @@ class GhostBatchNorm2d(BatchNorm2d):
         self.register_buffer('running_var',
                              torch.ones(num_features*self.num_splits))
 
-    def train(self, mode=True):
-        # lazily collate stats when we are going to use them
-        if (self.training is True) and (mode is False):
+    # def train(self, mode=True):
+    #     # lazily collate stats when we are going to use them
+    #     if (self.training is True) and (mode is False):
+    #         self.running_mean = torch.mean(
+    #             self.running_mean.view(self.num_splits, self.num_features),
+    #             dim=0
+    #         ).repeat(self.num_splits)
+    #         self.running_var = torch.mean(
+    #             self.running_var.view(self.num_splits, self.num_features),
+    #             dim=0
+    #         ).repeat(self.num_splits)
+    #     return super().train(mode)
+
+    def forward(self, input):
+        N, C, H, W = input.shape
+        if self.training or not self.track_running_stats:
+            # return torch.nn.functional.batch_norm(
+            #     input.view(-1, C*self.num_splits, H, W),
+            #     running_mean=self.running_mean,
+            #     running_var=self.running_var,
+            #     weight=self.weight.repeat(self.num_splits),
+            #     bias=self.bias.repeat(self.num_splits),
+            #     training=True,
+            #     momentum=self.momentum,
+            #     eps=self.eps).view(N, C, H, W)
+            bn = torch.nn.functional.batch_norm(
+                input.view(-1, C*self.num_splits, H, W),
+                running_mean=self.running_mean,
+                running_var=self.running_var,
+                weight=self.weight.repeat(self.num_splits),
+                bias=self.bias.repeat(self.num_splits),
+                training=True,
+                momentum=self.momentum,
+                eps=self.eps)
             self.running_mean = torch.mean(
                 self.running_mean.view(self.num_splits, self.num_features),
                 dim=0
@@ -94,20 +143,7 @@ class GhostBatchNorm2d(BatchNorm2d):
                 self.running_var.view(self.num_splits, self.num_features),
                 dim=0
             ).repeat(self.num_splits)
-        return super().train(mode)
-
-    def forward(self, input):
-        N, C, H, W = input.shape
-        if self.training or not self.track_running_stats:
-            return torch.nn.functional.batch_norm(
-                input.view(-1, C*self.num_splits, H, W),
-                running_mean=self.running_mean,
-                running_var=self.running_var,
-                weight=self.weight.repeat(self.num_splits),
-                bias=self.bias.repeat(self.num_splits),
-                training=True,
-                momentum=self.momentum,
-                eps=self.eps).view(N, C, H, W)
+            return bn.view(N, C, H, W)
         else:
             return torch.nn.functional.batch_norm(
                 input,

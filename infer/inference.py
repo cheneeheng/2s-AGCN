@@ -1,26 +1,37 @@
-import argparse
 import json
-import os
 import numpy as np
+import os
+import time
 import torch
 import yaml
-import time
+
 from datetime import datetime
+from typing import Tuple
 
 from data_gen.ntu_gendata import (
-    get_nonzero_std,
-    training_cameras,
-    training_subjects,
     max_frame,
     max_body_true,
     max_body_kinect,
     num_joint
 )
-from data_gen.preprocess import pre_normalization
 
+from data_preprocess import DataPreprocessor
 from main import get_parser, import_class, init_seed
 
-from visualize_ntu_skel import draw_skeleton
+
+def arg_parser(parser):
+    p = parser.parse_args()
+    with open(os.path.join(p.model_path, 'config.yaml'), 'r') as f:
+        default_arg = yaml.safe_load(f)
+    key = vars(p).keys()
+    for k in default_arg.keys():
+        if k not in key:
+            print(f'WRONG ARG: {k}')
+            assert (k in key)
+    parser.set_defaults(**default_arg)
+    arg = parser.parse_args()
+
+    return arg
 
 
 def read_xyz(file, max_body=4, num_joint=25):
@@ -37,64 +48,6 @@ def read_xyz(file, max_body=4, num_joint=25):
     return data  # M, T, V, C
 
 
-class DataPreprocessor(object):
-
-    def __init__(self, num_joint=25, max_seq_length=300) -> None:
-        super().__init__()
-        self.num_joint = num_joint
-        self.max_seq_length = max_seq_length
-        self.data = None
-        self.data_counter = 0
-        self.clear_data_array()
-
-    def clear_data_array(self) -> None:
-        """
-        Creates an empty/zero array of size (M,T,V,C).
-        We assume that the input data can have up to 4 possible skeletons ids.
-        """
-        self.data = np.zeros((4,
-                              self.max_seq_length,
-                              self.num_joint,
-                              3),
-                             dtype=np.float32)
-        self.data_counter = 0
-
-    def append_data(self, data: np.ndarray) -> None:
-        """Append data.
-
-        Args:
-            data (np.ndarray): (M, 1, V, C)
-        """
-        if self.data_counter < self.max_seq_length:
-            self.data[:, self.data_counter:self.data_counter+1, :, :] = data
-            self.data_counter += 1
-        else:
-            self.data[:, 1:, :, :] = self.data[:, 0:-2, :, :]
-            self.data[:, -2:, :, :] = data
-
-    def select_skeletons(self, num_skels: int = 2) -> np.ndarray:
-        """Select the `num_skels` most active skeletons. """
-        # select two max energy body
-        energy = np.array([get_nonzero_std(x) for x in self.data])
-        index = energy.argsort()[::-1][0:num_skels]
-        return self.data[index]  # m', T, V, C
-
-    def normalize_data(self, data: np.ndarray) -> None:
-        if data.ndim < 4 or data.ndim > 5:
-            raise ValueError("Dimension not supported...")
-        if data.ndim == 4:
-            data = np.expand_dims(data, axis=0)
-        data = np.transpose(data, [0, 4, 2, 3, 1])  # N, C, T, V, M
-        data = pre_normalization(data)
-        data = np.transpose(data, [0, 4, 2, 3, 1])  # N, M, T, V, C
-        return data
-
-    def select_skeletons_and_normalize_data(self,
-                                            num_skels: int = 2) -> np.ndarray:
-        data = self.select_skeletons(num_skels=num_skels)
-        return self.normalize_data(data)
-
-
 def prepare_model(arg):
     Model = import_class(arg.model)
     AAGCN = Model(**arg.model_args)
@@ -106,19 +59,34 @@ def prepare_model(arg):
     return AAGCN
 
 
-def arg_parser(parser):
-    p = parser.parse_args()
-    with open(os.path.join(p.model_path, 'config.yaml'), 'r') as f:
-        default_arg = yaml.safe_load(f)
-    key = vars(p).keys()
-    for k in default_arg.keys():
-        if k not in key:
-            print(f'WRONG ARG: {k}')
-            assert (k in key)
-    parser.set_defaults(**default_arg)
-    arg = parser.parse_args()
+def append_data_and_predict(data: np.ndarray,
+                            preprocessor: DataPreprocessor,
+                            model: torch.nn.Module,
+                            num_skels: int) -> Tuple[list, int]:
+    """
+    Args:
+        data (np.ndarray): (M, 1, V, C)
+    """
+    # 1. Batch frames to fixed length.
+    preprocessor.append_data(data)
 
-    return arg
+    # 2. Normalization.
+    input_data = preprocessor.select_skeletons_and_normalize_data(num_skels)
+    input_data = np.transpose(input_data, [0, 4, 2, 3, 1])  # N, C, T, V, M
+
+    # 3. Inference.
+    with torch.no_grad():
+        if next(model.parameters()).is_cuda:
+            output = model(torch.Tensor(input_data).cuda(0))
+            _, predict_label = torch.max(output, 1)
+            output = output.data.cpu()
+            predict_label = predict_label.data.cpu()
+
+        else:
+            output = model(torch.Tensor(input_data))
+            _, predict_label = torch.max(output, 1)
+
+    return output.tolist(), predict_label.item()
 
 
 if __name__ == '__main__':
@@ -188,20 +156,11 @@ if __name__ == '__main__':
                         num_joint=num_joint)
 
         # 2. Batch frames to fixed length. -------------------------------------
-        DataProc.append_data(data)
-
-        # 3. Normalization.
-        input_data = DataProc.select_skeletons_and_normalize_data(
-            max_body_true)
-
-        # N, C, T, V, M
-        input_data = np.transpose(input_data, [0, 4, 2, 3, 1])
-
-        # 4. Inference.
-        with torch.no_grad():
-            output = AAGCN(torch.Tensor(input_data))
-            _, predict_label = torch.max(output, 1)
+        # 3. Normalization. ----------------------------------------------------
+        # 4. Inference. --------------------------------------------------------
+        logits, prediction, = append_data_and_predict(
+            data, DataProc, AAGCN, max_body_true)
 
         with open(output_file, 'a+') as f:
-            output_str = ",".join([str(pred) for pred in output.tolist()])
-            print(f'{predict_label.item()},{output_str}', file=f)
+            output_str = ",".join([str(logit) for logit in logits])
+            print(f'{prediction},{output_str}', file=f)

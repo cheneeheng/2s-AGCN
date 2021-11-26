@@ -1,5 +1,5 @@
-work_dir: ./data/ntu_result/xview/aagcn_joint/211119173001_gbn32
-model_saved_name: ./data/ntu_result/xview/aagcn_joint/211119173001_gbn32/ntu_cv_aagcn_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_joint/211126210001_gbn2
+model_saved_name: ./data/data/ntu_result/xview/aagcn_joint/211126210001_gbn2/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
@@ -14,8 +14,8 @@ print_log: true
 feeder: feeders.feeder.Feeder
 num_worker: 32
 train_feeder_args:
-  data_path: ./data/ntu/xview/train_data_joint.npy
-  label_path: ./data/ntu/xview/train_label.pkl
+  data_path: ./data/data/ntu/xview/train_data_joint.npy
+  label_path: ./data/data/ntu/xview/train_label.pkl
   debug: False
   random_choose: False
   random_shift: False
@@ -24,8 +24,8 @@ train_feeder_args:
   normalization: False
 
 test_feeder_args:
-  data_path: ./data/ntu/xview/val_data_joint.npy
-  label_path: ./data/ntu/xview/val_label.pkl
+  data_path: ./data/data/ntu/xview/val_data_joint.npy
+  label_path: ./data/data/ntu/xview/val_label.pkl
 
 # model
 model: model.aagcn.Model
@@ -33,6 +33,7 @@ model_args:
   num_class: 60
   num_point: 25
   num_person: 2
+  gbn_split: 2
   graph: graph.ntu_rgb_d.Graph
   graph_args:
     labeling_mode: 'spatial'
