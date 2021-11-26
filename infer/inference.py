@@ -6,6 +6,7 @@ import torch
 import yaml
 
 from datetime import datetime
+from functools import partial
 from typing import Tuple
 
 from data_gen.ntu_gendata import (
@@ -128,8 +129,8 @@ if __name__ == '__main__':
     output_file = os.path.join(
         arg.out_folder, datetime.now().strftime("%y%m%d%H%M%S") + '.txt')
 
-    skel_dir = os.path.join(arg.data_path,
-                            sorted(os.listdir(arg.data_path))[-1])
+    skel_fol = sorted(os.listdir(arg.data_path))[-1]
+    skel_dir = os.path.join(arg.data_path, skel_fol)
 
     # Data processor -----------------------------------------------------------
     DataProc = DataPreprocessor(num_joint, max_frame)
@@ -139,6 +140,11 @@ if __name__ == '__main__':
     if arg.gpu:
         AAGCN = AAGCN.cuda(0)
     print("Model loaded...")
+
+    append_data_and_predict_fn = partial(append_data_and_predict,
+                                         preprocessor=DataProc,
+                                         model=AAGCN,
+                                         num_skels=max_body_true)
 
     # MAIN LOOP ----------------------------------------------------------------
     start = time.time()
@@ -179,12 +185,12 @@ if __name__ == '__main__':
         # 2. Batch frames to fixed length. -------------------------------------
         # 3. Normalization. ----------------------------------------------------
         # 4. Inference. --------------------------------------------------------
-        logits, prediction, = append_data_and_predict(
-            data, DataProc, AAGCN, max_body_true)
+        logits, pred = append_data_and_predict_fn(data=data)
 
         with open(output_file, 'a+') as f:
             output_str = ",".join([str(logit) for logit in logits])
-            print(f'{prediction},{output_str}', file=f)
+            output_str = f'{skel_fol}/{skel_file[:-4]},{pred},{output_str}'
+            print(output_str, file=f)
 
         if arg.timing:
             end_time = time.time() - start_time
