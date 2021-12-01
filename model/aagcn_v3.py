@@ -42,7 +42,7 @@ def bn_init(bn, scale):
 # Blocks
 # ------------------------------------------------------------------------------
 class SpatialAttention(nn.Module):
-    def __init__(self, in_channels, out_channels=1, kernel_size=9):
+    def __init__(self, in_channels, out_channels=1, kernel_size=9, stride=1):
         super().__init__()
         pad = (kernel_size - 1) // 2
         self.conv_sa = nn.Conv1d(in_channels, out_channels, kernel_size,
@@ -124,9 +124,11 @@ class AdaptiveGCN(nn.Module):
         self.alpha = nn.Parameter(torch.zeros(1))  # G
         self.conv_a = nn.ModuleList()
         self.conv_b = nn.ModuleList()
+        self.conv_c = nn.ModuleList()
         for _ in range(self.num_subset):
             self.conv_a.append(nn.Conv2d(in_channels, out_channels, 1))
             self.conv_b.append(nn.Conv2d(in_channels, out_channels, 1))
+            self.conv_c.append(nn.Conv2d(in_channels, in_channels, 1))
         self.soft = nn.Softmax(-2)
         self.conv_d = conv_d
 
@@ -136,11 +138,13 @@ class AdaptiveGCN(nn.Module):
         A = self.PA  # Bk
         for i in range(self.num_subset):
             A1 = self.conv_a[i](x).permute(0, 3, 1, 2).contiguous()
-            A1 = A1.view(N, V, -1)
-            A2 = self.conv_b[i](x).view(N, -1, V)
+            A2 = self.conv_b[i](x)
+            A3 = self.conv_c[i](x)
+            A1 = A1.view(N, V, -1)  # N V C'T (theta)
+            A2 = A2.view(N, -1, V)  # N C'T V (phi)
+            A3 = A3.view(N, -1, V)  # N CT V
             A1 = self.soft(torch.matmul(A1, A2) / A1.size(-1))  # N V V
             A1 = A[i] + A1 * self.alpha
-            A3 = x.view(N, -1, V)
             z = self.conv_d[i](torch.matmul(A3, A1).view(N, C, T, V))
             y = z + y if y is not None else z
         return y
@@ -281,7 +285,7 @@ class TCNGCNUnit(nn.Module):
 
 # ------------------------------------------------------------------------------
 # Network
-# - A does not depend on predefined A matrix.
+# - Added additional projection in the GCN.
 # ------------------------------------------------------------------------------
 class Model(nn.Module):
     def __init__(self, num_class=60, num_point=25, num_person=2,
@@ -290,15 +294,13 @@ class Model(nn.Module):
                  gbn_split=None):
         super().__init__()
 
-        # if graph is None:
-        #     raise ValueError()
-        # else:
-        #     Graph = import_class(graph)
-        #     self.graph = Graph(**graph_args)
+        if graph is None:
+            raise ValueError()
+        else:
+            Graph = import_class(graph)
+            self.graph = Graph(**graph_args)
 
-        # A = self.graph.A
-
-        A = np.ones((num_subset, num_point, num_point))
+        A = self.graph.A
         self.num_class = num_class
 
         if gbn_split is None:

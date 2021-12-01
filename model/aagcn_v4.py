@@ -42,7 +42,7 @@ def bn_init(bn, scale):
 # Blocks
 # ------------------------------------------------------------------------------
 class SpatialAttention(nn.Module):
-    def __init__(self, in_channels, out_channels=1, kernel_size=9):
+    def __init__(self, in_channels, out_channels=1, kernel_size=9, stride=1):
         super().__init__()
         pad = (kernel_size - 1) // 2
         self.conv_sa = nn.Conv1d(in_channels, out_channels, kernel_size,
@@ -117,16 +117,38 @@ class NonAdaptiveGCN(nn.Module):
 
 
 class AdaptiveGCN(nn.Module):
-    def __init__(self, in_channels, out_channels, A, conv_d, num_subset=3):
+    def __init__(self,
+                 in_channels,
+                 out_channels,
+                 A,
+                 conv_d,
+                 kernel_sizes=[1],
+                 stride=1,
+                 dilations=[1],
+                 num_subset=3):
         super().__init__()
+        assert len(kernel_sizes) == len(dilations)
+        self.num_t_subset = len(kernel_sizes)
         self.num_subset = num_subset
         self.PA = nn.Parameter(torch.from_numpy(A.astype(np.float32)))  # Bk
         self.alpha = nn.Parameter(torch.zeros(1))  # G
         self.conv_a = nn.ModuleList()
         self.conv_b = nn.ModuleList()
-        for _ in range(self.num_subset):
-            self.conv_a.append(nn.Conv2d(in_channels, out_channels, 1))
-            self.conv_b.append(nn.Conv2d(in_channels, out_channels, 1))
+        for kernel_size, dilation in zip(kernel_sizes, dilations):
+            pad = (kernel_size - 1) // 2
+            for _ in range(self.num_subset):
+                self.conv_a.append(nn.Conv2d(in_channels,
+                                             out_channels,
+                                             kernel_size=(kernel_size, 1),
+                                             padding=(pad, 0),
+                                             stride=(stride, 1),
+                                             dilation=(dilation, 1)))
+                self.conv_b.append(nn.Conv2d(in_channels,
+                                             out_channels,
+                                             kernel_size=(kernel_size, 1),
+                                             padding=(pad, 0),
+                                             stride=(stride, 1),
+                                             dilation=(dilation, 1)))
         self.soft = nn.Softmax(-2)
         self.conv_d = conv_d
 
@@ -134,15 +156,17 @@ class AdaptiveGCN(nn.Module):
         y = None
         N, C, T, V = x.size()
         A = self.PA  # Bk
-        for i in range(self.num_subset):
-            A1 = self.conv_a[i](x).permute(0, 3, 1, 2).contiguous()
-            A1 = A1.view(N, V, -1)
-            A2 = self.conv_b[i](x).view(N, -1, V)
-            A1 = self.soft(torch.matmul(A1, A2) / A1.size(-1))  # N V V
-            A1 = A[i] + A1 * self.alpha
-            A3 = x.view(N, -1, V)
-            z = self.conv_d[i](torch.matmul(A3, A1).view(N, C, T, V))
-            y = z + y if y is not None else z
+        for j in range(self.num_t_subset):
+            for i in range(self.num_subset):
+                idx = j * self.num_subset + i
+                A1 = self.conv_a[idx](x).permute(0, 3, 1, 2).contiguous()
+                A1 = A1.view(N, V, -1)  # N V CT (theta)
+                A2 = self.conv_b[idx](x).view(N, -1, V)  # N CT V (phi)
+                A1 = self.soft(torch.matmul(A1, A2) / A1.size(-1))  # N V V
+                A1 = A[i] + A1 * self.alpha
+                A3 = x.view(N, -1, V)
+                z = self.conv_d[idx](torch.matmul(A3, A1).view(N, C, T, V))
+                y = z + y if y is not None else z
         return y
 
 
@@ -150,7 +174,11 @@ class AdaptiveGCN(nn.Module):
 # Modules
 # ------------------------------------------------------------------------------
 class TCNUnit(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=9, stride=1,
+    def __init__(self,
+                 in_channels,
+                 out_channels,
+                 kernel_size=9,
+                 stride=1,
                  gbn_split=None):
         super().__init__()
         pad = (kernel_size - 1) // 2
@@ -175,8 +203,17 @@ class TCNUnit(nn.Module):
 
 
 class GCNUnit(nn.Module):
-    def __init__(self, in_channels, out_channels, A, coff_embedding=4,
-                 num_subset=3, adaptive=True, attention=True,
+    def __init__(self,
+                 in_channels,
+                 out_channels,
+                 A,
+                 kernel_sizes=[1],
+                 stride=1,
+                 dilations=[1],
+                 coff_embedding=4,
+                 num_subset=3,
+                 adaptive=True,
+                 attention=True,
                  gbn_split=None):
         super().__init__()
         inter_channels = out_channels // coff_embedding
@@ -187,12 +224,19 @@ class GCNUnit(nn.Module):
         num_jpts = A.shape[-1]
 
         self.conv_d = nn.ModuleList()
-        for i in range(self.num_subset):
-            self.conv_d.append(nn.Conv2d(in_channels, out_channels, 1))
+        for _ in range(len(kernel_sizes)):
+            for _ in range(self.num_subset):
+                self.conv_d.append(nn.Conv2d(in_channels, out_channels, 1))
 
         if adaptive:
-            self.agcn = AdaptiveGCN(
-                in_channels, inter_channels, A, self.conv_d, num_subset)
+            self.agcn = AdaptiveGCN(in_channels,
+                                    inter_channels,
+                                    A,
+                                    self.conv_d,
+                                    kernel_sizes,
+                                    stride,
+                                    dilations,
+                                    num_subset)
         else:
             self.agcn = NonAdaptiveGCN(A, self.conv_d, num_subset)
 
@@ -249,15 +293,30 @@ class GCNUnit(nn.Module):
 
 
 class TCNGCNUnit(nn.Module):
-    def __init__(self, in_channels, out_channels, A, num_subset=3, stride=1,
-                 residual=True, adaptive=True, attention=True,
+    def __init__(self,
+                 in_channels,
+                 out_channels,
+                 A,
+                 kernel_sizes=[1],
+                 stride=1,
+                 dilations=[1],
+                 coff_embedding=4,
+                 num_subset=3,
+                 residual=True,
+                 adaptive=True,
+                 attention=True,
                  gbn_split=None):
         super().__init__()
-        self.gcn1 = GCNUnit(in_channels, out_channels, A,
+        self.gcn1 = GCNUnit(in_channels,
+                            out_channels,
+                            A,
+                            kernel_sizes=kernel_sizes,
+                            stride=stride,
+                            dilations=dilations,
+                            coff_embedding=coff_embedding,
                             num_subset=num_subset,
-                            adaptive=adaptive, attention=attention,
-                            gbn_split=gbn_split)
-        self.tcn1 = TCNUnit(out_channels, out_channels, stride=stride,
+                            adaptive=adaptive,
+                            attention=attention,
                             gbn_split=gbn_split)
         self.relu = nn.ReLU(inplace=True)
 
@@ -275,30 +334,40 @@ class TCNGCNUnit(nn.Module):
                                     gbn_split=gbn_split)
 
     def forward(self, x):
-        y = self.relu(self.tcn1(self.gcn1(x)) + self.residual(x))
+        y = self.relu(self.gcn1(x) + self.residual(x))
         return y
 
 
 # ------------------------------------------------------------------------------
 # Network
-# - A does not depend on predefined A matrix.
+# - Merged TCN into GCN.
+# - Create different sets of subsets.
+# - Each set will have different kernel size in temporal dim. (1,3,6,9)
 # ------------------------------------------------------------------------------
 class Model(nn.Module):
-    def __init__(self, num_class=60, num_point=25, num_person=2,
-                 num_subset=3, graph=None, graph_args=dict(), in_channels=3,
-                 drop_out=0, adaptive=True, attention=True,
+    def __init__(self,
+                 num_class=60,
+                 num_point=25,
+                 num_person=2,
+                 num_subset=3,
+                 graph=None,
+                 graph_args=dict(),
+                 in_channels=3,
+                 drop_out=0,
+                 kernel_sizes=[1],
+                 dilations=[1],
+                 adaptive=True,
+                 attention=True,
                  gbn_split=None):
         super().__init__()
 
-        # if graph is None:
-        #     raise ValueError()
-        # else:
-        #     Graph = import_class(graph)
-        #     self.graph = Graph(**graph_args)
+        if graph is None:
+            raise ValueError()
+        else:
+            Graph = import_class(graph)
+            self.graph = Graph(**graph_args)
 
-        # A = self.graph.A
-
-        A = np.ones((num_subset, num_point, num_point))
+        A = self.graph.A
         self.num_class = num_class
 
         if gbn_split is None:
@@ -307,10 +376,20 @@ class Model(nn.Module):
             self.data_bn = GhostBatchNorm1d(
                 num_person*in_channels*num_point, gbn_split)
 
+        # kernel_sizes = [1, 3, 5, 7, 9]
+        # dilations = [1, 1, 1, 1, 1]
+
         def _TCNGCNUnit(_in, _out, stride=1, residual=True):
-            return TCNGCNUnit(_in, _out, A, num_subset=num_subset,
-                              stride=stride, residual=residual,
-                              adaptive=adaptive, attention=attention,
+            return TCNGCNUnit(_in,
+                              _out,
+                              A,
+                              kernel_sizes=kernel_sizes,
+                              stride=stride,
+                              dilations=dilations,
+                              num_subset=num_subset,
+                              residual=residual,
+                              adaptive=adaptive,
+                              attention=attention,
                               gbn_split=gbn_split)
 
         self.l1 = _TCNGCNUnit(3, 64, residual=False)

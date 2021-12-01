@@ -136,8 +136,8 @@ class AdaptiveGCN(nn.Module):
         A = self.PA  # Bk
         for i in range(self.num_subset):
             A1 = self.conv_a[i](x).permute(0, 3, 1, 2).contiguous()
-            A1 = A1.view(N, V, -1)
-            A2 = self.conv_b[i](x).view(N, -1, V)
+            A1 = A1.view(N, V, -1)  # N V CT (theta)
+            A2 = self.conv_b[i](x).view(N, -1, V)  # N CT V (phi)
             A1 = self.soft(torch.matmul(A1, A2) / A1.size(-1))  # N V V
             A1 = A[i] + A1 * self.alpha
             A3 = x.view(N, -1, V)
@@ -356,8 +356,3 @@ class Model(nn.Module):
         x = self.drop_out(x)
 
         return self.fc(x)
-
-
-if __name__ == '__main__':
-    import_class('graph.openpose_b25_j15.Graph')
-    print("Done...")

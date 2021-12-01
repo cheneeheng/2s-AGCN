@@ -28,7 +28,7 @@ test_feeder_args:
   label_path: ./data/data/ntu/xview/val_label.pkl
 
 # model
-model: model.aagcn.Model
+model: model.aagcn_v2.Model
 model_args:
   num_class: 60
   num_point: 25
