@@ -42,7 +42,7 @@ def bn_init(bn, scale):
 # Blocks
 # ------------------------------------------------------------------------------
 class SpatialAttention(nn.Module):
-    def __init__(self, in_channels, out_channels=1, kernel_size=9, stride=1):
+    def __init__(self, in_channels, out_channels=1, kernel_size=9):
         super().__init__()
         pad = (kernel_size - 1) // 2
         self.conv_sa = nn.Conv1d(in_channels, out_channels, kernel_size,
@@ -289,13 +289,15 @@ class Model(nn.Module):
                  gbn_split=None):
         super().__init__()
 
-        if graph is None:
-            raise ValueError()
-        else:
-            Graph = import_class(graph)
-            self.graph = Graph(**graph_args)
+        # if graph is None:
+        #     raise ValueError()
+        # else:
+        #     Graph = import_class(graph)
+        #     self.graph = Graph(**graph_args)
 
-        A = self.graph.A
+        # A = self.graph.A
+
+        A = np.ones((num_subset, num_point, num_point))
         self.num_class = num_class
 
         if gbn_split is None:
@@ -356,8 +358,3 @@ class Model(nn.Module):
         x = self.drop_out(x)
 
         return self.fc(x)
-
-
-if __name__ == '__main__':
-    import_class('graph.openpose_b25_j15.Graph')
-    print("Done...")
