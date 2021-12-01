@@ -41,6 +41,20 @@ def bn_init(bn, scale):
 # ------------------------------------------------------------------------------
 # Blocks
 # ------------------------------------------------------------------------------
+def batch_norm_1d(num_channels, gbn_split):
+    if gbn_split is None:
+        return nn.BatchNorm1d(num_channels)
+    else:
+        return GhostBatchNorm1d(num_channels, gbn_split)
+
+
+def batch_norm_2d(num_channels, gbn_split):
+    if gbn_split is None:
+        return nn.BatchNorm2d(num_channels)
+    else:
+        return GhostBatchNorm2d(num_channels, gbn_split)
+
+
 class SpatialAttention(nn.Module):
     def __init__(self, in_channels, out_channels=1, kernel_size=9, stride=1):
         super().__init__()
@@ -187,11 +201,7 @@ class TCNUnit(nn.Module):
                               kernel_size=(kernel_size, 1),
                               padding=(pad, 0),
                               stride=(stride, 1))
-        if gbn_split is None:
-            self.bn = nn.BatchNorm2d(out_channels)
-        else:
-            self.bn = GhostBatchNorm2d(out_channels, gbn_split)
-
+        self.bn = batch_norm_2d(out_channels, gbn_split)
         conv_init(self.conv)
         bn_init(self.bn, 1)
 
@@ -216,6 +226,10 @@ class GCNUnit(nn.Module):
                  attention=True,
                  gbn_split=None):
         super().__init__()
+
+        def out_proj():
+            return nn.Conv2d(in_channels, out_channels, 1, stride=(stride, 1))
+
         inter_channels = out_channels // coff_embedding
         self.inter_c = inter_channels
         self.out_c = out_channels
@@ -224,49 +238,38 @@ class GCNUnit(nn.Module):
         num_jpts = A.shape[-1]
 
         self.conv_d = nn.ModuleList()
-        for _ in range(len(kernel_sizes)):
-            for _ in range(self.num_subset):
-                self.conv_d.append(nn.Conv2d(in_channels, out_channels, 1))
+        for _ in range(len(kernel_sizes) * self.num_subset):
+            self.conv_d.append(out_proj())
 
         if adaptive:
             self.agcn = AdaptiveGCN(in_channels,
                                     inter_channels,
                                     A,
                                     self.conv_d,
-                                    kernel_sizes,
-                                    stride,
-                                    dilations,
-                                    num_subset)
+                                    kernel_sizes=kernel_sizes,
+                                    dilations=dilations,
+                                    num_subset=num_subset)
         else:
             self.agcn = NonAdaptiveGCN(A, self.conv_d, num_subset)
 
-        self.attention = attention
         if attention:
             ker_jpt = num_jpts - 1 if not num_jpts % 2 else num_jpts
             self.attn_s = SpatialAttention(out_channels, kernel_size=ker_jpt)
             self.attn_t = TemporalAttention(out_channels)
             self.attn_c = ChannelAttention(out_channels)
+        else:
+            self.attn_s, self.attn_t, self.attn_c = None, None, None
 
         # if the residual does not have the same channel dimensions.
         if in_channels != out_channels:
-            if gbn_split is None:
-                self.down = nn.Sequential(
-                    nn.Conv2d(in_channels, out_channels, 1),
-                    nn.BatchNorm2d(out_channels)
-                )
-            else:
-                self.down = nn.Sequential(
-                    nn.Conv2d(in_channels, out_channels, 1),
-                    GhostBatchNorm2d(out_channels)
-                )
+            self.down = nn.Sequential(
+                out_proj(),
+                batch_norm_2d(out_channels, gbn_split)
+            )
         else:
             self.down = lambda x: x
 
-        if gbn_split is None:
-            self.bn = nn.BatchNorm2d(out_channels)
-        else:
-            self.bn = GhostBatchNorm2d(out_channels)
-
+        self.bn = batch_norm_2d(out_channels, gbn_split)
         self.relu = nn.ReLU(inplace=True)
 
         for m in self.modules():
@@ -280,15 +283,11 @@ class GCNUnit(nn.Module):
 
     def forward(self, x):
         y = self.agcn(x)
-
         y = self.bn(y) + self.down(x)
         y = self.relu(y)
-
-        if self.attention:
-            y = self.attn_s(y)
-            y = self.attn_t(y)
-            y = self.attn_c(y)
-
+        y = y if self.attn_s is None else self.attn_s(y)
+        y = y if self.attn_t is None else self.attn_t(y)
+        y = y if self.attn_c is None else self.attn_c(y)
         return y
 
 
@@ -334,7 +333,8 @@ class TCNGCNUnit(nn.Module):
                                     gbn_split=gbn_split)
 
     def forward(self, x):
-        y = self.relu(self.gcn1(x) + self.residual(x))
+        y = self.gcn1(x) + self.residual(x)
+        y = self.relu(y)
         return y
 
 
@@ -369,12 +369,8 @@ class Model(nn.Module):
 
         A = self.graph.A
         self.num_class = num_class
-
-        if gbn_split is None:
-            self.data_bn = nn.BatchNorm1d(num_person*in_channels*num_point)
-        else:
-            self.data_bn = GhostBatchNorm1d(
-                num_person*in_channels*num_point, gbn_split)
+        self.data_bn = batch_norm_1d(num_person*in_channels*num_point,
+                                     gbn_split)
 
         # kernel_sizes = [1, 3, 5, 7, 9]
         # dilations = [1, 1, 1, 1, 1]
