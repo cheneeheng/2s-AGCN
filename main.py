@@ -19,7 +19,6 @@ import torch.optim as optim
 import yaml
 
 from torch.utils.tensorboard import SummaryWriter
-from torch.autograd import Variable
 from torch.optim.lr_scheduler import _LRScheduler
 from tqdm import tqdm
 
@@ -389,10 +388,8 @@ class Processor():
         for batch_idx, (data, label, index) in enumerate(process):
             self.global_step += 1
             # get data
-            data = Variable(data.float().cuda(
-                self.output_device), requires_grad=False)
-            label = Variable(label.long().cuda(
-                self.output_device), requires_grad=False)
+            data = data.float().cuda(self.output_device)
+            label = label.long().cuda(self.output_device)
             timer['dataloader'] += self.split_time()
 
             # forward
@@ -468,14 +465,8 @@ class Processor():
             process = tqdm(self.data_loader[ln])
             for batch_idx, (data, label, index) in enumerate(process):
                 with torch.no_grad():
-                    data = Variable(
-                        data.float().cuda(self.output_device),
-                        requires_grad=False,
-                        volatile=True)
-                    label = Variable(
-                        label.long().cuda(self.output_device),
-                        requires_grad=False,
-                        volatile=True)
+                    data = data.float().cuda(self.output_device)
+                    label = label.long().cuda(self.output_device)
                     output = self.model(data)
                     if isinstance(output, tuple):
                         output, l1 = output

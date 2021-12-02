@@ -213,7 +213,7 @@ class GCNUnit(nn.Module):
             else:
                 self.down = nn.Sequential(
                     nn.Conv2d(in_channels, out_channels, 1),
-                    GhostBatchNorm2d(out_channels)
+                    GhostBatchNorm2d(out_channels, gbn_split)
                 )
         else:
             self.down = lambda x: x
@@ -221,7 +221,7 @@ class GCNUnit(nn.Module):
         if gbn_split is None:
             self.bn = nn.BatchNorm2d(out_channels)
         else:
-            self.bn = GhostBatchNorm2d(out_channels)
+            self.bn = GhostBatchNorm2d(out_channels, gbn_split)
 
         self.relu = nn.ReLU(inplace=True)
 

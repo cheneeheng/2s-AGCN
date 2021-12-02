@@ -68,6 +68,8 @@ class GhostBatchNorm1d(BatchNorm1d):
             ).repeat(self.num_splits)
             return bn.view(N, C, K)
         else:
+            assert self.running_mean[0] == self.running_mean[self.num_features]
+            assert self.running_var[0] == self.running_var[self.num_features]
             return torch.nn.functional.batch_norm(
                 input,
                 running_mean=self.running_mean[:self.num_features],
@@ -145,6 +147,8 @@ class GhostBatchNorm2d(BatchNorm2d):
             ).repeat(self.num_splits)
             return bn.view(N, C, H, W)
         else:
+            assert self.running_mean[0] == self.running_mean[self.num_features]
+            assert self.running_var[0] == self.running_var[self.num_features]
             return torch.nn.functional.batch_norm(
                 input,
                 running_mean=self.running_mean[:self.num_features],

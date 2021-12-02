@@ -18,6 +18,8 @@ matplotlib
 plotly
 pandas
 
+torch-tb-profiler
+
 # pillow
 # opencv-python
 
