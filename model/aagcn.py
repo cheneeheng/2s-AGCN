@@ -1,14 +1,22 @@
 import math
 import numpy as np
+from typing import Optional, Union
 
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
 
 from .ghostbatchnorm import GhostBatchNorm1d, GhostBatchNorm2d
 
 
-def import_class(name):
+__all__ = ['import_class',
+           'conv_branch_init', 'conv_init', 'bn_init'
+           'batch_norm_1d', 'batch_norm_2d'
+           'SpatialAttention', 'TemporalAttention', 'ChannelAttention',
+           'NonAdaptiveGCN', 'AdaptiveGCN', 'TCNUnit', 'GCNUnit', 'TCNGCNUnit'
+           ]
+
+
+def import_class(name: str):
     components = name.split('.')
     mod = __import__(components[0])
     for comp in components[1:]:
@@ -19,7 +27,7 @@ def import_class(name):
 # ------------------------------------------------------------------------------
 # Initialization
 # ------------------------------------------------------------------------------
-def conv_branch_init(conv, branches):
+def conv_branch_init(conv: Union[nn.Conv1d, nn.Conv2d], branches: int):
     weight = conv.weight
     n = weight.size(0)
     k1 = weight.size(1)
@@ -28,12 +36,12 @@ def conv_branch_init(conv, branches):
     nn.init.constant_(conv.bias, 0)
 
 
-def conv_init(conv):
+def conv_init(conv: Union[nn.Conv1d, nn.Conv2d]):
     nn.init.kaiming_normal_(conv.weight, mode='fan_out')
     nn.init.constant_(conv.bias, 0)
 
 
-def bn_init(bn, scale):
+def bn_init(bn: Union[nn.BatchNorm1d, nn.BatchNorm2d], scale: int):
     nn.init.constant_(bn.weight, scale)
     nn.init.constant_(bn.bias, 0)
 
@@ -41,8 +49,25 @@ def bn_init(bn, scale):
 # ------------------------------------------------------------------------------
 # Blocks
 # ------------------------------------------------------------------------------
+def batch_norm_1d(num_channels: int, gbn_split: Optional[int] = None):
+    if gbn_split is None or gbn_split < 2:
+        return nn.BatchNorm1d(num_channels)
+    else:
+        return GhostBatchNorm1d(num_channels, gbn_split)
+
+
+def batch_norm_2d(num_channels: int, gbn_split: Optional[int] = None):
+    if gbn_split is None or gbn_split < 2:
+        return nn.BatchNorm2d(num_channels)
+    else:
+        return GhostBatchNorm2d(num_channels, gbn_split)
+
+
 class SpatialAttention(nn.Module):
-    def __init__(self, in_channels, out_channels=1, kernel_size=9, stride=1):
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int = 1,
+                 kernel_size: int = 9):
         super().__init__()
         pad = (kernel_size - 1) // 2
         self.conv_sa = nn.Conv1d(in_channels, out_channels, kernel_size,
@@ -59,7 +84,10 @@ class SpatialAttention(nn.Module):
 
 
 class TemporalAttention(nn.Module):
-    def __init__(self, in_channels, out_channels=1, kernel_size=9):
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int = 1,
+                 kernel_size: int = 9):
         super().__init__()
         pad = (kernel_size - 1) // 2
         self.conv_ta = nn.Conv1d(in_channels, out_channels, kernel_size,
@@ -76,7 +104,7 @@ class TemporalAttention(nn.Module):
 
 
 class ChannelAttention(nn.Module):
-    def __init__(self, in_channels, rr=2):
+    def __init__(self, in_channels: int, rr: int = 2):
         super().__init__()
         self.fc1c = nn.Linear(in_channels, in_channels // rr)
         self.fc2c = nn.Linear(in_channels // rr, in_channels)
@@ -96,11 +124,14 @@ class ChannelAttention(nn.Module):
 
 
 class NonAdaptiveGCN(nn.Module):
-    def __init__(self, A, conv_d, num_subset=3):
+    def __init__(self,
+                 A: np.ndarray,
+                 conv_d: nn.Conv2d,
+                 num_subset: int = 3):
         super().__init__()
         self.num_subset = num_subset
-        self.A = Variable(torch.from_numpy(
-            A.astype(np.float32)), requires_grad=False)
+        self.A = torch.tensor(torch.from_numpy(A.astype(np.float32)),
+                              requires_grad=False)
         self.conv_d = conv_d
 
     def forward(self, x):
@@ -117,7 +148,12 @@ class NonAdaptiveGCN(nn.Module):
 
 
 class AdaptiveGCN(nn.Module):
-    def __init__(self, in_channels, out_channels, A, conv_d, num_subset=3):
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 A: np.ndarray,
+                 conv_d: nn.Conv2d,
+                 num_subset: int = 3):
         super().__init__()
         self.num_subset = num_subset
         self.PA = nn.Parameter(torch.from_numpy(A.astype(np.float32)))  # Bk
@@ -150,8 +186,12 @@ class AdaptiveGCN(nn.Module):
 # Modules
 # ------------------------------------------------------------------------------
 class TCNUnit(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=9, stride=1,
-                 gbn_split=None):
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 kernel_size: int = 9,
+                 stride: int = 1,
+                 gbn_split: Optional[int] = None):
         super().__init__()
         pad = (kernel_size - 1) // 2
         self.conv = nn.Conv2d(in_channels,
@@ -159,10 +199,7 @@ class TCNUnit(nn.Module):
                               kernel_size=(kernel_size, 1),
                               padding=(pad, 0),
                               stride=(stride, 1))
-        if gbn_split is None:
-            self.bn = nn.BatchNorm2d(out_channels)
-        else:
-            self.bn = GhostBatchNorm2d(out_channels, gbn_split)
+        self.bn = batch_norm_2d(out_channels, gbn_split)
 
         conv_init(self.conv)
         bn_init(self.bn, 1)
@@ -175,9 +212,15 @@ class TCNUnit(nn.Module):
 
 
 class GCNUnit(nn.Module):
-    def __init__(self, in_channels, out_channels, A, coff_embedding=4,
-                 num_subset=3, adaptive=True, attention=True,
-                 gbn_split=None):
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 A: np.ndarray,
+                 coff_embedding: int = 4,
+                 num_subset: int = 3,
+                 adaptive: bool = True,
+                 attention: bool = True,
+                 gbn_split: Optional[int] = None):
         super().__init__()
         inter_channels = out_channels // coff_embedding
         self.inter_c = inter_channels
@@ -196,33 +239,24 @@ class GCNUnit(nn.Module):
         else:
             self.agcn = NonAdaptiveGCN(A, self.conv_d, num_subset)
 
-        self.attention = attention
         if attention:
             ker_jpt = num_jpts - 1 if not num_jpts % 2 else num_jpts
             self.attn_s = SpatialAttention(out_channels, kernel_size=ker_jpt)
             self.attn_t = TemporalAttention(out_channels)
             self.attn_c = ChannelAttention(out_channels)
+        else:
+            self.attn_s, self.attn_t, self.attn_c = None, None, None
 
         # if the residual does not have the same channel dimensions.
         if in_channels != out_channels:
-            if gbn_split is None:
-                self.down = nn.Sequential(
-                    nn.Conv2d(in_channels, out_channels, 1),
-                    nn.BatchNorm2d(out_channels)
-                )
-            else:
-                self.down = nn.Sequential(
-                    nn.Conv2d(in_channels, out_channels, 1),
-                    GhostBatchNorm2d(out_channels, gbn_split)
-                )
+            self.down = nn.Sequential(
+                nn.Conv2d(in_channels, out_channels, 1),
+                batch_norm_2d(out_channels, gbn_split)
+            )
         else:
             self.down = lambda x: x
 
-        if gbn_split is None:
-            self.bn = nn.BatchNorm2d(out_channels)
-        else:
-            self.bn = GhostBatchNorm2d(out_channels, gbn_split)
-
+        self.bn = batch_norm_1d(out_channels, gbn_split)
         self.relu = nn.ReLU(inplace=True)
 
         for m in self.modules():
@@ -236,22 +270,25 @@ class GCNUnit(nn.Module):
 
     def forward(self, x):
         y = self.agcn(x)
-
         y = self.bn(y) + self.down(x)
         y = self.relu(y)
-
-        if self.attention:
-            y = self.attn_s(y)
-            y = self.attn_t(y)
-            y = self.attn_c(y)
-
+        y = y if self.attn_s is None else self.attn_s(y)
+        y = y if self.attn_t is None else self.attn_t(y)
+        y = y if self.attn_c is None else self.attn_c(y)
         return y
 
 
 class TCNGCNUnit(nn.Module):
-    def __init__(self, in_channels, out_channels, A, num_subset=3, stride=1,
-                 residual=True, adaptive=True, attention=True,
-                 gbn_split=None):
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 A: np.ndarray,
+                 num_subset: int = 3,
+                 stride: int = 1,
+                 residual: bool = True,
+                 adaptive: bool = True,
+                 attention: bool = True,
+                 gbn_split: Optional[int] = None):
         super().__init__()
         self.gcn1 = GCNUnit(in_channels, out_channels, A,
                             num_subset=num_subset,
@@ -283,10 +320,18 @@ class TCNGCNUnit(nn.Module):
 # Network
 # ------------------------------------------------------------------------------
 class Model(nn.Module):
-    def __init__(self, num_class=60, num_point=25, num_person=2,
-                 num_subset=3, graph=None, graph_args=dict(), in_channels=3,
-                 drop_out=0, adaptive=True, attention=True,
-                 gbn_split=None):
+    def __init__(self,
+                 num_class: int = 60,
+                 num_point: int = 25,
+                 num_person: int = 2,
+                 num_subset: int = 3,
+                 graph: Optional[str] = None,
+                 graph_args: dict = dict(),
+                 in_channels: int = 3,
+                 drop_out: int = 0,
+                 adaptive: bool = True,
+                 attention: bool = True,
+                 gbn_split: Optional[int] = None):
         super().__init__()
 
         if graph is None:
@@ -298,16 +343,18 @@ class Model(nn.Module):
         A = self.graph.A
         self.num_class = num_class
 
-        if gbn_split is None:
-            self.data_bn = nn.BatchNorm1d(num_person*in_channels*num_point)
-        else:
-            self.data_bn = GhostBatchNorm1d(
-                num_person*in_channels*num_point, gbn_split)
+        self.data_bn = batch_norm_1d(num_person*in_channels*num_point,
+                                     gbn_split)
 
         def _TCNGCNUnit(_in, _out, stride=1, residual=True):
-            return TCNGCNUnit(_in, _out, A, num_subset=num_subset,
-                              stride=stride, residual=residual,
-                              adaptive=adaptive, attention=attention,
+            return TCNGCNUnit(_in,
+                              _out,
+                              A,
+                              num_subset=num_subset,
+                              stride=stride,
+                              residual=residual,
+                              adaptive=adaptive,
+                              attention=attention,
                               gbn_split=gbn_split)
 
         self.l1 = _TCNGCNUnit(3, 64, residual=False)
