@@ -256,7 +256,7 @@ class GCNUnit(nn.Module):
         else:
             self.down = lambda x: x
 
-        self.bn = batch_norm_1d(out_channels, gbn_split)
+        self.bn = batch_norm_2d(out_channels, gbn_split)
         self.relu = nn.ReLU(inplace=True)
 
         for m in self.modules():
