@@ -5,15 +5,7 @@ from typing import Optional, Union
 import torch
 import torch.nn as nn
 
-from .ghostbatchnorm import GhostBatchNorm1d, GhostBatchNorm2d
-
-
-__all__ = ['import_class',
-           'conv_branch_init', 'conv_init', 'bn_init'
-           'batch_norm_1d', 'batch_norm_2d'
-           'SpatialAttention', 'TemporalAttention', 'ChannelAttention',
-           'NonAdaptiveGCN', 'AdaptiveGCN', 'TCNUnit', 'GCNUnit', 'TCNGCNUnit'
-           ]
+from model.ghostbatchnorm import GhostBatchNorm1d, GhostBatchNorm2d
 
 
 def import_class(name: str):
@@ -125,6 +117,8 @@ class ChannelAttention(nn.Module):
 
 class NonAdaptiveGCN(nn.Module):
     def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
                  A: np.ndarray,
                  conv_d: nn.Conv2d,
                  num_subset: int = 3):
@@ -218,7 +212,7 @@ class GCNUnit(nn.Module):
                  A: np.ndarray,
                  coff_embedding: int = 4,
                  num_subset: int = 3,
-                 adaptive: bool = True,
+                 adaptive: nn.Module = AdaptiveGCN,
                  attention: bool = True,
                  gbn_split: Optional[int] = None):
         super().__init__()
@@ -233,11 +227,8 @@ class GCNUnit(nn.Module):
         for i in range(self.num_subset):
             self.conv_d.append(nn.Conv2d(in_channels, out_channels, 1))
 
-        if adaptive:
-            self.agcn = AdaptiveGCN(
-                in_channels, inter_channels, A, self.conv_d, num_subset)
-        else:
-            self.agcn = NonAdaptiveGCN(A, self.conv_d, num_subset)
+        self.agcn = adaptive(in_channels, inter_channels,
+                             A, self.conv_d, num_subset)
 
         if attention:
             ker_jpt = num_jpts - 1 if not num_jpts % 2 else num_jpts
@@ -286,7 +277,7 @@ class TCNGCNUnit(nn.Module):
                  num_subset: int = 3,
                  stride: int = 1,
                  residual: bool = True,
-                 adaptive: bool = True,
+                 adaptive: nn.Module = AdaptiveGCN,
                  attention: bool = True,
                  gbn_split: Optional[int] = None):
         super().__init__()
@@ -319,54 +310,39 @@ class TCNGCNUnit(nn.Module):
 # ------------------------------------------------------------------------------
 # Network
 # ------------------------------------------------------------------------------
-class Model(nn.Module):
+class BaseModel(nn.Module):
     def __init__(self,
                  num_class: int = 60,
                  num_point: int = 25,
                  num_person: int = 2,
-                 num_subset: int = 3,
-                 graph: Optional[str] = None,
-                 graph_args: dict = dict(),
                  in_channels: int = 3,
                  drop_out: int = 0,
                  adaptive: bool = True,
-                 attention: bool = True,
                  gbn_split: Optional[int] = None):
         super().__init__()
 
-        if graph is None:
-            raise ValueError()
-        else:
-            Graph = import_class(graph)
-            self.graph = Graph(**graph_args)
-
-        A = self.graph.A
         self.num_class = num_class
+
+        self.graph = None
+
+        if adaptive:
+            self.adaptive_fn = AdaptiveGCN
+        else:
+            self.adaptive_fn = NonAdaptiveGCN
 
         self.data_bn = batch_norm_1d(num_person*in_channels*num_point,
                                      gbn_split)
 
-        def _TCNGCNUnit(_in, _out, stride=1, residual=True):
-            return TCNGCNUnit(_in,
-                              _out,
-                              A,
-                              num_subset=num_subset,
-                              stride=stride,
-                              residual=residual,
-                              adaptive=adaptive,
-                              attention=attention,
-                              gbn_split=gbn_split)
-
-        self.l1 = _TCNGCNUnit(3, 64, residual=False)
-        self.l2 = _TCNGCNUnit(64, 64)
-        self.l3 = _TCNGCNUnit(64, 64)
-        self.l4 = _TCNGCNUnit(64, 64)
-        self.l5 = _TCNGCNUnit(64, 128, stride=2)
-        self.l6 = _TCNGCNUnit(128, 128)
-        self.l7 = _TCNGCNUnit(128, 128)
-        self.l8 = _TCNGCNUnit(128, 256, stride=2)
-        self.l9 = _TCNGCNUnit(256, 256)
-        self.l10 = _TCNGCNUnit(256, 256)
+        self.l1 = None
+        self.l2 = None
+        self.l3 = None
+        self.l4 = None
+        self.l5 = None
+        self.l6 = None
+        self.l7 = None
+        self.l8 = None
+        self.l9 = None
+        self.l10 = None
 
         self.fc = nn.Linear(256, num_class)
         nn.init.normal_(self.fc.weight, 0, math.sqrt(2. / num_class))
@@ -403,3 +379,48 @@ class Model(nn.Module):
         x = self.drop_out(x)
 
         return self.fc(x)
+
+
+class Model(BaseModel):
+    def __init__(self,
+                 num_class: int = 60,
+                 num_point: int = 25,
+                 num_person: int = 2,
+                 num_subset: int = 3,
+                 graph: Optional[str] = None,
+                 graph_args: dict = dict(),
+                 in_channels: int = 3,
+                 drop_out: int = 0,
+                 adaptive: bool = True,
+                 attention: bool = True,
+                 gbn_split: Optional[int] = None):
+        super().__init__(num_class, num_point, num_person,
+                         in_channels, drop_out, adaptive, gbn_split)
+
+        if graph is None:
+            raise ValueError()
+        else:
+            Graph = import_class(graph)
+            self.graph = Graph(**graph_args)
+
+        def _TCNGCNUnit(_in, _out, stride=1, residual=True):
+            return TCNGCNUnit(_in,
+                              _out,
+                              self.graph.A,
+                              num_subset=num_subset,
+                              stride=stride,
+                              residual=residual,
+                              adaptive=self.adaptive_fn,
+                              attention=attention,
+                              gbn_split=gbn_split)
+
+        self.l1 = _TCNGCNUnit(3, 64, residual=False)
+        self.l2 = _TCNGCNUnit(64, 64)
+        self.l3 = _TCNGCNUnit(64, 64)
+        self.l4 = _TCNGCNUnit(64, 64)
+        self.l5 = _TCNGCNUnit(64, 128, stride=2)
+        self.l6 = _TCNGCNUnit(128, 128)
+        self.l7 = _TCNGCNUnit(128, 128)
+        self.l8 = _TCNGCNUnit(128, 256, stride=2)
+        self.l9 = _TCNGCNUnit(256, 256)
+        self.l10 = _TCNGCNUnit(256, 256)

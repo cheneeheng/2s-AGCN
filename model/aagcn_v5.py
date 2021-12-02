@@ -1,14 +1,12 @@
-import math
 import numpy as np
 from typing import Optional
 
 import torch.nn as nn
 
-from model.aagcn import batch_norm_1d
-from model.aagcn import bn_init
 from model.aagcn import import_class
 from model.aagcn import GCNUnit
 from model.aagcn import TCNUnit
+from model.aagcn import BaseModel
 
 
 class SqueezeExcitation(nn.Module):
@@ -86,7 +84,7 @@ class TCNGCNUnit(nn.Module):
 # - change TCN to GCN style attention.
 # - sct attention is removed.
 # ------------------------------------------------------------------------------
-class Model(nn.Module):
+class Model(BaseModel):
     def __init__(self,
                  num_class: int = 60,
                  num_point: int = 25,
@@ -99,7 +97,8 @@ class Model(nn.Module):
                  adaptive: bool = True,
                  attention: bool = True,
                  gbn_split: Optional[int] = None):
-        super().__init__()
+        super().__init__(num_class, num_point, num_person,
+                         in_channels, drop_out, adaptive, gbn_split)
 
         if graph is None:
             raise ValueError()
@@ -107,16 +106,10 @@ class Model(nn.Module):
             Graph = import_class(graph)
             self.graph = Graph(**graph_args)
 
-        A = self.graph.A
-        self.num_class = num_class
-
-        self.data_bn = batch_norm_1d(num_person*in_channels*num_point,
-                                     gbn_split)
-
         def _TCNGCNUnit(_in, _out, stride=1, residual=True):
             return TCNGCNUnit(_in,
                               _out,
-                              A,
+                              self.graph.A,
                               num_subset=num_subset,
                               stride=stride,
                               residual=residual,
@@ -134,39 +127,3 @@ class Model(nn.Module):
         self.l8 = _TCNGCNUnit(128, 256, stride=2)
         self.l9 = _TCNGCNUnit(256, 256)
         self.l10 = _TCNGCNUnit(256, 256)
-
-        self.fc = nn.Linear(256, num_class)
-        nn.init.normal_(self.fc.weight, 0, math.sqrt(2. / num_class))
-        bn_init(self.data_bn, 1)
-        if drop_out:
-            self.drop_out = nn.Dropout(drop_out)
-        else:
-            self.drop_out = lambda x: x
-
-    def forward(self, x):
-        N, C, T, V, M = x.size()
-
-        x = x.permute(0, 4, 3, 1, 2).contiguous()  # n,m,v,c,t
-        x = x.view(N, -1, T)
-        x = self.data_bn(x)
-        x = x.view(N, M, V, C, T).permute(0, 1, 3, 4, 2).contiguous()  # n,m,c,t,v  # noqa
-        x = x.view(-1, C, T, V)
-
-        x = self.l1(x)
-        x = self.l2(x)
-        x = self.l3(x)
-        x = self.l4(x)
-        x = self.l5(x)
-        x = self.l6(x)
-        x = self.l7(x)
-        x = self.l8(x)
-        x = self.l9(x)
-        x = self.l10(x)
-
-        # N*M,C,T,V
-        c_new = x.size(1)
-        x = x.view(N, M, c_new, -1)
-        x = x.mean(3).mean(1)
-        x = self.drop_out(x)
-
-        return self.fc(x)

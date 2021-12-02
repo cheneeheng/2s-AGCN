@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_v2_joint/211130210001
-model_saved_name: ./data/data/ntu_result/xview/aagcn_v2_joint/211130210001/ntu_cv_aagcn_v2_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_v2_joint/211202210001_1subset
+model_saved_name: ./data/data/ntu_result/xview/aagcn_v2_joint/211202210001_1subset/ntu_cv_aagcn_v2_joint
 
 phase: train
 save_score: True
@@ -33,10 +33,7 @@ model_args:
   num_class: 60
   num_point: 25
   num_person: 2
-  num_subset: 3
-  graph: graph.ntu_rgb_d.Graph
-  graph_args:
-    labeling_mode: 'spatial'
+  num_subset: 1
 # weights: None 
 
 #optim
