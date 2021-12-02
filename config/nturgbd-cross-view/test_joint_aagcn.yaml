@@ -1,0 +1,37 @@
+work_dir: ./data/data/ntu_result/xview/aagcn_joint/211126210001_gbn2_test
+model_saved_name: ./data/data/ntu_result/xview/aagcn_joint/211126210001_gbn2_test/ntu_cv_aagcn_joint
+
+phase: test
+save_score: True
+
+seed: 1
+log_interval: 100  # iter
+save_interval: 2  # iter
+eval_interval: 5  # iter
+print_log: true
+
+# feeder
+feeder: feeders.feeder.Feeder
+num_worker: 32
+test_feeder_args:
+  data_path: ./data/data/ntu/xview/val_data_joint.npy
+  label_path: ./data/data/ntu/xview/val_label.pkl
+  debug: False
+
+# model
+model: model.aagcn.Model
+model_args:
+  num_class: 60
+  num_point: 25
+  num_person: 2
+  gbn_split: 2
+  graph: graph.ntu_rgb_d.Graph
+  graph_args:
+    labeling_mode: 'spatial'
+weights: ./data/data/ntu_result/xview/aagcn_joint/211126210001_gbn2/ntu_cv_aagcn_joint-1-1176.pt
+
+#optim
+# device: [0, 1 ,2, 3]
+device: [0, 1]
+batch_size: 64
+test_batch_size: 64
