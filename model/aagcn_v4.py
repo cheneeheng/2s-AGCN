@@ -343,6 +343,7 @@ class TCNGCNUnit(nn.Module):
 # - Merged TCN into GCN.
 # - Create different sets of subsets.
 # - Each set will have different kernel size in temporal dim. (1,3,6,9)
+# NOT CONVERGING.
 # ------------------------------------------------------------------------------
 class Model(nn.Module):
     def __init__(self,

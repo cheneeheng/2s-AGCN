@@ -73,16 +73,18 @@ class TCNGCNUnit(nn.Module):
 
     def forward(self, x):
         y = self.gcn1(x)
-        y = self.tcn1(y)
+        y = self.tcn1(y)  # N C T V
+        y = y.permute(0, 2, 1, 3).contiguous()  # N T C V
         y = self.tse1(y)
+        y = y.permute(0, 1, 2, 3).contiguous()  # N C T V
         y = self.relu(y + self.residual(x))
         return y
 
 
 # ------------------------------------------------------------------------------
 # Network
-# - change TCN to GCN style attention.
-# - sct attention is removed.
+# - added se block after TCN, sct attention is removed.
+# - without the tse block.
 # ------------------------------------------------------------------------------
 class Model(BaseModel):
     def __init__(self,
@@ -113,7 +115,7 @@ class Model(BaseModel):
                               num_subset=num_subset,
                               stride=stride,
                               residual=residual,
-                              adaptive=adaptive,
+                              adaptive=self.adaptive_fn,
                               attention=attention,
                               gbn_split=gbn_split)
 

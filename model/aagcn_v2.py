@@ -7,7 +7,8 @@ from model.aagcn import BaseModel
 
 # ------------------------------------------------------------------------------
 # Network
-# - A does not depend on predefined A matrix.
+# - A does not depend on predefined A matrix. > slightly worse ~0.5%
+# - Using only 1 subset > no noticable difference.
 # ------------------------------------------------------------------------------
 class Model(BaseModel):
     def __init__(self,
@@ -15,6 +16,8 @@ class Model(BaseModel):
                  num_point: int = 25,
                  num_person: int = 2,
                  num_subset: int = 3,
+                 graph: Optional[str] = None,
+                 graph_args: dict = dict(),
                  in_channels: int = 3,
                  drop_out: int = 0,
                  adaptive: bool = True,

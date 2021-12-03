@@ -46,7 +46,7 @@ class AdaptiveGCN(nn.Module):
 
 # ------------------------------------------------------------------------------
 # Network
-# - Added additional projection in the GCN.
+# - Added additional projection in the GCN. > no noticable change.
 # ------------------------------------------------------------------------------
 class Model(BaseModel):
     def __init__(self,
