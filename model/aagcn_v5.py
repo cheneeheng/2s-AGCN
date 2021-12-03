@@ -4,6 +4,7 @@ from typing import Optional
 import torch.nn as nn
 
 from model.aagcn import import_class
+from model.aagcn import conv_init
 from model.aagcn import GCNUnit
 from model.aagcn import TCNUnit
 from model.aagcn import BaseModel
@@ -32,6 +33,30 @@ class SqueezeExcitation(nn.Module):
         return x
 
 
+class TemporalSE(nn.Module):
+    def __init__(self,
+                 in_channels: int,
+                 coff_embedding: int = 4,
+                 kernel_size: int = 9):
+        super().__init__()
+        pad = (kernel_size - 1) // 2
+        self.conv1 = nn.Conv1d(in_channels, in_channels//coff_embedding,
+                               kernel_size, padding=pad)
+        self.conv2 = nn.Conv1d(in_channels//coff_embedding, 1,
+                               kernel_size, padding=pad)
+        self.sigmoid = nn.Sigmoid()
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, x):
+        se = x.mean(-1)  # N C T
+        se = self.conv1(se)
+        se = self.relu(se)
+        se = self.conv2(se)
+        se = self.sigmoid(se)
+        x = x * se.unsqueeze(-1) + x
+        return x
+
+
 class TCNGCNUnit(nn.Module):
     def __init__(self,
                  in_channels: int,
@@ -55,7 +80,7 @@ class TCNGCNUnit(nn.Module):
                             out_channels,
                             stride=stride,
                             gbn_split=gbn_split)
-        self.tse1 = SqueezeExcitation(out_channels)
+        self.tse1 = TemporalSE(out_channels)
         self.relu = nn.ReLU(inplace=True)
 
         if not residual:
@@ -73,10 +98,8 @@ class TCNGCNUnit(nn.Module):
 
     def forward(self, x):
         y = self.gcn1(x)
-        y = self.tcn1(y)  # N C T V
-        y = y.permute(0, 2, 1, 3).contiguous()  # N T C V
+        y = self.tcn1(y)
         y = self.tse1(y)
-        y = y.permute(0, 1, 2, 3).contiguous()  # N C T V
         y = self.relu(y + self.residual(x))
         return y
 
