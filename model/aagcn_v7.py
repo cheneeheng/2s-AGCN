@@ -1,36 +1,13 @@
 import numpy as np
 from typing import Optional
 
+import torch
 import torch.nn as nn
 
 from model.aagcn import import_class
-from model.aagcn import AdaptiveGCN
 from model.aagcn import GCNUnit
 from model.aagcn import TCNUnit
 from model.aagcn import BaseModel
-
-
-class SqueezeExcitation(nn.Module):
-    def __init__(self, in_channels: int, coff_embedding: int = 4):
-        super().__init__()
-        self.fc1c = nn.Linear(in_channels, in_channels // coff_embedding)
-        self.fc2c = nn.Linear(in_channels // coff_embedding, in_channels)
-        nn.init.kaiming_normal_(self.fc1c.weight)
-        nn.init.kaiming_normal_(self.fc2c.weight)
-        nn.init.constant_(self.fc1c.bias, 0)
-        nn.init.constant_(self.fc2c.bias, 0)
-        self.sigmoid = nn.Sigmoid()
-        self.relu = nn.ReLU(inplace=True)
-
-    def forward(self, x):
-        # x : N C T V
-        se = x.mean(-1).mean(-1)  # N C
-        se = self.fc1c(se)
-        se = self.relu(se)
-        se = self.fc2c(se)
-        se = self.sigmoid(se)
-        x = x * se.unsqueeze(-1).unsqueeze(-1) + x
-        return x
 
 
 class TemporalSE(nn.Module):
@@ -47,14 +24,53 @@ class TemporalSE(nn.Module):
         self.sigmoid = nn.Sigmoid()
         self.relu = nn.ReLU(inplace=True)
 
-    def forward(self, x):
-        se = x.mean(-1)  # N C T
+    def forward(self, x1, x2):
+        se = x1.mean(-1)  # N C T
         se = self.conv1(se)
         se = self.relu(se)
         se = self.conv2(se)
         se = self.sigmoid(se)
-        x = x * se.unsqueeze(-1) + x
+        x = x2 * se.unsqueeze(-1) + x2
         return x
+
+
+class AdaptiveGCN(nn.Module):
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 A: np.ndarray,
+                 conv_d: nn.Conv2d,
+                 num_subset: int = 3):
+        super().__init__()
+        self.num_subset = num_subset
+        self.PA = nn.Parameter(torch.from_numpy(A.astype(np.float32)))  # Bk
+        self.alpha = nn.Parameter(torch.zeros(1))  # G
+        self.conv_a = nn.ModuleList()
+        self.conv_b = nn.ModuleList()
+        self.tse1 = nn.ModuleList()
+        for _ in range(self.num_subset):
+            self.conv_a.append(nn.Conv2d(in_channels, out_channels, 1))
+            self.conv_b.append(nn.Conv2d(in_channels, out_channels, 1))
+            self.tse1.append(TemporalSE(in_channels))
+        self.soft = nn.Softmax(-2)
+        self.conv_d = conv_d
+
+    def forward(self, x):
+        y = None
+        N, C, T, V = x.size()
+        A = self.PA  # Bk
+        for i in range(self.num_subset):
+            A1 = self.conv_a[i](x).permute(0, 3, 1, 2).contiguous()
+            A1 = A1.view(N, V, -1)  # N V CT (theta)
+            A2 = self.conv_b[i](x).view(N, -1, V)  # N CT V (phi)
+            A1 = self.soft(torch.matmul(A1, A2) / A1.size(-1))  # N V V
+            A1 = A[i] + A1 * self.alpha
+            A3 = x.view(N, -1, V)
+            S1 = torch.matmul(A3, A1).view(N, C, -1, V)
+            T1 = self.tse1(x, S1)
+            z = self.conv_d[i](T1)
+            y = z + y if y is not None else z
+        return y
 
 
 class TCNGCNUnit(nn.Module):
@@ -76,11 +92,6 @@ class TCNGCNUnit(nn.Module):
                             adaptive=adaptive,
                             attention=attention,
                             gbn_split=gbn_split)
-        self.tcn1 = TCNUnit(out_channels,
-                            out_channels,
-                            stride=stride,
-                            gbn_split=gbn_split)
-        self.tse1 = TemporalSE(out_channels)
         self.relu = nn.ReLU(inplace=True)
 
         if not residual:
@@ -92,22 +103,21 @@ class TCNGCNUnit(nn.Module):
         else:
             # if the residual does not have the same channel dimensions.
             # if stride > 1
-            self.residual = TCNUnit(in_channels, out_channels,
-                                    kernel_size=1, stride=stride,
+            self.residual = TCNUnit(in_channels,
+                                    out_channels,
+                                    kernel_size=1,
+                                    stride=stride,
                                     gbn_split=gbn_split)
 
     def forward(self, x):
         y = self.gcn1(x)
-        y = self.tcn1(y)
-        y = self.tse1(y)
         y = self.relu(y + self.residual(x))
         return y
 
 
 # ------------------------------------------------------------------------------
 # Network
-# - added se block after TCN, sct attention is removed.
-# - without the tse block.
+# - removed TCN, added TSE in the AdaptiveGCN.
 # ------------------------------------------------------------------------------
 class Model(BaseModel):
     def __init__(self,
@@ -130,6 +140,9 @@ class Model(BaseModel):
         else:
             Graph = import_class(graph)
             self.graph = Graph(**graph_args)
+
+        if adaptive:
+            self.adaptive_fn = AdaptiveGCN
 
         def _TCNGCNUnit(_in, _out, stride=1, residual=True):
             return TCNGCNUnit(_in,

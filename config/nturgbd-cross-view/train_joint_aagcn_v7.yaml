@@ -1,0 +1,64 @@
+work_dir: ./data/data/ntu_result/xview/aagcn_v7_joint/211203150001
+model_saved_name: ./data/data/ntu_result/xview/aagcn_v7_joint/211203150001/ntu_cv_aagcn_v7_joint
+
+phase: train
+save_score: True
+
+seed: 1
+log_interval: 100  # iter
+save_interval: 2  # iter
+eval_interval: 5  # iter
+print_log: true
+
+# feeder
+feeder: feeders.feeder.Feeder
+num_worker: 32
+train_feeder_args:
+  data_path: ./data/data/ntu/xview/train_data_joint.npy
+  label_path: ./data/data/ntu/xview/train_label.pkl
+  debug: False
+  random_choose: False
+  random_shift: False
+  random_move: False
+  window_size: -1
+  normalization: False
+
+test_feeder_args:
+  data_path: ./data/data/ntu/xview/val_data_joint.npy
+  label_path: ./data/data/ntu/xview/val_label.pkl
+
+# model
+model: model.aagcn_v7.Model
+model_args:
+  num_class: 60
+  num_point: 25
+  num_person: 2
+  num_subset: 3
+  graph: graph.ntu_rgb_d.Graph
+  graph_args:
+    labeling_mode: 'spatial'
+  in_channels: 3
+  drop_out: 0
+  adaptive: True
+  attention: False
+  gbn_split: 0
+# weights: None 
+
+#optim
+# device: [0, 1 ,2, 3]
+device: [0, 1]
+batch_size: 64
+test_batch_size: 64
+
+optimizer: SGD
+nesterov: True
+base_lr: 0.1
+step: [30, 40]
+weight_decay: 0.0001
+
+start_epoch: 0
+num_epoch: 50
+warm_up_epoch: 5
+
+only_train_part: True
+only_train_epoch: 5

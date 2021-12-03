@@ -171,7 +171,7 @@ class AdaptiveGCN(nn.Module):
             A1 = self.soft(torch.matmul(A1, A2) / A1.size(-1))  # N V V
             A1 = A[i] + A1 * self.alpha
             A3 = x.view(N, -1, V)
-            z = self.conv_d[i](torch.matmul(A3, A1).view(N, C, T, V))
+            z = self.conv_d[i](torch.matmul(A3, A1).view(N, C, -1, V))
             y = z + y if y is not None else z
         return y
 
@@ -281,11 +281,16 @@ class TCNGCNUnit(nn.Module):
                  attention: bool = True,
                  gbn_split: Optional[int] = None):
         super().__init__()
-        self.gcn1 = GCNUnit(in_channels, out_channels, A,
+        self.gcn1 = GCNUnit(in_channels,
+                            out_channels,
+                            A,
                             num_subset=num_subset,
-                            adaptive=adaptive, attention=attention,
+                            adaptive=adaptive,
+                            attention=attention,
                             gbn_split=gbn_split)
-        self.tcn1 = TCNUnit(out_channels, out_channels, stride=stride,
+        self.tcn1 = TCNUnit(out_channels,
+                            out_channels,
+                            stride=stride,
                             gbn_split=gbn_split)
         self.relu = nn.ReLU(inplace=True)
 
@@ -298,12 +303,16 @@ class TCNGCNUnit(nn.Module):
         else:
             # if the residual does not have the same channel dimensions.
             # if stride > 1
-            self.residual = TCNUnit(in_channels, out_channels,
-                                    kernel_size=1, stride=stride,
+            self.residual = TCNUnit(in_channels,
+                                    out_channels,
+                                    kernel_size=1,
+                                    stride=stride,
                                     gbn_split=gbn_split)
 
     def forward(self, x):
-        y = self.relu(self.tcn1(self.gcn1(x)) + self.residual(x))
+        y = self.gcn1(x)
+        y = self.tcn1(y)
+        y = self.relu(y + self.residual(x))
         return y
 
 
