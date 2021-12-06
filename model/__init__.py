@@ -6,3 +6,4 @@ from . import aagcn_v4
 from . import aagcn_v5
 from . import aagcn_v6
 from . import aagcn_v7
+from . import aagcn_v8

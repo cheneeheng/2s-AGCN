@@ -17,9 +17,13 @@ class TemporalSE(nn.Module):
                  kernel_size: int = 9):
         super().__init__()
         pad = (kernel_size - 1) // 2
-        self.conv1 = nn.Conv1d(in_channels, in_channels//coff_embedding,
+        if in_channels < coff_embedding * 2:
+            inter_channels = in_channels
+        else:
+            inter_channels = in_channels//coff_embedding
+        self.conv1 = nn.Conv1d(in_channels, inter_channels,
                                kernel_size, padding=pad)
-        self.conv2 = nn.Conv1d(in_channels//coff_embedding, 1,
+        self.conv2 = nn.Conv1d(inter_channels, 1,
                                kernel_size, padding=pad)
         self.sigmoid = nn.Sigmoid()
         self.relu = nn.ReLU(inplace=True)
@@ -67,7 +71,7 @@ class AdaptiveGCN(nn.Module):
             A1 = A[i] + A1 * self.alpha
             A3 = x.view(N, -1, V)
             S1 = torch.matmul(A3, A1).view(N, C, -1, V)
-            T1 = self.tse1(x, S1)
+            T1 = self.tse1[i](x, S1)
             z = self.conv_d[i](T1)
             y = z + y if y is not None else z
         return y
@@ -94,12 +98,15 @@ class TCNGCNUnit(nn.Module):
                             gbn_split=gbn_split)
         self.relu = nn.ReLU(inplace=True)
 
+        if stride > 1:
+            self.pool = nn.AvgPool2d((stride, 1))
+        else:
+            self.pool = lambda x: x
+
         if not residual:
             self.residual = lambda x: 0
-
         elif (in_channels == out_channels) and (stride == 1):
             self.residual = lambda x: x
-
         else:
             # if the residual does not have the same channel dimensions.
             # if stride > 1
@@ -111,6 +118,7 @@ class TCNGCNUnit(nn.Module):
 
     def forward(self, x):
         y = self.gcn1(x)
+        y = self.pool(y)
         y = self.relu(y + self.residual(x))
         return y
 

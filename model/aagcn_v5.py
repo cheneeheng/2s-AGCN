@@ -106,8 +106,8 @@ class TCNGCNUnit(nn.Module):
 
 # ------------------------------------------------------------------------------
 # Network
-# - added se block after TCN, sct attention is removed.
-# - without the tse block.
+# - added se block after TCN, sct attention is removed. > slightly worse 93.72%
+# - without the tse block, sct attention is removed.
 # ------------------------------------------------------------------------------
 class Model(BaseModel):
     def __init__(self,

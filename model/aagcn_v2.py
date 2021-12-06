@@ -7,8 +7,9 @@ from model.aagcn import BaseModel
 
 # ------------------------------------------------------------------------------
 # Network
-# - A does not depend on predefined A matrix. > slightly worse ~0.5%
-# - Using only 1 subset > no noticable difference.
+# - A does not depend on predefined A matrix. > no noticable difference.
+# - Using 1 subset > no noticable difference.
+# - Using 5 subset > no noticable difference.
 # ------------------------------------------------------------------------------
 class Model(BaseModel):
     def __init__(self,
