@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_v2_joint/211202210001_1subset
-model_saved_name: ./data/data/ntu_result/xview/aagcn_v2_joint/211202210001_1subset/ntu_cv_aagcn_v2_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_v2_joint/211202210001_5subset
+model_saved_name: ./data/data/ntu_result/xview/aagcn_v2_joint/211202210001_5subset/ntu_cv_aagcn_v2_joint
 
 phase: train
 save_score: True
@@ -33,7 +33,7 @@ model_args:
   num_class: 60
   num_point: 25
   num_person: 2
-  num_subset: 1
+  num_subset: 5
 # weights: None 
 
 #optim

@@ -16,7 +16,7 @@ class AdaptiveGCN(nn.Module):
                  A: np.ndarray,
                  conv_d: nn.Conv2d,
                  num_subset: int = 3,
-                 num_splits: int = 10):
+                 num_splits: int = 5):
         super().__init__()
         self.num_subset = num_subset
         self.num_splits = num_splits
@@ -41,20 +41,21 @@ class AdaptiveGCN(nn.Module):
         y = None
 
         for i in range(self.num_subset):
-            A1 = self.conv_a[i](x).permute(0, 3, 1, 2).contiguous()  # N V C T
+            A1 = self.conv_a[i](x).permute(0, 3, 1, 2)  # N V C T
             A2 = self.conv_b[i](x)  # N C T V
             A1 = torch.split(A1, split_size, dim=3)
             A2 = torch.split(A2, split_size, dim=2)
             A3 = []
             for j in range(self.num_splits):
-                A1j = A1[j].view(N, V, -1)  # N V Ct (theta)
-                A2j = A2[j].view(N, -1, V)  # N Ct V (phi)
+                A1j = A1[j].contiguous().view(N, V, -1)  # N V Ct (theta)
+                A2j = A2[j].contiguous().view(N, -1, V)  # N Ct V (phi)
                 A12 = self.soft(torch.matmul(A1j, A2j) / A1j.size(-1))  # N V V
                 A12 = A[i] + A12 * self.alpha[j]  # N V V
-                A3j = x_tuple[j].view(N, -1, V)  # N Ct V
-                A3j = torch.matmul(A3j, A1).view(N, C, -1, V)  # N C t V
+                A3j = x_tuple[j].contiguous().view(N, -1, V)  # N Ct V
+                A3j = torch.matmul(A3j, A12).view(N, C, -1, V)  # N C t V
                 A3.append(A3j)
-            z = self.conv_d[i](torch.cat(A3), dim=2)
+            z = self.conv_d[i](torch.cat(A3, dim=2))
+            assert z.shape[2] == T, z.shape[2]
             y = z + y if y is not None else z
         return y
 
