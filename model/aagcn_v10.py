@@ -69,7 +69,7 @@ class TCNGCNUnit(nn.Module):
                             attention=attention,
                             gbn_split=gbn_split)
         self.mha1 = MHAUnit(out_channels * num_point,
-                            out_channels * num_point,
+                            out_channels,
                             num_heads=num_heads,
                             gbn_split=gbn_split)
 

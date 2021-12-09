@@ -28,7 +28,7 @@ class LSTMUnit(nn.Module):
         self.bidirectional = bidirectional
         self.lstm = nn.LSTM(
             input_size=in_channels,
-            hidden_size=out_channels // (bidirectional + 1),
+            hidden_size=in_channels // (bidirectional + 1),
             num_layers=num_layers,
             bias=True,
             batch_first=True,
@@ -73,7 +73,7 @@ class TCNGCNUnit(nn.Module):
                             attention=attention,
                             gbn_split=gbn_split)
         self.rnn1 = LSTMUnit(out_channels * num_point,
-                             out_channels * num_point,
+                             out_channels,
                              num_layers=num_layers,
                              bidirectional=bidirectional,
                              gbn_split=gbn_split)
