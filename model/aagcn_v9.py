@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torchinfo import summary
 
 import numpy as np
 from typing import Optional
@@ -150,18 +151,19 @@ class Model(BaseModel):
                               bidirectional=bidirectional)
 
         self.l1 = _TCNGCNUnit(3, 64, residual=False)
-        self.l2 = _TCNGCNUnit(64, 64)
+        self.l2 = lambda x: x
         self.l3 = _TCNGCNUnit(64, 64)
         self.l4 = _TCNGCNUnit(64, 64)
         self.l5 = _TCNGCNUnit(64, 128, stride=2)
-        self.l6 = _TCNGCNUnit(128, 128)
+        self.l6 = lambda x: x
         self.l7 = _TCNGCNUnit(128, 128)
         self.l8 = _TCNGCNUnit(128, 256, stride=2)
-        self.l9 = _TCNGCNUnit(256, 256)
+        self.l9 = lambda x: x
         self.l10 = _TCNGCNUnit(256, 256)
 
 
 if __name__ == '__main__':
     graph = 'graph.ntu_rgb_d.Graph'
     model = Model(graph=graph)
-    model(torch.ones((1, 3, 300, 25, 2)))
+    summary(model, (1, 3, 300, 25, 2), device='cpu')
+    # model(torch.ones((1, 3, 300, 25, 2)))

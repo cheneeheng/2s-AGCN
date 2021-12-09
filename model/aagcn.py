@@ -4,6 +4,7 @@ from typing import Optional, Union
 
 import torch
 import torch.nn as nn
+from torchinfo import summary
 
 from model.ghostbatchnorm import GhostBatchNorm1d, GhostBatchNorm2d
 
@@ -433,3 +434,10 @@ class Model(BaseModel):
         self.l8 = _TCNGCNUnit(128, 256, stride=2)
         self.l9 = _TCNGCNUnit(256, 256)
         self.l10 = _TCNGCNUnit(256, 256)
+
+
+if __name__ == '__main__':
+    graph = 'graph.ntu_rgb_d.Graph'
+    model = Model(graph=graph)
+    summary(model, (1, 3, 300, 25, 2), device='cpu')
+    # model(torch.ones((1, 3, 300, 25, 2)))

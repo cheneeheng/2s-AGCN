@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torchinfo import summary
 
 import numpy as np
 from typing import Optional
@@ -19,7 +20,7 @@ class MHAUnit(nn.Module):
     def __init__(self,
                  in_channels: int,
                  out_channels: int,
-                 num_heads: int = 4,
+                 num_heads: int = 1,
                  gbn_split: Optional[int] = None):
         super().__init__()
         self.mha = nn.MultiheadAttention(
@@ -59,7 +60,7 @@ class TCNGCNUnit(nn.Module):
                  attention: bool = True,
                  gbn_split: Optional[int] = None,
                  num_point: int = 25,
-                 num_heads: int = 4):
+                 num_heads: int = 1):
         super().__init__()
         self.gcn1 = GCNUnit(in_channels,
                             out_channels,
@@ -119,7 +120,7 @@ class Model(BaseModel):
                  adaptive: bool = True,
                  attention: bool = True,
                  gbn_split: Optional[int] = None,
-                 num_heads: int = 4):
+                 num_heads: int = 1):
         super().__init__(num_class, num_point, num_person,
                          in_channels, drop_out, adaptive, gbn_split)
 
@@ -157,4 +158,5 @@ class Model(BaseModel):
 if __name__ == '__main__':
     graph = 'graph.ntu_rgb_d.Graph'
     model = Model(graph=graph)
-    model(torch.ones((1, 3, 300, 25, 2)))
+    summary(model, (1, 3, 300, 25, 2), device='cpu')
+    # model(torch.ones((1, 3, 300, 25, 2)))

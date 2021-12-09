@@ -589,7 +589,7 @@ if __name__ == '__main__':
         parser.set_defaults(**default_arg)
 
     arg = parser.parse_args()
-    init_seed(0)
+    init_seed(1)
     processor = Processor(arg)
     processor.start()
     print()
