@@ -292,14 +292,11 @@ class TCNGCNUnit(nn.Module):
                             out_channels,
                             stride=stride,
                             gbn_split=gbn_split)
-        self.relu = nn.ReLU(inplace=True)
 
         if not residual:
             self.residual = lambda x: 0
-
         elif (in_channels == out_channels) and (stride == 1):
             self.residual = lambda x: x
-
         else:
             # if the residual does not have the same channel dimensions.
             # if stride > 1
@@ -308,6 +305,8 @@ class TCNGCNUnit(nn.Module):
                                     kernel_size=1,
                                     stride=stride,
                                     gbn_split=gbn_split)
+
+        self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
         y = self.gcn1(x)

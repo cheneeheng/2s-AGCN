@@ -5,6 +5,7 @@ import numpy as np
 from typing import Optional
 
 from model.aagcn import import_class
+from model.aagcn import batch_norm_2d
 from model.aagcn import AdaptiveGCN
 from model.aagcn import GCNUnit
 from model.aagcn import TCNUnit
@@ -18,7 +19,8 @@ class MHAUnit(nn.Module):
     def __init__(self,
                  in_channels: int,
                  out_channels: int,
-                 num_heads: int = 4):
+                 num_heads: int = 4,
+                 gbn_split: Optional[int] = None):
         super().__init__()
         self.mha = nn.MultiheadAttention(
             embed_dim=in_channels,
@@ -30,6 +32,7 @@ class MHAUnit(nn.Module):
             kdim=None,
             vdim=None,
             batch_first=True)
+        self.bn = batch_norm_2d(out_channels, gbn_split)
 
     def forward(self, x):
         # x : N C T V
@@ -55,6 +58,7 @@ class TCNGCNUnit(nn.Module):
                  adaptive: nn.Module = AdaptiveGCN,
                  attention: bool = True,
                  gbn_split: Optional[int] = None,
+                 num_point: int = 25,
                  num_heads: int = 4):
         super().__init__()
         self.gcn1 = GCNUnit(in_channels,
@@ -64,16 +68,15 @@ class TCNGCNUnit(nn.Module):
                             adaptive=adaptive,
                             attention=attention,
                             gbn_split=gbn_split)
-        self.mha1 = MHAUnit(out_channels,
-                            out_channels,
-                            num_heads=num_heads)
+        self.mha1 = MHAUnit(out_channels * num_point,
+                            out_channels * num_point,
+                            num_heads=num_heads,
+                            gbn_split=gbn_split)
 
         if stride > 1:
             self.pool = nn.AvgPool2d((stride, 1))
         else:
             self.pool = lambda x: x
-
-        self.relu = nn.ReLU(inplace=True)
 
         if not residual:
             self.residual = lambda x: 0
@@ -88,9 +91,11 @@ class TCNGCNUnit(nn.Module):
                                     stride=stride,
                                     gbn_split=gbn_split)
 
+        self.relu = nn.ReLU(inplace=True)
+
     def forward(self, x):
         y = self.gcn1(x)
-        y, attn = self.rnn1(y)
+        y, attn = self.mha1(y)
         y = self.pool(y)
         y = y + self.residual(x)
         y = self.relu(y)
@@ -134,6 +139,7 @@ class Model(BaseModel):
                               adaptive=self.adaptive_fn,
                               attention=attention,
                               gbn_split=gbn_split,
+                              num_point=num_point,
                               num_heads=num_heads)
 
         self.l1 = _TCNGCNUnit(3, 64, residual=False)
@@ -146,3 +152,9 @@ class Model(BaseModel):
         self.l8 = _TCNGCNUnit(128, 256, stride=2)
         self.l9 = _TCNGCNUnit(256, 256)
         self.l10 = _TCNGCNUnit(256, 256)
+
+
+if __name__ == '__main__':
+    graph = 'graph.ntu_rgb_d.Graph'
+    model = Model(graph=graph)
+    model(torch.ones((1, 3, 300, 25, 2)))
