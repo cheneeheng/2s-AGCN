@@ -45,11 +45,12 @@ class GradualWarmupScheduler(_LRScheduler):
             return super(GradualWarmupScheduler, self).step(epoch)
 
 
-def init_seed(_):
-    torch.cuda.manual_seed_all(1)
-    torch.manual_seed(1)
-    np.random.seed(1)
-    random.seed(1)
+def init_seed(seed=1):
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
     # torch.backends.cudnn.enabled = False
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
@@ -225,6 +226,8 @@ class Processor():
         Feeder = import_class(self.arg.feeder)
         self.data_loader = dict()
         if self.arg.phase == 'train':
+            assert os.path.exists(self.arg.train_feeder_args['data_path'])
+            assert os.path.exists(self.arg.train_feeder_args['label_path'])
             self.data_loader['train'] = torch.utils.data.DataLoader(
                 dataset=Feeder(**self.arg.train_feeder_args),
                 batch_size=self.arg.batch_size,
