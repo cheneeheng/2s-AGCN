@@ -2,93 +2,90 @@ from .rotation import *
 from tqdm import tqdm
 
 
-def pre_normalization(data, zaxis=[0, 1], xaxis=[8, 4], verbose=False):
+def __verbose(x, out=None):
+    if out is not None:
+        print(out)
+        return tqdm(x)
+    else:
+        return x
+
+
+def pre_normalization(data, zaxis=[0, 1], xaxis=[8, 4], pad=True, center=True,
+                      verbose=False):
     N, C, T, V, M = data.shape
     s = np.transpose(data, [0, 4, 2, 3, 1])  # N, C, T, V, M  to  N, M, T, V, C
 
-    if verbose:
-        print('pad the null frames with the previous frames')
-        s_list = tqdm(s)
-    else:
-        s_list = s
-    for i_s, skeleton in enumerate(s_list):  # pad
-        if skeleton.sum() == 0:
-            print(i_s, ' has no skeleton')
-        for i_p, person in enumerate(skeleton):
-            if person.sum() == 0:
-                continue
-            if person[0].sum() == 0:
-                index = (person.sum(-1).sum(-1) != 0)
-                tmp = person[index].copy()
-                person *= 0
-                person[:len(tmp)] = tmp
-            for i_f, frame in enumerate(person):
-                if frame.sum() == 0:
-                    if person[i_f:].sum() == 0:
-                        rest = len(person) - i_f
-                        num = int(np.ceil(rest / i_f))
-                        pad = np.concatenate([person[0:i_f] for _ in range(num)], 0)[:rest]  # noqa
-                        s[i_s, i_p, i_f:] = pad
-                        break
-
-    if verbose:
-        print('sub the center joint #1 (spine joint in ntu and neck joint in kinetics)')  # noqa
-        s_list = tqdm(s)
-    else:
-        s_list = s
-    for i_s, skeleton in enumerate(s_list):
-        if skeleton.sum() == 0:
-            continue
-        main_body_center = skeleton[0][:, 1:2, :].copy()
-        for i_p, person in enumerate(skeleton):
-            if person.sum() == 0:
-                continue
-            mask = (person.sum(-1) != 0).reshape(T, V, 1)
-            s[i_s, i_p] = (s[i_s, i_p] - main_body_center) * mask
-
-    if verbose:
-        print('parallel the bone between hip(jpt 0) and spine(jpt 1) of the first person to the z axis')  # noqa
-        s_list = tqdm(s)
-    else:
-        s_list = s
-    for i_s, skeleton in enumerate(s_list):
-        if skeleton.sum() == 0:
-            continue
-        joint_bottom = skeleton[0, 0, zaxis[0]]
-        joint_top = skeleton[0, 0, zaxis[1]]
-        axis = np.cross(joint_top - joint_bottom, [0, 0, 1])
-        angle = angle_between(joint_top - joint_bottom, [0, 0, 1])
-        matrix_z = rotation_matrix(axis, angle)
-        for i_p, person in enumerate(skeleton):
-            if person.sum() == 0:
-                continue
-            for i_f, frame in enumerate(person):
-                if frame.sum() == 0:
+    if pad:
+        s_list = __verbose(s, out='pad the null frames with the previous frames')  # noqa
+        for i_s, skeleton in enumerate(s_list):  # pad
+            if skeleton.sum() == 0:
+                print(i_s, ' has no skeleton')
+            for i_p, person in enumerate(skeleton):
+                if person.sum() == 0:
                     continue
-                for i_j, joint in enumerate(frame):
-                    s[i_s, i_p, i_f, i_j] = np.dot(matrix_z, joint)
+                if person[0].sum() == 0:
+                    index = (person.sum(-1).sum(-1) != 0)
+                    tmp = person[index].copy()
+                    person *= 0
+                    person[:len(tmp)] = tmp
+                for i_f, frame in enumerate(person):
+                    if frame.sum() == 0:
+                        if person[i_f:].sum() == 0:
+                            rest = len(person) - i_f
+                            num = int(np.ceil(rest / i_f))
+                            pad = np.concatenate([person[0:i_f] for _ in range(num)], 0)[:rest]  # noqa
+                            s[i_s, i_p, i_f:] = pad
+                            break
 
-    if verbose:
-        print('parallel the bone between right shoulder(jpt 8) and left shoulder(jpt 4) of the first person to the x axis')  # noqa
-        s_list = tqdm(s)
-    else:
-        s_list = s
-    for i_s, skeleton in enumerate(s_list):
-        if skeleton.sum() == 0:
-            continue
-        joint_rshoulder = skeleton[0, 0, xaxis[0]]
-        joint_lshoulder = skeleton[0, 0, xaxis[1]]
-        axis = np.cross(joint_rshoulder - joint_lshoulder, [1, 0, 0])
-        angle = angle_between(joint_rshoulder - joint_lshoulder, [1, 0, 0])
-        matrix_x = rotation_matrix(axis, angle)
-        for i_p, person in enumerate(skeleton):
-            if person.sum() == 0:
+    if center:
+        s_list = __verbose(s, out='sub the center joint #1 (spine joint in ntu and neck joint in kinetics)')  # noqa
+        for i_s, skeleton in enumerate(s_list):
+            if skeleton.sum() == 0:
                 continue
-            for i_f, frame in enumerate(person):
-                if frame.sum() == 0:
+            main_body_center = skeleton[0][:, 1:2, :].copy()
+            for i_p, person in enumerate(skeleton):
+                if person.sum() == 0:
                     continue
-                for i_j, joint in enumerate(frame):
-                    s[i_s, i_p, i_f, i_j] = np.dot(matrix_x, joint)
+                mask = (person.sum(-1) != 0).reshape(T, V, 1)
+                s[i_s, i_p] = (s[i_s, i_p] - main_body_center) * mask
+
+    if zaxis is not None:
+        s_list = __verbose(s, out='parallel the bone between hip(jpt 0) and spine(jpt 1) of the first person to the z axis')  # noqa
+        for i_s, skeleton in enumerate(s_list):
+            if skeleton.sum() == 0:
+                continue
+            joint_bottom = skeleton[0, 0, zaxis[0]]
+            joint_top = skeleton[0, 0, zaxis[1]]
+            axis = np.cross(joint_top - joint_bottom, [0, 0, 1])
+            angle = angle_between(joint_top - joint_bottom, [0, 0, 1])
+            matrix_z = rotation_matrix(axis, angle)
+            for i_p, person in enumerate(skeleton):
+                if person.sum() == 0:
+                    continue
+                for i_f, frame in enumerate(person):
+                    if frame.sum() == 0:
+                        continue
+                    for i_j, joint in enumerate(frame):
+                        s[i_s, i_p, i_f, i_j] = np.dot(matrix_z, joint)
+
+    if xaxis is not None:
+        s_list = __verbose(s, out='parallel the bone between right shoulder(jpt 8) and left shoulder(jpt 4) of the first person to the x axis')  # noqa
+        for i_s, skeleton in enumerate(s_list):
+            if skeleton.sum() == 0:
+                continue
+            joint_rshoulder = skeleton[0, 0, xaxis[0]]
+            joint_lshoulder = skeleton[0, 0, xaxis[1]]
+            axis = np.cross(joint_rshoulder - joint_lshoulder, [1, 0, 0])
+            angle = angle_between(joint_rshoulder - joint_lshoulder, [1, 0, 0])
+            matrix_x = rotation_matrix(axis, angle)
+            for i_p, person in enumerate(skeleton):
+                if person.sum() == 0:
+                    continue
+                for i_f, frame in enumerate(person):
+                    if frame.sum() == 0:
+                        continue
+                    for i_j, joint in enumerate(frame):
+                        s[i_s, i_p, i_f, i_j] = np.dot(matrix_x, joint)
 
     data = np.transpose(s, [0, 4, 2, 3, 1])  # N, M, T, V, C to N, C, T, V, M
     return data

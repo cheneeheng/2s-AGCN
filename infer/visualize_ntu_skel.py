@@ -215,6 +215,31 @@ def draw_skeleton(data, pause_sec=10, action=""):
         sleep(pause_sec)
 
 
+def draw_skeleton_offline(data, pause_sec=10, action=""):
+
+    camera = dict(
+        up=dict(x=0, y=0, z=1),
+        center=dict(x=0, y=0, z=0),
+        eye=dict(x=0, y=3.0, z=0)
+    )
+    fig = go.Figure(
+        data=_plot_skel(data, 0),
+        layout=go.Layout(
+            updatemenus=[dict(type="buttons",
+                              buttons=[dict(label="Play",
+                                            method="animate",
+                                            args=[None])])]),
+        frames=[go.Frame(data=_plot_skel(data, k))
+                for k in range(data.shape[1])]
+    )
+    fig.update_layout(scene_camera=camera,
+                      showlegend=False,
+                      margin=dict(l=0, r=0, b=0, t=0),
+                      yaxis=dict(range=[-1, 1]),
+                      xaxis=dict(range=[-1, 1]))
+    fig.show(renderer='notebook_connected')
+
+
 if __name__ == '__main__':
 
     file_name = r'/workspaces/2s-AGCN/data/data/nturgbd_raw/nturgb+d_skeletons/S001C001P001R001A009.skeleton'  # noqa
@@ -238,7 +263,7 @@ if __name__ == '__main__':
 
     print('read data done!')
     print(data.shape)  # C, T, V, M
-    draw_skeleton(data)
+    # draw_skeleton(data)
 
     # import plotly.graph_objects as go
     # import numpy as np

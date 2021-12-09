@@ -16,9 +16,9 @@ from data_gen.ntu_gendata import (
     max_body_kinect,
     num_joint
 )
+from infer.data_preprocess import DataPreprocessor
+from infer.inference import prepare_model, arg_parser, append_data_and_predict
 
-from data_preprocess import DataPreprocessor
-from inference import prepare_model, arg_parser, append_data_and_predict
 from main import get_parser, init_seed
 
 

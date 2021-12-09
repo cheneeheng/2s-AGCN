@@ -1,4 +1,3 @@
-
 aagcn:
 - original model.
 - 94.7%
@@ -41,3 +40,12 @@ aagcn_v6:
 aagcn_v7:
 - removed TCN, added TSE in the AdaptiveGCN.
 - worst, 92.1%
+
+aagcn_v8:
+- creates multiple attentions instead of one in AdaptiveGCN
+- using 5 splits
+-- no noticable difference. 94.5%
+-- overfit, train acc ~1
+- using 3 splits
+-- no noticable difference. 94.5%
+-- overfit, train acc ~1

@@ -15,8 +15,7 @@ from data_gen.ntu_gendata import (
     max_body_kinect,
     num_joint
 )
-
-from data_preprocess import DataPreprocessor
+from infer.data_preprocess import DataPreprocessor
 from main import get_parser, import_class, init_seed
 
 
