@@ -11,6 +11,7 @@ from model.aagcn import batch_norm_2d
 from model.aagcn import AdaptiveGCN
 from model.aagcn import GCNUnit
 from model.aagcn import TCNUnit
+from model.aagcn import TCNGCNUnit as TCNGCNUnitOri
 from model.aagcn import BaseModel
 
 
@@ -136,6 +137,17 @@ class Model(BaseModel):
             Graph = import_class(graph)
             self.graph = Graph(**graph_args)
 
+        def _TCNGCNUnitOri(_in, _out, stride=1, residual=True):
+            return TCNGCNUnitOri(_in,
+                                 _out,
+                                 self.graph.A,
+                                 num_subset=num_subset,
+                                 stride=stride,
+                                 residual=residual,
+                                 adaptive=self.adaptive_fn,
+                                 attention=attention,
+                                 gbn_split=gbn_split)
+
         def _TCNGCNUnit(_in, _out, stride=1, residual=True):
             return TCNGCNUnit(_in,
                               _out,
@@ -152,24 +164,24 @@ class Model(BaseModel):
 
         # self.l1 = _TCNGCNUnit(3, 64, residual=False)
         # self.l2 = lambda x: x
-        # self.l3 = _TCNGCNUnit(64, 64)
-        # self.l4 = _TCNGCNUnit(64, 64)
-        # self.l5 = _TCNGCNUnit(64, 128, stride=2)
+        # self.l3 = lambda x: x
+        # self.l4 = lambda x: x
+        # self.l5 = lambda x: x
         # self.l6 = lambda x: x
-        # self.l7 = _TCNGCNUnit(128, 128)
-        # self.l8 = _TCNGCNUnit(128, 256, stride=2)
+        # self.l7 = lambda x: x
+        # self.l8 = lambda x: x
         # self.l9 = lambda x: x
-        # self.l10 = _TCNGCNUnit(256, 256)
+        # self.l10 = lambda x: x
 
-        self.l1 = _TCNGCNUnit(3, 64, residual=False)
-        self.l2 = _TCNGCNUnit(64, 64)
-        self.l3 = _TCNGCNUnit(64, 64)
-        self.l4 = _TCNGCNUnit(64, 64)
-        self.l5 = _TCNGCNUnit(64, 128, stride=2)
-        self.l6 = _TCNGCNUnit(128, 128)
-        self.l7 = _TCNGCNUnit(128, 128)
-        self.l8 = _TCNGCNUnit(128, 256, stride=2)
-        self.l9 = _TCNGCNUnit(256, 256)
+        self.l1 = _TCNGCNUnitOri(3, 64, residual=False)
+        self.l2 = _TCNGCNUnitOri(64, 64)
+        self.l3 = _TCNGCNUnitOri(64, 64)
+        self.l4 = _TCNGCNUnitOri(64, 64)
+        self.l5 = _TCNGCNUnitOri(64, 128, stride=2)
+        self.l6 = _TCNGCNUnitOri(128, 128)
+        self.l7 = _TCNGCNUnitOri(128, 128)
+        self.l8 = _TCNGCNUnitOri(128, 256, stride=2)
+        self.l9 = _TCNGCNUnitOri(256, 256)
         self.l10 = _TCNGCNUnit(256, 256)
 
 
