@@ -99,7 +99,8 @@ class TCNGCNUnit(nn.Module):
         y = self.gcn1(x)
         y = self.rnn1(y)
         y = self.pool(y)
-        y = self.relu(y + self.residual(x))
+        y = y + self.residual(x)
+        y = self.relu(y)
         return y
 
 

@@ -119,7 +119,8 @@ class TCNGCNUnit(nn.Module):
     def forward(self, x):
         y = self.gcn1(x)
         y = self.pool(y)
-        y = self.relu(y + self.residual(x))
+        y = y + self.residual(x)
+        y = self.relu(y)
         return y
 
 

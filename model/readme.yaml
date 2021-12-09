@@ -51,7 +51,7 @@ aagcn_v8:
     - overfit, train acc ~1
 
 aagcn_v9:
-  - uses lstm instead of TCN and no attention.
+  - uses lstm instead of TCN.
 
 aagcn_v10:
   - uses MHA instead of TCN (transformer)

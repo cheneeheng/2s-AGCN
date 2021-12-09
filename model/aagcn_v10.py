@@ -1,7 +1,8 @@
+import torch
+from torch import nn
+
 import numpy as np
 from typing import Optional
-
-import torch.nn as nn
 
 from model.aagcn import import_class
 from model.aagcn import AdaptiveGCN
@@ -10,51 +11,37 @@ from model.aagcn import TCNUnit
 from model.aagcn import BaseModel
 
 
-class SqueezeExcitation(nn.Module):
-    def __init__(self, in_channels: int, coff_embedding: int = 4):
+# ------------------------------------------------------------------------------
+# Blocks
+# ------------------------------------------------------------------------------
+class MHAUnit(nn.Module):
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 num_heads: int = 4):
         super().__init__()
-        self.fc1c = nn.Linear(in_channels, in_channels // coff_embedding)
-        self.fc2c = nn.Linear(in_channels // coff_embedding, in_channels)
-        nn.init.kaiming_normal_(self.fc1c.weight)
-        nn.init.kaiming_normal_(self.fc2c.weight)
-        nn.init.constant_(self.fc1c.bias, 0)
-        nn.init.constant_(self.fc2c.bias, 0)
-        self.sigmoid = nn.Sigmoid()
-        self.relu = nn.ReLU(inplace=True)
+        self.mha = nn.MultiheadAttention(
+            embed_dim=in_channels,
+            num_heads=num_heads,
+            dropout=0.,
+            bias=True,
+            add_bias_kv=False,
+            add_zero_attn=False,
+            kdim=None,
+            vdim=None,
+            batch_first=True)
 
     def forward(self, x):
         # x : N C T V
-        se = x.mean(-1).mean(-1)  # N C
-        se = self.fc1c(se)
-        se = self.relu(se)
-        se = self.fc2c(se)
-        se = self.sigmoid(se)
-        x = x * se.unsqueeze(-1).unsqueeze(-1) + x
-        return x
-
-
-class TemporalSE(nn.Module):
-    def __init__(self,
-                 in_channels: int,
-                 coff_embedding: int = 4,
-                 kernel_size: int = 9):
-        super().__init__()
-        pad = (kernel_size - 1) // 2
-        self.conv1 = nn.Conv1d(in_channels, in_channels//coff_embedding,
-                               kernel_size, padding=pad)
-        self.conv2 = nn.Conv1d(in_channels//coff_embedding, 1,
-                               kernel_size, padding=pad)
-        self.sigmoid = nn.Sigmoid()
-        self.relu = nn.ReLU(inplace=True)
-
-    def forward(self, x):
-        se = x.mean(-1)  # N C T
-        se = self.conv1(se)
-        se = self.relu(se)
-        se = self.conv2(se)
-        se = self.sigmoid(se)
-        x = x * se.unsqueeze(-1) + x
-        return x
+        # relu is done after residual.
+        N, _, T, V = x.size()
+        x = x.permute(0, 2, 1, 3).contiguous()  # N T C V
+        x = x.view(N, T, -1)  # N T CV
+        x, attn = self.mha(x, x, x)
+        x = x.view(N, T, -1, V)  # N T C V
+        x = x.permute(0, 2, 1, 3).contiguous()  # N C T V
+        x = self.bn(x)
+        return x, attn
 
 
 class TCNGCNUnit(nn.Module):
@@ -67,7 +54,8 @@ class TCNGCNUnit(nn.Module):
                  residual: bool = True,
                  adaptive: nn.Module = AdaptiveGCN,
                  attention: bool = True,
-                 gbn_split: Optional[int] = None):
+                 gbn_split: Optional[int] = None,
+                 num_heads: int = 4):
         super().__init__()
         self.gcn1 = GCNUnit(in_channels,
                             out_channels,
@@ -76,30 +64,34 @@ class TCNGCNUnit(nn.Module):
                             adaptive=adaptive,
                             attention=attention,
                             gbn_split=gbn_split)
-        self.tcn1 = TCNUnit(out_channels,
+        self.mha1 = MHAUnit(out_channels,
                             out_channels,
-                            stride=stride,
-                            gbn_split=gbn_split)
-        self.tse1 = TemporalSE(out_channels)
+                            num_heads=num_heads)
+
+        if stride > 1:
+            self.pool = nn.AvgPool2d((stride, 1))
+        else:
+            self.pool = lambda x: x
+
         self.relu = nn.ReLU(inplace=True)
 
         if not residual:
             self.residual = lambda x: 0
-
         elif (in_channels == out_channels) and (stride == 1):
             self.residual = lambda x: x
-
         else:
             # if the residual does not have the same channel dimensions.
             # if stride > 1
-            self.residual = TCNUnit(in_channels, out_channels,
-                                    kernel_size=1, stride=stride,
+            self.residual = TCNUnit(in_channels,
+                                    out_channels,
+                                    kernel_size=1,
+                                    stride=stride,
                                     gbn_split=gbn_split)
 
     def forward(self, x):
         y = self.gcn1(x)
-        y = self.tcn1(y)
-        y = self.tse1(y)
+        y, attn = self.rnn1(y)
+        y = self.pool(y)
         y = y + self.residual(x)
         y = self.relu(y)
         return y
@@ -107,8 +99,7 @@ class TCNGCNUnit(nn.Module):
 
 # ------------------------------------------------------------------------------
 # Network
-# - added se block after TCN, sct attention is removed. > slightly worse 93.72%
-# - without the tse block, sct attention is removed.
+# - creates multiple attentions instead of one in AdaptiveGCN
 # ------------------------------------------------------------------------------
 class Model(BaseModel):
     def __init__(self,
@@ -122,7 +113,8 @@ class Model(BaseModel):
                  drop_out: int = 0,
                  adaptive: bool = True,
                  attention: bool = True,
-                 gbn_split: Optional[int] = None):
+                 gbn_split: Optional[int] = None,
+                 num_heads: int = 4):
         super().__init__(num_class, num_point, num_person,
                          in_channels, drop_out, adaptive, gbn_split)
 
@@ -141,7 +133,8 @@ class Model(BaseModel):
                               residual=residual,
                               adaptive=self.adaptive_fn,
                               attention=attention,
-                              gbn_split=gbn_split)
+                              gbn_split=gbn_split,
+                              num_heads=num_heads)
 
         self.l1 = _TCNGCNUnit(3, 64, residual=False)
         self.l2 = _TCNGCNUnit(64, 64)

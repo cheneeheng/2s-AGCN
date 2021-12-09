@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_v9_joint/211209130001
-model_saved_name: ./data/data/ntu_result/xview/aagcn_v9_joint/211209130001/ntu_cv_aagcn_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_v10_joint/211209180001
+model_saved_name: ./data/data/ntu_result/xview/aagcn_v10_joint/211209180001/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
@@ -28,7 +28,7 @@ test_feeder_args:
   label_path: ./data/data/ntu/xview/val_label.pkl
 
 # model
-model: model.aagcn_v9.Model
+model: model.aagcn_v10.Model
 model_args:
   num_class: 60
   num_point: 25
