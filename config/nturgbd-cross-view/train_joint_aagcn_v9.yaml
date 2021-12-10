@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_v9_joint/211209130001
-model_saved_name: ./data/data/ntu_result/xview/aagcn_v9_joint/211209130001/ntu_cv_aagcn_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_v9_joint/211209130001_gaptv_proj2
+model_saved_name: ./data/data/ntu_result/xview/aagcn_v9_joint/211209130001_gaptv_proj2/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
@@ -41,6 +41,7 @@ model_args:
   drop_out: 0
   adaptive: True
   attention: True
+  proj_factor: 2
   num_layers: 1
   bidirectional: False
   postprocess_type: GAP-TV

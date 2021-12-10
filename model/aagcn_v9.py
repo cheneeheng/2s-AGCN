@@ -15,14 +15,23 @@ from model.aagcn import BaseModel
 # ------------------------------------------------------------------------------
 class LSTMUnit(nn.Module):
     def __init__(self,
-                 in_channels: int,
+                 lstm_in_channels: int,
+                 proj_in_channels: int = 1,
+                 proj_factor: int = 4,
                  num_layers: int = 1,
                  bidirectional: bool = False):
         super().__init__()
+
+        if proj_factor > 1:
+            self.proj = nn.Linear(
+                proj_in_channels, proj_in_channels // proj_factor)
+        else:
+            self.proj = lambda x: x
+
         self.bidirectional = bidirectional
         self.lstm = nn.LSTM(
-            input_size=in_channels,
-            hidden_size=in_channels // (bidirectional + 1),
+            input_size=lstm_in_channels,
+            hidden_size=lstm_in_channels // (bidirectional + 1),
             num_layers=num_layers,
             bias=True,
             batch_first=True,
@@ -30,8 +39,9 @@ class LSTMUnit(nn.Module):
             bidirectional=bidirectional,
             proj_size=0  # will be used for dim of h if > 0
         )
+
         self.norm = nn.LayerNorm(
-            normalized_shape=in_channels,
+            normalized_shape=lstm_in_channels,
             eps=1e-05,
             elementwise_affine=True
         )
@@ -40,13 +50,14 @@ class LSTMUnit(nn.Module):
         # x : N C T V
         # relu is done after residual.
         N, _, T, V = x.size()
-        x = x.permute(0, 2, 1, 3).contiguous()  # N T C V
-        x = x.view(N, T, -1)  # N T CV
+        x = x.permute(0, 2, 3, 1).contiguous()  # N T V C
+        x = self.proj(x)
+        x = x.view(N, T, -1)  # N T VC
         x, (hn, cn) = self.lstm(x)
-        x = self.norm(x)  # N T CV
+        x = self.norm(x)  # N T VC
         if original_shape:
-            x = x.view(N, T, -1, V)  # N T C V
-            x = x.permute(0, 2, 1, 3).contiguous()  # N C T V
+            x = x.view(N, T, V, -1)  # N T V C
+            x = x.permute(0, 3, 1, 2).contiguous()  # N C T V
         return x, hn, cn
 
 
@@ -67,11 +78,14 @@ class Model(BaseModel):
                  adaptive: bool = True,
                  attention: bool = True,
                  gbn_split: Optional[int] = None,
+                 proj_factor: int = 1,
                  num_layers: int = 1,
                  bidirectional: bool = False,
                  postprocess_type: Optional[str] = 'GAP-TV'):
         super().__init__(num_class, num_point, num_person,
                          in_channels, drop_out, adaptive, gbn_split)
+
+        assert proj_factor > 0
 
         assert postprocess_type in ['GAP-T', 'GAP-TV', 'LAST-T', 'LAST-TV']
         self.postprocess_type = postprocess_type
@@ -104,50 +118,52 @@ class Model(BaseModel):
         self.l9 = _TCNGCNUnit(256, 256)
         self.l10 = _TCNGCNUnit(256, 256)
 
-        if self.postprocess_type == 'GAP-T':
-            self.init_fc(256*num_point, num_class)
-        elif self.postprocess_type == 'GAP-TV':
-            self.init_fc(256, num_class)
-        elif self.postprocess_type == 'LAST-T':
-            self.init_fc(256*num_point, num_class)
-        elif self.postprocess_type == 'LAST-TV':
-            self.init_fc(256, num_class)
-
         self.rnn = LSTMUnit(
-            in_channels=256*num_point,
+            lstm_in_channels=256*num_point // proj_factor,
+            proj_in_channels=256,
+            proj_factor=proj_factor,
             num_layers=num_layers,
             bidirectional=bidirectional,
         )
 
-    def forward_postprocess(self, x: torch.Tensor, size: torch.Size):
-        # x : NM C T V
-        N, C, T, V, M = size
-        c_new = x.size(1)
         if self.postprocess_type == 'GAP-T':
-            x, hn, cn = self.rnn(x, False)  # N T CV
-            x = x.view(N, M, -1, c_new, V)  # n,m,t,c,v
+            self.init_fc(256*num_point//proj_factor, num_class)
+        elif self.postprocess_type == 'GAP-TV':
+            self.init_fc(256//proj_factor, num_class)
+        elif self.postprocess_type == 'LAST-T':
+            self.init_fc(256*num_point//proj_factor, num_class)
+        elif self.postprocess_type == 'LAST-TV':
+            self.init_fc(256//proj_factor, num_class)
+
+    def forward_postprocess(self, x: torch.Tensor, size: torch.Size):
+        # x : n,c,t,v ; n=nm
+        N, C, T, V, M = size
+        t = x.size(2)
+        if self.postprocess_type == 'GAP-T':
+            x, hn, cn = self.rnn(x, False)  # n,t,vc
+            x = x.view(N, M, t, V, -1)  # n,m,t,v,c
             x = x.mean(2).mean(1)  # n,c,v
             x = x.view(N, -1)  # n,cv
         elif self.postprocess_type == 'GAP-TV':
-            x, hn, cn = self.rnn(x, True)  # N C T V
-            x = x.view(N, M, c_new, -1)  # n,m,c,tv
+            x, hn, cn = self.rnn(x, True)  # n,c,t,v
+            x = x.view(N, M, -1, t*V)  # n,m,c,tv
             x = x.mean(3).mean(1)  # n,c
         elif self.postprocess_type == 'LAST-T':
-            x, hn, cn = self.rnn(x, False)  # N T CV
-            x = x[:, -1, :]  # N CV
-            x = x.view(N, M, -1)  # n,m,cv
-            x = x.mean(1)  # n,cv
+            x, hn, cn = self.rnn(x, False)  # n,t,vc
+            x = x[:, -1, :]  # n,vc
+            x = x.view(N, M, -1)  # n,m,vc
+            x = x.mean(1)  # n,vc
         elif self.postprocess_type == 'LAST-TV':
-            x, hn, cn = self.rnn(x, False)  # N T CV
-            x = x[:, -1, :]  # N CV
-            x = x.view(N, M, c_new, V)  # n,m,c,v
-            x = x.mean(3).mean(1)  # n,c
+            x, hn, cn = self.rnn(x, False)  # n,t,vc
+            x = x[:, -1, :]  # n,vc
+            x = x.view(N, M, V, -1)  # n,m,v,c
+            x = x.mean(2).mean(1)  # n,c
         return x
 
 
 if __name__ == '__main__':
     graph = 'graph.ntu_rgb_d.Graph'
-    model = Model(graph=graph)
+    model = Model(graph=graph, proj_factor=4, postprocess_type='LAST-T')
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))
     model(torch.ones((1, 3, 300, 25, 2)))
