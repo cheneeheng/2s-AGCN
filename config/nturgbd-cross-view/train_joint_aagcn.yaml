@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_joint/211126210001_gbn2
-model_saved_name: ./data/data/ntu_result/xview/aagcn_joint/211126210001_gbn2/ntu_cv_aagcn_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_joint/211209190001
+model_saved_name: ./data/data/ntu_result/xview/aagcn_joint/211209190001/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
@@ -41,7 +41,7 @@ model_args:
   drop_out: 0
   adaptive: True
   attention: True
-  gbn_split: 2
+#  gbn_split: 2
 # weights: None 
 
 #optim
