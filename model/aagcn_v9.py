@@ -53,6 +53,7 @@ class LSTMUnit(nn.Module):
         x = x.permute(0, 2, 3, 1).contiguous()  # N T V C
         x = self.proj(x)
         x = x.view(N, T, -1)  # N T VC
+        self.lstm.flatten_parameters()
         x, (hn, cn) = self.lstm(x)
         x = self.norm(x)  # N T VC
         if original_shape:
@@ -163,7 +164,8 @@ class Model(BaseModel):
 
 if __name__ == '__main__':
     graph = 'graph.ntu_rgb_d.Graph'
-    model = Model(graph=graph, proj_factor=4, postprocess_type='LAST-T')
+    model = Model(graph=graph, proj_factor=1, postprocess_type='GAP-TV',
+                  bidirectional=False, num_layers=1)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))
     model(torch.ones((1, 3, 300, 25, 2)))
