@@ -153,3 +153,5 @@ class Model(BaseModel):
         self.l8 = _TCNGCNUnit(128, 256, stride=2)
         self.l9 = _TCNGCNUnit(256, 256)
         self.l10 = _TCNGCNUnit(256, 256)
+
+        self.init_fc(256, num_class)

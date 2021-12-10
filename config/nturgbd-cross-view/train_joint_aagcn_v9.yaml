@@ -41,7 +41,9 @@ model_args:
   drop_out: 0
   adaptive: True
   attention: True
-  # gbn_split: 2
+  num_layers: 1
+  bidirectional: False
+  postprocess_type: GAP-TV
 # weights: None
 
 #optim

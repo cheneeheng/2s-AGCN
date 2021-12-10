@@ -328,7 +328,8 @@ class BaseModel(nn.Module):
                  in_channels: int = 3,
                  drop_out: int = 0,
                  adaptive: bool = True,
-                 gbn_split: Optional[int] = None):
+                 gbn_split: Optional[int] = None,
+                 fc_cv: bool = False):
         super().__init__()
 
         self.num_class = num_class
@@ -342,6 +343,7 @@ class BaseModel(nn.Module):
 
         self.data_bn = batch_norm_1d(num_person*in_channels*num_point,
                                      gbn_split)
+        bn_init(self.data_bn, 1)
 
         self.l1 = None
         self.l2 = None
@@ -354,23 +356,28 @@ class BaseModel(nn.Module):
         self.l9 = None
         self.l10 = None
 
-        self.fc = nn.Linear(256, num_class)
-        nn.init.normal_(self.fc.weight, 0, math.sqrt(2. / num_class))
-        bn_init(self.data_bn, 1)
+        self.fc = None
+        self.fc_cv = fc_cv
+
         if drop_out:
             self.drop_out = nn.Dropout(drop_out)
         else:
             self.drop_out = lambda x: x
 
-    def forward(self, x):
-        N, C, T, V, M = x.size()
+    def init_fc(self, in_channels: int, out_channels: int):
+        self.fc = nn.Linear(in_channels, out_channels)
+        nn.init.normal_(self.fc.weight, 0, math.sqrt(2. / out_channels))
 
+    def forward_preprocess(self, x, size):
+        N, C, T, V, M = size
         x = x.permute(0, 4, 3, 1, 2).contiguous()  # n,m,v,c,t
         x = x.view(N, -1, T)
         x = self.data_bn(x)
         x = x.view(N, M, V, C, T).permute(0, 1, 3, 4, 2).contiguous()  # n,m,c,t,v  # noqa
-        x = x.view(-1, C, T, V)
+        x = x.view(-1, C, T, V)  # nm,c,t,v
+        return x
 
+    def forward_model(self, x, size):
         x = self.l1(x)
         x = self.l2(x)
         x = self.l3(x)
@@ -380,15 +387,33 @@ class BaseModel(nn.Module):
         x = self.l7(x)
         x = self.l8(x)
         x = self.l9(x)
-        x = self.l10(x)
+        x = self.l10(x)  # nm,c,t,v
+        return x
 
-        # N*M,C,T,V
+    def forward_postprocess(self, x, size):
+        N, C, T, V, M = size
         c_new = x.size(1)
-        x = x.view(N, M, c_new, -1)
-        x = x.mean(3).mean(1)
-        x = self.drop_out(x)
+        if self.fc_cv:
+            x = x.view(N, M, c_new, -1, V)  # n,m,c,t,v
+            x = x.mean(3).mean(1)  # n,c,v
+            x = x.view(N, -1)  # n,cv
+        else:
+            x = x.view(N, M, c_new, -1)  # n,m,c,tv
+            x = x.mean(3).mean(1)  # n,c
+        return x
 
-        return self.fc(x)
+    def forward_classifier(self, x, size):
+        x = self.drop_out(x)
+        x = self.fc(x)
+        return x
+
+    def forward(self, x):
+        size = x.size()
+        x = self.forward_preprocess(x, size)
+        x = self.forward_model(x, size)
+        x = self.forward_postprocess(x, size)
+        x = self.forward_classifier(x, size)
+        return x
 
 
 class Model(BaseModel):
@@ -403,9 +428,10 @@ class Model(BaseModel):
                  drop_out: int = 0,
                  adaptive: bool = True,
                  attention: bool = True,
-                 gbn_split: Optional[int] = None):
+                 gbn_split: Optional[int] = None,
+                 fc_cv: bool = False):
         super().__init__(num_class, num_point, num_person,
-                         in_channels, drop_out, adaptive, gbn_split)
+                         in_channels, drop_out, adaptive, gbn_split, fc_cv)
 
         if graph is None:
             raise ValueError()
@@ -435,10 +461,15 @@ class Model(BaseModel):
         self.l9 = _TCNGCNUnit(256, 256)
         self.l10 = _TCNGCNUnit(256, 256)
 
+        if fc_cv:
+            self.init_fc(256*num_point, num_class)
+        else:
+            self.init_fc(256, num_class)
+
 
 if __name__ == '__main__':
     graph = 'graph.ntu_rgb_d.Graph'
-    model = Model(graph=graph)
+    model = Model(graph=graph, fc_cv=True)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))
-    # model(torch.ones((1, 3, 300, 25, 2)))
+    model(torch.ones((1, 3, 300, 25, 2)))
