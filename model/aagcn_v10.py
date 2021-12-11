@@ -93,7 +93,7 @@ class Model(BaseModel):
                               adaptive=self.adaptive_fn,
                               attention=attention,
                               gbn_split=gbn_split)
-        
+
         # 3layers
         if model_layers == 3:
             self.l1 = _TCNGCNUnit(3, 64, residual=False)
