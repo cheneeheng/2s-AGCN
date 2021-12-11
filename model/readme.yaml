@@ -1,19 +1,26 @@
 aagcn:
-  - original model.
-  - 94.7%
-  - overfit, train acc ~1
+  - original model:
+      - 94.7%
+      - overfit, train acc ~1
+  - original model, new datagen:
+      - 94.4%
+      - overfit, train acc ~1
+  - original model, new datagen, no attention:
+      - 94.1%
+      - overfit, train acc ~1
+      - not much difference compared to the one with attention
 
 aagcn_v2:
   - A does not depend on predefined A matrix. > no noticable difference.
-  - Using 1 subset
-    - no noticable difference. 94.3%
-    - overfit, train acc ~1
-  - Using 3 subset
-    - no noticable difference. 94.1%
-    - overfit, train acc ~1
-  - Using 5 subset
-    - no noticable difference. 94.3%
-    - overfit, train acc ~1
+  - Using 1 subset:
+      - no noticable difference. 94.3%
+      - overfit, train acc ~1
+  - Using 3 subset:
+      - no noticable difference. 94.1%
+      - overfit, train acc ~1
+  - Using 5 subset:
+      - no noticable difference. 94.3%
+      - overfit, train acc ~1
 
 aagcn_v3:
   - Added additional projection in the GCN.
@@ -27,9 +34,9 @@ aagcn_v4:
   - did not converge
 
 aagcn_v5:
-  - added se block after TCN, sct attention is removed.
-    - slightly worse 93.72%
-    - overfit, train acc ~1
+  - added se block after TCN, sct attention is removed:
+      - slightly worse 93.72%
+      - overfit, train acc ~1
   - without the tse block, sct attention is removed.
 
 aagcn_v6:
@@ -43,15 +50,34 @@ aagcn_v7:
 
 aagcn_v8:
   - creates multiple attentions instead of one in AdaptiveGCN
-  - using 5 splits
-    - no noticable difference. 94.5%
-    - overfit, train acc ~1
-  - using 3 splits
-    - no noticable difference. 94.5%
-    - overfit, train acc ~1
+  - using 5 splits:
+      - no noticable difference. 94.5%
+      - overfit, train acc ~1
+  - using 3 splits:
+      - no noticable difference. 94.5%
+      - overfit, train acc ~1
 
 aagcn_v9:
   - uses lstm before classification.
+  - GAP-TV, proj4:
+    - 93.2%
+    - overfit, faster than original model, train acc ~1
+  - GAP-TV, proj4, bi:
+    - 93.7%
+    - overfit, faster than original model, train acc ~1
+    - not much difference compared to lstm
 
 aagcn_v10:
   - uses MHA before classification.
+  - GAP-TV, 1h:
+      - 92%
+      - overfit, faster than original model, train acc ~1
+  - GAP-TV, 2h:
+      - 92.4%
+      - overfit, faster than original model, train acc ~1
+  - GAP-T, 1h:
+      - 91.2%
+      - overfit, slower than original model, train acc ~1
+  - GAP-T, 2h:
+      - 91%
+      - overfit, slower than original model, train acc ~1

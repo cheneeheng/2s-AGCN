@@ -69,7 +69,8 @@ class Model(BaseModel):
                  attention: bool = True,
                  gbn_split: Optional[int] = None,
                  num_heads: int = 1,
-                 postprocess_type: Optional[str] = 'GAP-TV'):
+                 postprocess_type: Optional[str] = 'GAP-TV',
+                 model_layers: int = 10):
         super().__init__(num_class, num_point, num_person,
                          in_channels, drop_out, adaptive, gbn_split)
 
@@ -92,17 +93,58 @@ class Model(BaseModel):
                               adaptive=self.adaptive_fn,
                               attention=attention,
                               gbn_split=gbn_split)
+        
+        # 3layers
+        if model_layers == 3:
+            self.l1 = _TCNGCNUnit(3, 64, residual=False)
+            self.l2 = lambda x: x
+            self.l3 = lambda x: x
+            self.l4 = lambda x: x
+            self.l5 = _TCNGCNUnit(64, 128, stride=2)
+            self.l6 = lambda x: x
+            self.l7 = lambda x: x
+            self.l8 = _TCNGCNUnit(128, 256, stride=2)
+            self.l9 = lambda x: x
+            self.l10 = lambda x: x
 
-        self.l1 = _TCNGCNUnit(3, 64, residual=False)
-        self.l2 = _TCNGCNUnit(64, 64)
-        self.l3 = _TCNGCNUnit(64, 64)
-        self.l4 = _TCNGCNUnit(64, 64)
-        self.l5 = _TCNGCNUnit(64, 128, stride=2)
-        self.l6 = _TCNGCNUnit(128, 128)
-        self.l7 = _TCNGCNUnit(128, 128)
-        self.l8 = _TCNGCNUnit(128, 256, stride=2)
-        self.l9 = _TCNGCNUnit(256, 256)
-        self.l10 = _TCNGCNUnit(256, 256)
+        # 6layers
+        elif model_layers == 6:
+            self.l1 = _TCNGCNUnit(3, 64, residual=False)
+            self.l2 = lambda x: x
+            self.l3 = lambda x: x
+            self.l4 = _TCNGCNUnit(64, 64)
+            self.l5 = _TCNGCNUnit(64, 128, stride=2)
+            self.l6 = lambda x: x
+            self.l7 = _TCNGCNUnit(128, 128)
+            self.l8 = _TCNGCNUnit(128, 256, stride=2)
+            self.l9 = lambda x: x
+            self.l10 = _TCNGCNUnit(256, 256)
+
+        # 7layers
+        elif model_layers == 7:
+            self.l1 = _TCNGCNUnit(3, 64, residual=False)
+            self.l2 = lambda x: x
+            self.l3 = _TCNGCNUnit(64, 64)
+            self.l4 = _TCNGCNUnit(64, 64)
+            self.l5 = _TCNGCNUnit(64, 128, stride=2)
+            self.l6 = lambda x: x
+            self.l7 = _TCNGCNUnit(128, 128)
+            self.l8 = _TCNGCNUnit(128, 256, stride=2)
+            self.l9 = lambda x: x
+            self.l10 = _TCNGCNUnit(256, 256)
+
+        # full model
+        elif model_layers == 10:
+            self.l1 = _TCNGCNUnit(3, 64, residual=False)
+            self.l2 = _TCNGCNUnit(64, 64)
+            self.l3 = _TCNGCNUnit(64, 64)
+            self.l4 = _TCNGCNUnit(64, 64)
+            self.l5 = _TCNGCNUnit(64, 128, stride=2)
+            self.l6 = _TCNGCNUnit(128, 128)
+            self.l7 = _TCNGCNUnit(128, 128)
+            self.l8 = _TCNGCNUnit(128, 256, stride=2)
+            self.l9 = _TCNGCNUnit(256, 256)
+            self.l10 = _TCNGCNUnit(256, 256)
 
         if self.postprocess_type == 'GAP-T':
             self.init_fc(256*num_point, num_class)
