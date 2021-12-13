@@ -364,6 +364,52 @@ class BaseModel(nn.Module):
         else:
             self.drop_out = lambda x: x
 
+    def init_model_backbone(self, model_layers, tcngcn_unit):
+        if model_layers == 3:
+            self.l1 = tcngcn_unit(3, 64, residual=False)
+            self.l2 = lambda x: x
+            self.l3 = lambda x: x
+            self.l4 = lambda x: x
+            self.l5 = tcngcn_unit(64, 128, stride=2)
+            self.l6 = lambda x: x
+            self.l7 = lambda x: x
+            self.l8 = tcngcn_unit(128, 256, stride=2)
+            self.l9 = lambda x: x
+            self.l10 = lambda x: x
+        elif model_layers == 6:
+            self.l1 = tcngcn_unit(3, 64, residual=False)
+            self.l2 = lambda x: x
+            self.l3 = lambda x: x
+            self.l4 = tcngcn_unit(64, 64)
+            self.l5 = tcngcn_unit(64, 128, stride=2)
+            self.l6 = lambda x: x
+            self.l7 = tcngcn_unit(128, 128)
+            self.l8 = tcngcn_unit(128, 256, stride=2)
+            self.l9 = lambda x: x
+            self.l10 = tcngcn_unit(256, 256)
+        elif model_layers == 7:
+            self.l1 = tcngcn_unit(3, 64, residual=False)
+            self.l2 = lambda x: x
+            self.l3 = tcngcn_unit(64, 64)
+            self.l4 = tcngcn_unit(64, 64)
+            self.l5 = tcngcn_unit(64, 128, stride=2)
+            self.l6 = lambda x: x
+            self.l7 = tcngcn_unit(128, 128)
+            self.l8 = tcngcn_unit(128, 256, stride=2)
+            self.l9 = lambda x: x
+            self.l10 = tcngcn_unit(256, 256)
+        elif model_layers == 10:
+            self.l1 = tcngcn_unit(3, 64, residual=False)
+            self.l2 = tcngcn_unit(64, 64)
+            self.l3 = tcngcn_unit(64, 64)
+            self.l4 = tcngcn_unit(64, 64)
+            self.l5 = tcngcn_unit(64, 128, stride=2)
+            self.l6 = tcngcn_unit(128, 128)
+            self.l7 = tcngcn_unit(128, 128)
+            self.l8 = tcngcn_unit(128, 256, stride=2)
+            self.l9 = tcngcn_unit(256, 256)
+            self.l10 = tcngcn_unit(256, 256)
+
     def init_fc(self, in_channels: int, out_channels: int):
         self.fc = nn.Linear(in_channels, out_channels)
         nn.init.normal_(self.fc.weight, 0, math.sqrt(2. / out_channels))
@@ -429,7 +475,8 @@ class Model(BaseModel):
                  adaptive: bool = True,
                  attention: bool = True,
                  gbn_split: Optional[int] = None,
-                 fc_cv: bool = False):
+                 fc_cv: bool = False,
+                 model_layers: int = 10):
         super().__init__(num_class, num_point, num_person,
                          in_channels, drop_out, adaptive, gbn_split, fc_cv)
 
@@ -450,16 +497,8 @@ class Model(BaseModel):
                               attention=attention,
                               gbn_split=gbn_split)
 
-        self.l1 = _TCNGCNUnit(3, 64, residual=False)
-        self.l2 = _TCNGCNUnit(64, 64)
-        self.l3 = _TCNGCNUnit(64, 64)
-        self.l4 = _TCNGCNUnit(64, 64)
-        self.l5 = _TCNGCNUnit(64, 128, stride=2)
-        self.l6 = _TCNGCNUnit(128, 128)
-        self.l7 = _TCNGCNUnit(128, 128)
-        self.l8 = _TCNGCNUnit(128, 256, stride=2)
-        self.l9 = _TCNGCNUnit(256, 256)
-        self.l10 = _TCNGCNUnit(256, 256)
+        self.init_model_backbone(model_layers=model_layers,
+                                 tcngcn_unit=_TCNGCNUnit)
 
         if fc_cv:
             self.init_fc(256*num_point, num_class)

@@ -60,12 +60,18 @@ aagcn_v8:
 aagcn_v9:
   - uses lstm before classification.
   - GAP-TV, proj4:
-    - 93.2%
-    - overfit, faster than original model, train acc ~1
+      - 93.2%
+      - overfit, faster than original model, train acc ~1
+  - GAP-TV, proj4, 6layers:
+      - 92.9%
+      - overfit, faster than original model, train acc ~1
+  - GAP-TV, proj4, 3layers:
+      - 91.9%
+      - overfit, faster than original model, train acc ~1
   - GAP-TV, proj4, bi:
-    - 93.7%
-    - overfit, faster than original model, train acc ~1
-    - not much difference compared to lstm
+      - 93.7%
+      - overfit, faster than original model, train acc ~1
+      - not much difference compared to lstm
 
 aagcn_v10:
   - uses MHA before classification.
@@ -74,6 +80,12 @@ aagcn_v10:
       - overfit, faster than original model, train acc ~1
   - GAP-TV, 2h:
       - 92.4%
+      - overfit, faster than original model, train acc ~1
+  - GAP-TV, 2h, 6layers:
+      - 91.2%
+      - overfit, faster than original model, train acc ~1
+  - GAP-TV, 2h, 3layers:
+      - 91.5%
       - overfit, faster than original model, train acc ~1
   - GAP-T, 1h:
       - 91.2%
