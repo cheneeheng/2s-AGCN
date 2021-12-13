@@ -154,9 +154,6 @@ if __name__ == '__main__':
         '--out-folder',
         default='./data/data/ntu/')
     parser.add_argument(
-            '--out_folder',
-            default='./data/data/ntu/')
-    parser.add_argument(
         '--benchmark',
         type=str,
         default=['xsub', 'xview'],
