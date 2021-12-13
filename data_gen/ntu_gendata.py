@@ -145,18 +145,33 @@ def gendata(data_path, out_path, ignored_sample_path=None,
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='NTU-RGB-D Data Converter.')
     parser.add_argument(
-        '--data_path',
+        '--data-path',
         default='./data/data/nturgbd_raw/nturgb+d_skeletons/')
     parser.add_argument(
-        '--ignored_sample_path',
+        '--ignored-sample-path',
         default='./data/data/nturgbd_raw/samples_with_missing_skeletons.txt')
     parser.add_argument(
-        '--out_folder',
+        '--out-folder',
         default='./data/data/ntu/')
+    parser.add_argument(
+            '--out_folder',
+            default='./data/data/ntu/')
+    parser.add_argument(
+        '--benchmark',
+        type=str,
+        default=['xsub', 'xview'],
+        nargs='+',
+        help='which Top K accuracy will be shown')
+    parser.add_argument(
+        '--split',
+        type=int,
+        default=['train', 'val'],
+        nargs='+',
+        help='which Top K accuracy will be shown')
 
-    benchmark = ['xsub', 'xview']
-    part = ['train', 'val']
     arg = parser.parse_args()
+    benchmark = arg.benchmark
+    part = arg.datasplit
 
     for b in benchmark:
         for p in part:
