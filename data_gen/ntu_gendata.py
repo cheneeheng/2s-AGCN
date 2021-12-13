@@ -155,20 +155,18 @@ if __name__ == '__main__':
         default='./data/data/ntu/')
     parser.add_argument(
         '--benchmark',
-        type=str,
         default=['xsub', 'xview'],
         nargs='+',
         help='which Top K accuracy will be shown')
     parser.add_argument(
         '--split',
-        type=int,
         default=['train', 'val'],
         nargs='+',
         help='which Top K accuracy will be shown')
 
     arg = parser.parse_args()
     benchmark = arg.benchmark
-    part = arg.datasplit
+    part = arg.split
 
     for b in benchmark:
         for p in part:
