@@ -74,7 +74,7 @@ class Model(BaseModel):
         super().__init__(num_class, num_point, num_person,
                          in_channels, drop_out, adaptive, gbn_split)
 
-        assert postprocess_type in ['GAP-T', 'GAP-TV']
+        assert postprocess_type in ['GAP-T', 'GAP-TV', 'Flat']
         self.postprocess_type = postprocess_type
 
         if graph is None:
@@ -142,9 +142,10 @@ class Model(BaseModel):
             x = x.mean(3).mean(1)  # n,c
         elif self.postprocess_type == 'Flat':
             x, a = self.mha(x, False)  # n,t,cv
-            x = self.norm1(self.relu1(self.proj1(x)) + x)  # n,t,c'
-            x = x.view(N, -1)  # n,tc'
-            x = self.norm2(self.relu2(self.proj2(x)) + x)  # n,c = nm,c
+            x = self.norm1(self.relu1(self.proj1(x)))  # n,t,c'
+            x = x.view(N*M, -1)  # n,tc'
+            x = self.norm2(self.relu2(self.proj2(x)))  # n,c
+            x = x.view(N, -1)  # n,mc
         return x
 
 

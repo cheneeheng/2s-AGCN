@@ -505,7 +505,7 @@ class Model(BaseModel):
 
 if __name__ == '__main__':
     graph = 'graph.ntu_rgb_d.Graph'
-    model = Model(graph=graph, fc_cv=True)
+    model = Model(graph=graph, fc_cv=True, model_layers=6, attention=False)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))
-    model(torch.ones((1, 3, 300, 25, 2)))
+    # model(torch.ones((1, 3, 300, 25, 2)))
