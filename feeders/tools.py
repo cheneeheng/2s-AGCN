@@ -40,6 +40,43 @@ def auto_pading(data_numpy, size, random_pad=False):
         return data_numpy
 
 
+def random_axis_shift(data_numpy, candidate, channel):
+    C, T, V, M = data_numpy.shape
+    S = np.random.choice(candidate, 1)
+    distance = \
+        data_numpy[channel, :, :, 1] - data_numpy[channel, :, :, 0]  # T,V
+    data_numpy[channel, :, :, 1] = \
+        data_numpy[channel, :, :, 0] + (distance * S)
+    return data_numpy
+
+
+def random_xaxis_shift(data_numpy, candidate=[0.8, 0.9, 1.0, 1.1, 1.2],):
+    return random_axis_shift(data_numpy, candidate, 0)
+
+
+def random_yaxis_shift(data_numpy, candidate=[0.8, 0.9, 1.0, 1.1, 1.2],):
+    return random_axis_shift(data_numpy, candidate, 1)
+
+
+def random_flip(data_numpy, channel):
+    C, T, V, M = data_numpy.shape
+    flip_idx = random.sample(range(0, T), T//2)
+    data_numpy[channel, flip_idx, :, :] = -data_numpy[channel, flip_idx, :, :]
+    return data_numpy
+
+
+def random_xaxis_flip(data_numpy):
+    return random_flip(data_numpy, channel=0)
+
+
+def random_yaxis_flip(data_numpy):
+    return random_flip(data_numpy, channel=1)
+
+
+def random_zaxis_flip(data_numpy):
+    return random_flip(data_numpy, channel=2)
+
+
 def random_choose(data_numpy, size, auto_pad=True):
     # input: C,T,V,M 随机选择其中一段，不是很合理。因为有0
     C, T, V, M = data_numpy.shape
@@ -81,12 +118,12 @@ def random_move(data_numpy,
     for i in range(num_node - 1):
         a[node[i]:node[i + 1]] = np.linspace(
             A[i], A[i + 1], node[i + 1] - node[i]) * np.pi / 180
-        s[node[i]:node[i + 1]] = np.linspace(S[i], S[i + 1],
-                                             node[i + 1] - node[i])
-        t_x[node[i]:node[i + 1]] = np.linspace(T_x[i], T_x[i + 1],
-                                               node[i + 1] - node[i])
-        t_y[node[i]:node[i + 1]] = np.linspace(T_y[i], T_y[i + 1],
-                                               node[i + 1] - node[i])
+        s[node[i]:node[i + 1]] = np.linspace(
+            S[i], S[i + 1], node[i + 1] - node[i])
+        t_x[node[i]:node[i + 1]] = np.linspace(
+            T_x[i], T_x[i + 1], node[i + 1] - node[i])
+        t_y[node[i]:node[i + 1]] = np.linspace(
+            T_y[i], T_y[i + 1], node[i + 1] - node[i])
 
     theta = np.array([[np.cos(a) * s, -np.sin(a) * s],
                       [np.sin(a) * s, np.cos(a) * s]])  # xuanzhuan juzhen
@@ -149,8 +186,8 @@ def openpose_match(data_numpy):
     # generate data
     new_data_numpy = np.zeros(data_numpy.shape)
     for t in range(T):
-        new_data_numpy[:, t, :, :] = data_numpy[:, t, :, forward_map[
-                                                             t]].transpose(1, 2, 0)
+        new_data_numpy[:, t, :, :] = \
+            data_numpy[:, t, :, forward_map[t]].transpose(1, 2, 0)
     data_numpy = new_data_numpy
 
     # score sort

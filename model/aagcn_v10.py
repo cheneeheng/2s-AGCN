@@ -101,23 +101,50 @@ class Model(BaseModel):
             self.init_fc(256*num_point, num_class)
         elif self.postprocess_type == 'GAP-TV':
             self.init_fc(256, num_class)
+        elif self.postprocess_type == 'Flat':
+            self.proj1 = nn.Linear(256*num_point, 128)
+            self.relu1 = nn.ReLU()
+            self.norm1 = nn.LayerNorm(
+                normalized_shape=128,
+                eps=1e-05,
+                elementwise_affine=True
+            )
+            self.proj2 = nn.Linear(128*75, 256)
+            self.relu2 = nn.ReLU()
+            self.norm2 = nn.LayerNorm(
+                normalized_shape=256,
+                eps=1e-05,
+                elementwise_affine=True
+            )
+            self.init_fc(256*num_person, num_class)
 
         self.mha = MHAUnit(in_channels=256*num_point,
                            num_heads=num_heads)
+
+    # def forward_mlp(self, x):
+    #     x = self.proj1(x)
+    #     x = self.relu1(x)
+    #     x = self.drop_out1(x)
+    #     x = self.proj2(x)
 
     def forward_postprocess(self, x, size):
         # x : NM C T V
         N, C, T, V, M = size
         c_new = x.size(1)
         if self.postprocess_type == 'GAP-T':
-            x, a = self.mha(x, False)  # N T CV
+            x, a = self.mha(x, False)  # n,t,cv
             x = x.view(N, M, -1, c_new, V)  # n,m,t,c,v
             x = x.mean(2).mean(1)  # n,c,v
             x = x.view(N, -1)  # n,cv
         elif self.postprocess_type == 'GAP-TV':
-            x, a = self.mha(x, True)  # N C T V
+            x, a = self.mha(x, True)  # n,c,t,v
             x = x.view(N, M, c_new, -1)  # n,m,c,tv
             x = x.mean(3).mean(1)  # n,c
+        elif self.postprocess_type == 'Flat':
+            x, a = self.mha(x, False)  # n,t,cv
+            x = self.norm1(self.relu1(self.proj1(x)) + x)  # n,t,c'
+            x = x.view(N, -1)  # n,tc'
+            x = self.norm2(self.relu2(self.proj2(x)) + x)  # n,c = nm,c
         return x
 
 

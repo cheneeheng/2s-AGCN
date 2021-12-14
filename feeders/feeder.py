@@ -6,9 +6,19 @@ from feeders import tools
 
 
 class Feeder(Dataset):
-    def __init__(self, data_path, label_path,
-                 random_choose=False, random_shift=False, random_move=False,
-                 window_size=-1, normalization=False, debug=False, use_mmap=True):
+    def __init__(self,
+                 data_path,
+                 label_path,
+                 random_choose=False,
+                 random_shift=False,
+                 random_move=False,
+                 window_size=-1,
+                 normalization=False,
+                 random_zaxis_flip=False,
+                 random_xaxis_shift=False,
+                 random_yaxis_shift=False,
+                 debug=False,
+                 use_mmap=True):
         """
 
         :param data_path:
@@ -30,6 +40,9 @@ class Feeder(Dataset):
         self.random_move = random_move
         self.window_size = window_size
         self.normalization = normalization
+        self.random_zaxis_flip = random_zaxis_flip
+        self.random_xaxis_shift = random_xaxis_shift
+        self.random_yaxis_shift = random_yaxis_shift
         self.use_mmap = use_mmap
         self.load_data()
         if normalization:
@@ -85,6 +98,12 @@ class Feeder(Dataset):
             data_numpy = tools.auto_pading(data_numpy, self.window_size)
         if self.random_move:
             data_numpy = tools.random_move(data_numpy)
+        if self.random_zaxis_flip:
+            data_numpy = tools.random_zaxis_flip(data_numpy)
+        if self.random_xaxis_shift:
+            data_numpy = tools.random_xaxis_shift(data_numpy)
+        if self.random_yaxis_shift:
+            data_numpy = tools.random_yaxis_shift(data_numpy)
 
         return data_numpy, label, index
 

@@ -336,10 +336,7 @@ class BaseModel(nn.Module):
 
         self.graph = None
 
-        if adaptive:
-            self.adaptive_fn = AdaptiveGCN
-        else:
-            self.adaptive_fn = NonAdaptiveGCN
+        self.adaptive_fn = AdaptiveGCN if adaptive else NonAdaptiveGCN
 
         self.data_bn = batch_norm_1d(num_person*in_channels*num_point,
                                      gbn_split)
@@ -359,10 +356,7 @@ class BaseModel(nn.Module):
         self.fc = None
         self.fc_cv = fc_cv
 
-        if drop_out:
-            self.drop_out = nn.Dropout(drop_out)
-        else:
-            self.drop_out = lambda x: x
+        self.drop_out = nn.Dropout(drop_out) if drop_out else lambda x: x
 
     def init_model_backbone(self, model_layers, tcngcn_unit):
         if model_layers == 3:
@@ -409,6 +403,9 @@ class BaseModel(nn.Module):
             self.l8 = tcngcn_unit(128, 256, stride=2)
             self.l9 = tcngcn_unit(256, 256)
             self.l10 = tcngcn_unit(256, 256)
+        else:
+            raise ValueError(
+                f"Model with {model_layers} layers is not supported.")
 
     def init_fc(self, in_channels: int, out_channels: int):
         self.fc = nn.Linear(in_channels, out_channels)
@@ -423,7 +420,7 @@ class BaseModel(nn.Module):
         x = x.view(-1, C, T, V)  # nm,c,t,v
         return x
 
-    def forward_model(self, x, size):
+    def forward_model_backbone(self, x, size):
         x = self.l1(x)
         x = self.l2(x)
         x = self.l3(x)
@@ -456,7 +453,7 @@ class BaseModel(nn.Module):
     def forward(self, x):
         size = x.size()
         x = self.forward_preprocess(x, size)
-        x = self.forward_model(x, size)
+        x = self.forward_model_backbone(x, size)
         x = self.forward_postprocess(x, size)
         x = self.forward_classifier(x, size)
         return x
@@ -486,10 +483,10 @@ class Model(BaseModel):
             Graph = import_class(graph)
             self.graph = Graph(**graph_args)
 
-        def _TCNGCNUnit(_in, _out, stride=1, residual=True):
-            return TCNGCNUnit(_in,
-                              _out,
-                              self.graph.A,
+        def _TCNGCNUnit(in_channels, out_channels, stride=1, residual=True):
+            return TCNGCNUnit(in_channels=in_channels,
+                              out_channels=out_channels,
+                              A=self.graph.A,
                               num_subset=num_subset,
                               stride=stride,
                               residual=residual,
