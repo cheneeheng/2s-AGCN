@@ -50,11 +50,13 @@ def random_axis_shift(data_numpy, candidate, channel):
     return data_numpy
 
 
-def random_xaxis_shift(data_numpy, candidate=[0.8, 0.9, 1.0, 1.1, 1.2],):
+def random_xaxis_shift(data_numpy, candidate=None):
+    candidate = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5]
     return random_axis_shift(data_numpy, candidate, 0)
 
 
-def random_yaxis_shift(data_numpy, candidate=[0.8, 0.9, 1.0, 1.1, 1.2],):
+def random_yaxis_shift(data_numpy, candidate=None):
+    candidate = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5]
     return random_axis_shift(data_numpy, candidate, 1)
 
 

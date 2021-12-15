@@ -16,7 +16,7 @@ from data_gen.ntu_gendata import (
     num_joint
 )
 from infer.data_preprocess import DataPreprocessor
-from main import get_parser, import_class, init_seed
+from main_utils import get_parser, import_class, init_seed
 
 
 def arg_parser(parser):

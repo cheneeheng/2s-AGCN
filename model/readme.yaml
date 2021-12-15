@@ -3,6 +3,9 @@ aagcn:
                   - original, old dataset generation:
                             - 94.7%
                             - overfit, train acc ~1
+                  - original, 4gpu:
+                            - 94.5%
+                            - overfit, train acc ~1
                   - original:
                             - 94.3%
                             - overfit, train acc ~1
@@ -14,9 +17,9 @@ aagcn:
                             - 94.3%
                             - almost identical to the 10 layers.
                   - no pad, no attention:
-                    #     - 94.1%
-                    #     - overfit, train acc ~1
-                    #     - not much difference compared to the one with attention
+                            - 94.3%
+                            - overfit, train acc ~1
+                            - not much difference compared to the one with attention or with pad
         - 6 layers:
                   - original:
                             - 94.4%
@@ -29,9 +32,9 @@ aagcn:
                             - 94.1%
                             - almost identical to the 10 layers.
                   - no pad, no attention:
-                    #     - 94.1%
-                    #     - overfit, train acc ~1
-                    #     - not much difference compared to the one with attention
+                            - 94.0%
+                            - overfit, train acc ~1
+                            - not much difference compared to the one with attention
         - 3 layers:
                   - original:
                             - 93.2%
@@ -133,3 +136,6 @@ aagcn_v10:
         - GAP-T, 2h:
                   - 91%
                   - overfit, slower than original model, train acc ~1
+        - Flat, 2h:
+                  - 84.2%
+                  - No Overfitting
