@@ -138,7 +138,7 @@ def gendata(data_path, out_path, ignored_sample_path=None,
                         max_body=max_body_kinect, num_joint=num_joint)
         fp[i, :, 0:data.shape[1], :, :] = data
 
-    fp = pre_normalization(fp)
+    fp = pre_normalization(fp, pad=False)
     np.save('{}/{}_data_joint.npy'.format(out_path, part), fp)
 
 
@@ -152,7 +152,7 @@ if __name__ == '__main__':
         default='./data/data/nturgbd_raw/samples_with_missing_skeletons.txt')
     parser.add_argument(
         '--out-folder',
-        default='./data/data/ntu/')
+        default='./data/data/ntu_nopad/')
     parser.add_argument(
         '--benchmark',
         default=['xsub', 'xview'],
