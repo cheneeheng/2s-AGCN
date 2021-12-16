@@ -12,6 +12,7 @@ from model.aagcn import BaseModel
 
 # ------------------------------------------------------------------------------
 # Blocks
+# - pre-LN : On Layer Normalization in the Transformer Architecture
 # ------------------------------------------------------------------------------
 class MHAUnit(nn.Module):
     def __init__(self,
@@ -35,23 +36,67 @@ class MHAUnit(nn.Module):
             elementwise_affine=True
         )
 
-    def forward(self, x: torch.Tensor, original_shape: bool = True):
-        # x : N C T V, N = N*M
-        N, _, T, V = x.size()
-        x = x.permute(0, 2, 1, 3).contiguous()  # N T C V
-        x = x.view(N, T, -1)  # N T CV
+    def forward(self, x: torch.Tensor):
+        # x : N, L, C
+        x = self.norm(x)
         mha_x, mha_attn = self.mha(x, x, x)
         x = x + mha_x
-        x = self.norm(x)  # N T CV
-        if original_shape:
-            x = x.view(N, T, -1, V)  # N T C V
-            x = x.permute(0, 2, 1, 3).contiguous()  # N C T V
         return x, mha_attn
+
+
+class FFNUnit(nn.Module):
+    def __init__(self,
+                 in_channels: int,
+                 inter_channels: int,
+                 out_channels: int,
+                 skip: bool = True):
+        super().__init__()
+        self.skip = skip
+        self.l1 = nn.Linear(in_channels, inter_channels)
+        self.l2 = nn.Linear(inter_channels, out_channels)
+        self.re = nn.ReLU()
+        self.n1 = nn.LayerNorm(
+            normalized_shape=in_channels,
+            eps=1e-05,
+            elementwise_affine=True
+        )
+
+    def forward(self, x: torch.Tensor):
+        # x : N, L, C
+        if self.skip:
+            x = x + self.l2(self.re(self.l1(self.n1(x))))
+        else:
+            x = self.l2(self.re(self.l1(self.n1(x))))
+        return x
+
+
+class TransformerUnit(nn.Module):
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 num_heads: int = 1):
+        super().__init__()
+        self.ffn1 = FFNUnit(in_channels=in_channels,
+                            inter_channels=(in_channels+out_channels)//8,
+                            out_channels=out_channels,
+                            skip=False)
+        self.mha1 = MHAUnit(in_channels=out_channels, num_heads=num_heads)
+        self.ffn2 = FFNUnit(in_channels=out_channels,
+                            inter_channels=out_channels * 4,
+                            out_channels=out_channels,
+                            skip=True)
+
+    def forward(self, x: torch.Tensor):
+        # x : N, L, C
+        ffn1_x = self.ffn1(x)  # projections
+        mha1_x, mha1_attn = self.mha1(ffn1_x)
+        ffn2_x = self.ffn2(ffn1_x + mha1_x)
+        return ffn2_x, mha1_attn
 
 
 # ------------------------------------------------------------------------------
 # Network
-# - using MHA at the end
+# - uses transformer with fetaure projection.
 # ------------------------------------------------------------------------------
 class Model(BaseModel):
     def __init__(self,
@@ -67,13 +112,9 @@ class Model(BaseModel):
                  attention: bool = True,
                  gbn_split: Optional[int] = None,
                  num_heads: int = 1,
-                 postprocess_type: Optional[str] = 'GAP-TV',
                  model_layers: int = 10):
         super().__init__(num_class, num_point, num_person,
                          in_channels, drop_out, adaptive, gbn_split)
-
-        assert postprocess_type in ['GAP-T', 'GAP-TV', 'Flat']
-        self.postprocess_type = postprocess_type
 
         if graph is None:
             raise ValueError()
@@ -94,59 +135,22 @@ class Model(BaseModel):
 
         self.init_model_backbone(model_layers=model_layers,
                                  tcngcn_unit=_TCNGCNUnit)
-
-        if self.postprocess_type == 'GAP-T':
-            self.init_fc(256*num_point, num_class)
-        elif self.postprocess_type == 'GAP-TV':
-            self.init_fc(256, num_class)
-        elif self.postprocess_type == 'Flat':
-            self.init_flat_postprocess(256, num_point)
-            self.init_fc(256*num_person, num_class)
-
-        self.mha = MHAUnit(in_channels=256*num_point,
-                           num_heads=num_heads)
-
-    def init_flat_postprocess(self, in_channels, num_point):
-        self.proj1 = nn.Linear(in_channels*num_point, in_channels//2)
-        self.relu1 = nn.ReLU()
-        self.norm1 = nn.LayerNorm(
-            normalized_shape=in_channels//2,
-            eps=1e-05,
-            elementwise_affine=True
+        self.transformer1 = TransformerUnit(
+            in_channels=256*num_point*num_person,
+            out_channels=256,
+            num_heads=num_heads
         )
-        self.proj2 = nn.Linear(in_channels//2*75, in_channels)
-        self.relu2 = nn.ReLU()
-        self.norm2 = nn.LayerNorm(
-            normalized_shape=in_channels,
-            eps=1e-05,
-            elementwise_affine=True
-        )
-
-    # def forward_mlp(self, x):
-    #     x = self.proj1(x)
-    #     x = self.relu1(x)
-    #     x = self.drop_out1(x)
-    #     x = self.proj2(x)
+        self.init_fc(256, num_class)
 
     def forward_postprocess(self, x, size):
         # x : NM C T V
-        N, C, T, V, M = size
-        c_new = x.size(1)
-        if self.postprocess_type == 'GAP-T':
-            x, a = self.mha(x, False)  # n,t,cv
-            x = x.view(N, M, -1, c_new, V)  # n,m,t,c,v
-            x = x.mean(2).mean(1)  # n,c,v
-            x = x.view(N, -1)  # n,cv
-        elif self.postprocess_type == 'GAP-TV':
-            x, a = self.mha(x, True)  # n,c,t,v
-            x = x.view(N, M, c_new, -1)  # n,m,c,tv
-            x = x.mean(3).mean(1)  # n,c
-        elif self.postprocess_type == 'Flat':
-            x, a = self.mha(x, False)  # n,t,cv
-            x = self.norm1(self.relu1(self.proj1(x)))  # n,t,c'
-            x = x.view(N*M, -1)  # n,tc'
-            x = self.norm2(self.relu2(self.proj2(x)))  # n,c
-            x = x.view(N, -1)  # n,mc
+        N, _, _, V, M = size
+        _, c_new, T, _ = x.size()
+        x = x.view(N, M, c_new, T, V)   # n,m,c,t,v
+        x = x.permute(0, 3, 1, 4, 2).contiguous()   # n,t,m,v,c
+        x = x.view(N, T, M*c_new*V)   # n,t,mvc
+        x, a = self.transformer1(x)  # n,t,c
+        x = x.mean(1)  # n,c
         return x, a
 
 

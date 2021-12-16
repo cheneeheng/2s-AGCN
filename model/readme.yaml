@@ -20,6 +20,14 @@ aagcn:
                             - 94.3%
                             - overfit, train acc ~1
                             - not much difference compared to the one with attention or with pad
+                  - original, zflip, xyaxisshift (0.8-1.2):
+                            - 94.1%
+                            - overfit, train acc ~1
+                            - not much difference compared to the one with attention or with pad
+                  - original, zflip, xyaxisshift (0.5-1.5):
+                            - 94.0%
+                            - overfit, train acc ~1
+                            - not much difference compared to the one with attention or with pad
         - 6 layers:
                   - original:
                             - 94.4%

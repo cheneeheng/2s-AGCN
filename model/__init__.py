@@ -9,3 +9,5 @@ from . import aagcn_v7
 from . import aagcn_v8
 from . import aagcn_v9
 from . import aagcn_v10
+from . import aagcn_v11
+from . import aagcn_v12

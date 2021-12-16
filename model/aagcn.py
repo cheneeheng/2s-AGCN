@@ -443,7 +443,7 @@ class BaseModel(nn.Module):
         else:
             x = x.view(N, M, c_new, -1)  # n,m,c,tv
             x = x.mean(3).mean(1)  # n,c
-        return x
+        return x, None
 
     def forward_classifier(self, x, size):
         x = self.drop_out(x)
@@ -454,7 +454,7 @@ class BaseModel(nn.Module):
         size = x.size()
         x = self.forward_preprocess(x, size)
         x = self.forward_model_backbone(x, size)
-        x = self.forward_postprocess(x, size)
+        x, _ = self.forward_postprocess(x, size)
         x = self.forward_classifier(x, size)
         return x
 

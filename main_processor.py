@@ -2,19 +2,17 @@
 # from __future__ import print_function
 
 import inspect
+import numpy as np
 import os
 import pickle
 import shutil
 import time
-from collections import OrderedDict
-
-import numpy as np
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import yaml
 
+from collections import OrderedDict
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 

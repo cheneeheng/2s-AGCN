@@ -2,11 +2,9 @@
 # from __future__ import print_function
 
 import argparse
+import numpy as np
 import os
 import random
-
-import numpy as np
-
 import torch
 
 from torch.optim.lr_scheduler import _LRScheduler
@@ -79,11 +77,6 @@ def get_parser():
         '--work-dir',
         default='./work_dir/temp',
         help='the work folder for storing results')
-    parser.add_argument(
-        '--seed',
-        type=int,
-        default=1,
-        help='the seed for random')
 
     parser.add_argument('-model_saved_name', default='')
     parser.add_argument(

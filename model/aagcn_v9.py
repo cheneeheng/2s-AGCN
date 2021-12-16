@@ -64,7 +64,7 @@ class LSTMUnit(nn.Module):
 
 # ------------------------------------------------------------------------------
 # Network
-# - creates multiple attentions instead of one in AdaptiveGCN
+# - using LSTM at the end
 # ------------------------------------------------------------------------------
 class Model(BaseModel):
     def __init__(self,
@@ -152,7 +152,7 @@ class Model(BaseModel):
             x = x[:, -1, :]  # n,vc
             x = x.view(N, M, V, -1)  # n,m,v,c
             x = x.mean(2).mean(1)  # n,c
-        return x
+        return x, (hn, cn)
 
 
 if __name__ == '__main__':
