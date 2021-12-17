@@ -3,6 +3,7 @@ from torch import nn
 from torchinfo import summary
 
 import numpy as np
+import math
 from typing import Optional
 
 from model.aagcn import import_class
@@ -13,7 +14,23 @@ from model.aagcn import BaseModel
 # ------------------------------------------------------------------------------
 # Blocks
 # - pre-LN : On Layer Normalization in the Transformer Architecture
+# - https: // pytorch.org/tutorials/beginner/transformer_tutorial.html
 # ------------------------------------------------------------------------------
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 75):
+        super().__init__()
+        _pe = torch.empty(1, max_len, d_model)
+        nn.init.normal_(_pe, std=0.02)  # bert
+        self.pe = nn.Parameter(_pe)
+        self.dropout = nn.Dropout(p=dropout)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x : N, L, C
+        x = x + self.pe
+        x = self.dropout(x)
+        return x
+
+
 class MHAUnit(nn.Module):
     def __init__(self,
                  in_channels: int,
@@ -54,7 +71,7 @@ class FFNUnit(nn.Module):
         self.skip = skip
         self.l1 = nn.Linear(in_channels, inter_channels)
         self.l2 = nn.Linear(inter_channels, out_channels)
-        self.re = nn.ReLU()
+        self.re = nn.GELU()
         self.n1 = nn.LayerNorm(
             normalized_shape=in_channels,
             eps=1e-05,
@@ -73,31 +90,77 @@ class FFNUnit(nn.Module):
 class TransformerUnit(nn.Module):
     def __init__(self,
                  in_channels: int,
-                 out_channels: int,
+                 inter_channels: int,
                  num_heads: int = 1):
         super().__init__()
-        self.ffn1 = FFNUnit(in_channels=in_channels,
-                            inter_channels=(in_channels+out_channels)//8,
-                            out_channels=out_channels,
-                            skip=False)
-        self.mha1 = MHAUnit(in_channels=out_channels, num_heads=num_heads)
-        self.ffn2 = FFNUnit(in_channels=out_channels,
-                            inter_channels=out_channels * 4,
-                            out_channels=out_channels,
-                            skip=True)
+        self.mha = MHAUnit(in_channels=in_channels, num_heads=num_heads)
+        self.ffn = FFNUnit(in_channels=in_channels,
+                           inter_channels=inter_channels,
+                           out_channels=in_channels,
+                           skip=True)
 
     def forward(self, x: torch.Tensor):
         # x : N, L, C
-        ffn1_x = self.ffn1(x)  # projections
-        mha1_x, mha1_attn = self.mha1(ffn1_x)
-        ffn2_x = self.ffn2(ffn1_x + mha1_x)
-        return ffn2_x, mha1_attn
+        mha_x, mha_attn = self.mha(x)
+        ffn_x = self.ffn(x + mha_x)
+        return ffn_x, mha_attn
 
+
+class TransformerEncoder(nn.Module):
+    def __init__(self,
+                 in_channels: int,
+                 inter_channels: int,
+                 num_heads: int = 1,
+                 num_layers: int = 1,
+                 pos_enc: bool = True,
+                 classifier_type: str = 'CLS'):
+        super().__init__()
+
+        if pos_enc:
+            self.pos_encoder = PositionalEncoding(in_channels, max_len=75)
+        else:
+            self.pos_encoder = lambda x: x
+
+        self.classifier_type = classifier_type
+        if classifier_type == 'CLS':
+            self.cls_token = nn.Parameter(torch.randn(1, 1, in_channels))
+            self.pos_encoder = PositionalEncoding(in_channels, max_len=75+1)
+        else:
+            self.cls_token = None
+
+        self.transformer_layers = nn.ModuleList()
+        for _ in range(num_layers):
+            self.transformer_layers.append(
+                TransformerUnit(in_channels, inter_channels, num_heads))
+
+    def forward(self, x: torch.Tensor):
+        # x : N, L, C
+        if self.cls_token:
+            cls_tokens = self.cls_token.repeat(x.size(0), 1, 1)
+            x = torch.cat((cls_tokens, x), dim=1)
+        x = self.pos_encoder(x)
+        ffn_x, mha_attn = [], []
+        for layer in self.transformer_layers:
+            ffn_x_l, mha_attn_l = layer(x)
+            x = ffn_x_l
+            ffn_x.append(ffn_x_l)
+            mha_attn.append(mha_attn_l)
+        if self.classifier_type == 'CLS':
+            out = ffn_x[-1][:, 0, :]  # n,c
+        elif self.classifier_type == 'GAP':
+            out = ffn_x[-1].mean(1)  # n,c
+        elif self.classifier_type == 'ALL':
+            out = ffn_x[-1].view(ffn_x[-1].size(0), -1)  # n,tc
+        else:
+            raise ValueError("Unknown classifier_type")
+        return out, ffn_x, mha_attn
 
 # ------------------------------------------------------------------------------
 # Network
 # - uses transformer with fetaure projection.
 # ------------------------------------------------------------------------------
+
+
 class Model(BaseModel):
     def __init__(self,
                  num_class: int = 60,
@@ -112,6 +175,10 @@ class Model(BaseModel):
                  attention: bool = True,
                  gbn_split: Optional[int] = None,
                  num_heads: int = 1,
+                 pos_enc: bool = True,
+                 classifier_type: str = 'CLS',
+                 attention_type: str = 'MT-VC',
+                 attention_layers: int = 1,
                  model_layers: int = 10):
         super().__init__(num_class, num_point, num_person,
                          in_channels, drop_out, adaptive, gbn_split)
@@ -135,28 +202,70 @@ class Model(BaseModel):
 
         self.init_model_backbone(model_layers=model_layers,
                                  tcngcn_unit=_TCNGCNUnit)
-        self.transformer1 = TransformerUnit(
-            in_channels=256*num_point*num_person,
-            out_channels=256,
-            num_heads=num_heads
+
+        self.attention_type = attention_type
+        if self.attention_type == 'T-MVC':
+            self.proj = FFNUnit(in_channels=256*num_point*num_person,
+                                inter_channels=(256*num_point*num_person)//8,
+                                out_channels=256,
+                                skip=False)
+        elif self.attention_type == 'MT-VC':
+            self.proj = FFNUnit(in_channels=256*num_point,
+                                inter_channels=(256*num_point)//8,
+                                out_channels=256,
+                                skip=False)
+        elif self.attention_type == 'T-VC':
+            self.proj = FFNUnit(in_channels=256*num_point,
+                                inter_channels=(256*num_point)//8,
+                                out_channels=256,
+                                skip=False)
+        else:
+            raise ValueError("Unknown attention_type")
+
+        self.trans = TransformerEncoder(
+            in_channels=256,
+            inter_channels=256*4,
+            num_heads=num_heads,
+            num_layers=attention_layers,
+            pos_enc=pos_enc,
+            classifier_type=classifier_type
         )
-        self.init_fc(256, num_class)
+
+        if classifier_type == 'ALL':
+            self.init_fc(256*75, num_class)
+        else:
+            self.init_fc(256, num_class)
 
     def forward_postprocess(self, x, size):
         # x : NM C T V
         N, _, _, V, M = size
-        _, c_new, T, _ = x.size()
-        x = x.view(N, M, c_new, T, V)   # n,m,c,t,v
-        x = x.permute(0, 3, 1, 4, 2).contiguous()   # n,t,m,v,c
-        x = x.view(N, T, M*c_new*V)   # n,t,mvc
-        x, a = self.transformer1(x)  # n,t,c
-        x = x.mean(1)  # n,c
+        _, C, T, _ = x.size()
+        x = x.view(N, M, C, T, V)   # n,m,c,t,v
+        if self.attention_type == 'T-MVC':
+            x = x.permute(0, 3, 1, 4, 2).contiguous()   # n,t,m,v,c
+            x = x.view(N, T, M*C*V)   # n,t,mvc
+            x = self.proj(x)   # n,t,mvc
+            x, x_list, a = self.trans(x)   # n,c
+        elif self.attention_type == 'MT-VC':
+            x = x.permute(0, 1, 3, 4, 2).contiguous()   # n,m,t,v,c
+            x = x.view(N, M*T, C*V)   # n,mt,vc
+            x = self.proj(x)   # n,mt,c
+            x, x_list, a = self.trans(x)   # n,c
+        elif self.attention_type == 'T-VC':
+            x = x.permute(0, 1, 3, 4, 2).contiguous()   # n,m,t,v,c
+            x = x.view(N*M, T, C*V)   # nm,t,vc
+            x = self.proj(x)   # nm,t,c
+            x, x_list, a = self.trans(x)   # nm,c
+            x = x.view(N, M, -1).mean(1)   # n,c
+        else:
+            raise ValueError("Unknown attention_type")
         return x, a
 
 
 if __name__ == '__main__':
     graph = 'graph.ntu_rgb_d.Graph'
-    model = Model(graph=graph)
+    model = Model(graph=graph, model_layers=10,
+                  attention_layers=1, num_heads=1)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))
-    model(torch.ones((1, 3, 300, 25, 2)))
+    # model(torch.ones((1, 3, 300, 25, 2)))

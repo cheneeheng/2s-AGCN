@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_v11_joint/211216173001
-model_saved_name: ./data/data/ntu_result/xview/aagcn_v11_joint/211216173001/ntu_cv_aagcn_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_v11_joint/211217153001_cls_pos_mt_vc_2h_1a
+model_saved_name: ./data/data/ntu_result/xview/aagcn_v11_joint/211217153001_cls_pos_mt_vc_2h_1a/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
@@ -42,6 +42,10 @@ model_args:
   adaptive: True
   attention: True
   num_heads: 2
+  pos_enc: True
+  classifier_type: CLS
+  attention_type: MT-VC
+  attention_layers: 1
   model_layers: 10
 # weights: None
 
