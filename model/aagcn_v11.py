@@ -113,18 +113,25 @@ class TransformerEncoder(nn.Module):
                  num_heads: int = 1,
                  num_layers: int = 1,
                  pos_enc: bool = True,
-                 classifier_type: str = 'CLS'):
+                 classifier_type: str = 'CLS',
+                 attention_type: str = 'MT-VC',
+                 num_person: int = 2):
         super().__init__()
 
+        max_len = 75
+        if attention_type == 'MT-VC':
+            max_len *= num_person
+        if classifier_type == 'CLS':
+            max_len += 1
+
         if pos_enc:
-            self.pos_encoder = PositionalEncoding(in_channels, max_len=75)
+            self.pos_encoder = PositionalEncoding(in_channels, max_len=max_len)
         else:
             self.pos_encoder = lambda x: x
 
         self.classifier_type = classifier_type
         if classifier_type == 'CLS':
             self.cls_token = nn.Parameter(torch.randn(1, 1, in_channels))
-            self.pos_encoder = PositionalEncoding(in_channels, max_len=75+1)
         else:
             self.cls_token = None
 
@@ -135,7 +142,7 @@ class TransformerEncoder(nn.Module):
 
     def forward(self, x: torch.Tensor):
         # x : N, L, C
-        if self.cls_token:
+        if self.cls_token is not None:
             cls_tokens = self.cls_token.repeat(x.size(0), 1, 1)
             x = torch.cat((cls_tokens, x), dim=1)
         x = self.pos_encoder(x)
@@ -228,7 +235,9 @@ class Model(BaseModel):
             num_heads=num_heads,
             num_layers=attention_layers,
             pos_enc=pos_enc,
-            classifier_type=classifier_type
+            classifier_type=classifier_type,
+            attention_type=attention_type,
+            num_person=num_person
         )
 
         if classifier_type == 'ALL':
@@ -268,4 +277,4 @@ if __name__ == '__main__':
                   attention_layers=1, num_heads=1)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))
-    # model(torch.ones((1, 3, 300, 25, 2)))
+    model(torch.ones((1, 3, 300, 25, 2)))
