@@ -13,7 +13,7 @@ from model.aagcn import BaseModel
 # ------------------------------------------------------------------------------
 # Blocks
 # Neural Machine Translation by Jointly Learning to Align and Translate
-# use relu instead of tanh
+# relu / tanh
 # ------------------------------------------------------------------------------
 class FFNUnit(nn.Module):
     def __init__(self,
@@ -22,12 +22,14 @@ class FFNUnit(nn.Module):
         super().__init__()
         self.l1 = nn.Linear(in_channels, inter_channels)
         self.l2 = nn.Linear(inter_channels, 1)
-        self.re = nn.ReLU()
+        # self.re = nn.ReLU()
+        self.th = nn.Tanh()
         self.so = nn.Softmax(dim=1)
 
     def forward(self, x: torch.Tensor):
         # x : N, L, C
-        x = self.l2(self.re(self.l1(x)))
+        x = self.l2(self.th(self.l1(x)))
+        # x = self.l2(self.re(self.l1(x)))
         x = self.so(x.squeeze(2))
         return x
 
