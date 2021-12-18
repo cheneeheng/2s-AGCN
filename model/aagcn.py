@@ -403,6 +403,17 @@ class BaseModel(nn.Module):
             self.l8 = tcngcn_unit(128, 256, stride=2)
             self.l9 = tcngcn_unit(256, 256)
             self.l10 = tcngcn_unit(256, 256)
+        elif model_layers == 103:
+            self.l1 = tcngcn_unit(3, 64, residual=False)
+            self.l2 = tcngcn_unit(64, 64)
+            self.l3 = tcngcn_unit(64, 64)
+            self.l4 = lambda x: x
+            self.l5 = lambda x: x
+            self.l6 = lambda x: x
+            self.l7 = lambda x: x
+            self.l8 = lambda x: x
+            self.l9 = lambda x: x
+            self.l10 = lambda x: x
         else:
             raise ValueError(
                 f"Model with {model_layers} layers is not supported.")

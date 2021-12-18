@@ -46,7 +46,9 @@ model_args:
   classifier_type: CLS
   attention_type: MT-VC
   attention_layers: 1
-  model_layers: 10
+  mha_dropout: 0.2
+  ffn_dropout: 0.2
+  model_layers: 3
 # weights: None
 
 #optim

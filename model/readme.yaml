@@ -147,3 +147,21 @@ aagcn_v10:
         - Flat, 2h:
                   - 84.2%
                   - No Overfitting
+
+aagcn_v11:
+        - uses transformer layers with projection
+        - 211217153001_cls_pos_mt_vc_2h_1a:
+                  - did not converge
+        - 211217153001_cls_mt_vc_2h_1a:
+                  - did not converge
+        - 211217153001_gap_mt_vc_2h_1a:
+                  - did not converge
+
+aagcn_v12:
+        - uses attention learned from conv. (unary)
+        - with relu for attention:
+                  - 90.0 %.
+                  - did not overfit, may need longer training. !!!!!
+        - with tanh for attention:
+                  - 94.2%
+                  - almost identical to the original.

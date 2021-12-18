@@ -17,7 +17,10 @@ from model.aagcn import BaseModel
 # - https: // pytorch.org/tutorials/beginner/transformer_tutorial.html
 # ------------------------------------------------------------------------------
 class PositionalEncoding(nn.Module):
-    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 75):
+    def __init__(self,
+                 d_model: int,
+                 dropout: float = 0.0,
+                 max_len: int = 300):
         super().__init__()
         _pe = torch.empty(1, max_len, d_model)
         nn.init.normal_(_pe, std=0.02)  # bert
@@ -26,7 +29,7 @@ class PositionalEncoding(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x : N, L, C
-        x = x + self.pe
+        x = x + self.pe[:, :x.size(1), :]
         x = self.dropout(x)
         return x
 
@@ -34,12 +37,13 @@ class PositionalEncoding(nn.Module):
 class MHAUnit(nn.Module):
     def __init__(self,
                  in_channels: int,
-                 num_heads: int = 1):
+                 num_heads: int = 1,
+                 dropout: float = 0.0):
         super().__init__()
         self.mha = nn.MultiheadAttention(
             embed_dim=in_channels,
             num_heads=num_heads,
-            dropout=0.,
+            dropout=dropout,
             bias=True,
             add_bias_kv=False,
             add_zero_attn=False,
@@ -52,12 +56,13 @@ class MHAUnit(nn.Module):
             eps=1e-05,
             elementwise_affine=True
         )
+        self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, x: torch.Tensor):
         # x : N, L, C
         x = self.norm(x)
         mha_x, mha_attn = self.mha(x, x, x)
-        x = x + mha_x
+        x = x + self.dropout(mha_x)
         return x, mha_attn
 
 
@@ -66,24 +71,25 @@ class FFNUnit(nn.Module):
                  in_channels: int,
                  inter_channels: int,
                  out_channels: int,
-                 skip: bool = True):
+                 skip: bool = True,
+                 dropout: float = 0.0):
         super().__init__()
         self.skip = skip
         self.l1 = nn.Linear(in_channels, inter_channels)
         self.l2 = nn.Linear(inter_channels, out_channels)
         self.re = nn.GELU()
-        self.n1 = nn.LayerNorm(
-            normalized_shape=in_channels,
-            eps=1e-05,
-            elementwise_affine=True
-        )
+        self.n1 = nn.LayerNorm(normalized_shape=in_channels,
+                               eps=1e-05,
+                               elementwise_affine=True)
+        self.d1 = nn.Dropout(p=dropout)
+        self.d2 = nn.Dropout(p=dropout)
 
     def forward(self, x: torch.Tensor):
         # x : N, L, C
         if self.skip:
-            x = x + self.l2(self.re(self.l1(self.n1(x))))
+            x = x + self.d2(self.l2(self.d1(self.re(self.l1(self.n1(x))))))
         else:
-            x = self.l2(self.re(self.l1(self.n1(x))))
+            x = self.d2(self.l2(self.d1(self.re(self.l1(self.n1(x))))))
         return x
 
 
@@ -91,13 +97,18 @@ class TransformerUnit(nn.Module):
     def __init__(self,
                  in_channels: int,
                  inter_channels: int,
-                 num_heads: int = 1):
+                 num_heads: int = 1,
+                 mha_dropout: float = 0.0,
+                 ffn_dropout: float = 0.0):
         super().__init__()
-        self.mha = MHAUnit(in_channels=in_channels, num_heads=num_heads)
+        self.mha = MHAUnit(in_channels=in_channels,
+                           num_heads=num_heads,
+                           dropout=mha_dropout)
         self.ffn = FFNUnit(in_channels=in_channels,
                            inter_channels=inter_channels,
                            out_channels=in_channels,
-                           skip=True)
+                           skip=True,
+                           dropout=ffn_dropout)
 
     def forward(self, x: torch.Tensor):
         # x : N, L, C
@@ -112,20 +123,14 @@ class TransformerEncoder(nn.Module):
                  inter_channels: int,
                  num_heads: int = 1,
                  num_layers: int = 1,
+                 mha_dropout: float = 0.0,
+                 ffn_dropout: float = 0.0,
                  pos_enc: bool = True,
-                 classifier_type: str = 'CLS',
-                 attention_type: str = 'MT-VC',
-                 num_person: int = 2):
+                 classifier_type: str = 'CLS'):
         super().__init__()
 
-        max_len = 75
-        if attention_type == 'MT-VC':
-            max_len *= num_person
-        if classifier_type == 'CLS':
-            max_len += 1
-
         if pos_enc:
-            self.pos_encoder = PositionalEncoding(in_channels, max_len=max_len)
+            self.pos_encoder = PositionalEncoding(in_channels)
         else:
             self.pos_encoder = lambda x: x
 
@@ -138,7 +143,11 @@ class TransformerEncoder(nn.Module):
         self.transformer_layers = nn.ModuleList()
         for _ in range(num_layers):
             self.transformer_layers.append(
-                TransformerUnit(in_channels, inter_channels, num_heads))
+                TransformerUnit(in_channels=in_channels,
+                                inter_channels=inter_channels,
+                                num_heads=num_heads,
+                                mha_dropout=mha_dropout,
+                                ffn_dropout=ffn_dropout))
 
     def forward(self, x: torch.Tensor):
         # x : N, L, C
@@ -162,12 +171,11 @@ class TransformerEncoder(nn.Module):
             raise ValueError("Unknown classifier_type")
         return out, ffn_x, mha_attn
 
+
 # ------------------------------------------------------------------------------
 # Network
-# - uses transformer with fetaure projection.
+# - uses transformer with feature projection.
 # ------------------------------------------------------------------------------
-
-
 class Model(BaseModel):
     def __init__(self,
                  num_class: int = 60,
@@ -186,6 +194,8 @@ class Model(BaseModel):
                  classifier_type: str = 'CLS',
                  attention_type: str = 'MT-VC',
                  attention_layers: int = 1,
+                 mha_dropout: float = 0.0,
+                 ffn_dropout: float = 0.0,
                  model_layers: int = 10):
         super().__init__(num_class, num_point, num_person,
                          in_channels, drop_out, adaptive, gbn_split)
@@ -234,10 +244,10 @@ class Model(BaseModel):
             inter_channels=256*4,
             num_heads=num_heads,
             num_layers=attention_layers,
+            mha_dropout=mha_dropout,
+            ffn_dropout=ffn_dropout,
             pos_enc=pos_enc,
             classifier_type=classifier_type,
-            attention_type=attention_type,
-            num_person=num_person
         )
 
         if classifier_type == 'ALL':
@@ -273,8 +283,9 @@ class Model(BaseModel):
 
 if __name__ == '__main__':
     graph = 'graph.ntu_rgb_d.Graph'
-    model = Model(graph=graph, model_layers=10,
-                  attention_layers=1, num_heads=1)
+    model = Model(graph=graph, model_layers=3,
+                  attention_layers=1, num_heads=2, )
+    # print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))
-    model(torch.ones((1, 3, 300, 25, 2)))
+    # model(torch.ones((1, 3, 300, 25, 2)))
