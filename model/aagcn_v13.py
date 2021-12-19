@@ -231,6 +231,7 @@ class Model(BaseModel):
                  trans_ffn_dim: int = 64,
                  trans_dropout: float = 0.2,
                  trans_activation: str = "gelu",
+                 trans_num_layers: int = 1,
 
                  num_heads: int = 1,
                  pos_enc: bool = True,
@@ -243,14 +244,36 @@ class Model(BaseModel):
         super().__init__(num_class, num_point, num_person,
                          in_channels, drop_out, adaptive, gbn_split)
 
+        if graph is None:
+            raise ValueError()
+        else:
+            Graph = import_class(graph)
+            self.graph = Graph(**graph_args)
+
+        def _TCNGCNUnit(_in, _out, stride=1, residual=True):
+            return TCNGCNUnit(_in,
+                              _out,
+                              self.graph.A,
+                              num_subset=num_subset,
+                              stride=stride,
+                              residual=residual,
+                              adaptive=self.adaptive_fn,
+                              attention=attention,
+                              gbn_split=gbn_split)
+
+        self.init_model_backbone(model_layers=model_layers,
+                                 tcngcn_unit=_TCNGCNUnit,
+                                 output_channel=trans_model_dim)
+
         if pos_enc:
-            self.pos_encoder = PositionalEncoding(in_channels)
+            self.pos_encoder = PositionalEncoding(trans_model_dim*num_point)
         else:
             self.pos_encoder = lambda x: x
 
         self.classifier_type = classifier_type
         if classifier_type == 'CLS':
-            self.cls_token = nn.Parameter(torch.randn(1, 1, in_channels))
+            self.cls_token = nn.Parameter(
+                torch.randn(1, 1, trans_model_dim*num_point))
         else:
             self.cls_token = None
 
@@ -266,18 +289,16 @@ class Model(BaseModel):
 
         self.trans_enc = nn.TransformerEncoder(
             trans_enc_layer,
-            num_layers=3,
+            num_layers=trans_num_layers,
             norm=None
         )
 
         self.init_fc(trans_model_dim*num_point, num_class)
 
-    def forward(self, x: torch.Tensor):
-        N, C, T, V, M = x.size()
-        x = x.permute(0, 4, 3, 1, 2).contiguous()  # n,m,v,c,t
-        x = x.view(N, -1, T)
-        x = self.data_bn(x)
-        x = x.view(N, M, V, C, T).permute(0, 1, 4, 2, 3).contiguous()  # n,m,t,v,c  # noqa
+    def forward_postprocess(self, x: torch.Tensor, size: torch.Size):
+        N, _, _, V, M = size
+        _, C, T, _ = x.size()
+        x = x.view(N, M, C, T, V).permute(0, 1, 3, 4, 2).contiguous()  # n,m,t,v,c  # noqa
         x = x.view(N, M*T, C*V)  # n,mt,vc
 
         if self.cls_token is not None:
@@ -293,9 +314,7 @@ class Model(BaseModel):
         else:
             raise ValueError("Unknown classifier_type")
 
-        x = self.forward_classifier(x)
-
-        return x
+        return x, None
 
         # if graph is None:
         #     raise ValueError()
@@ -380,8 +399,8 @@ class Model(BaseModel):
 
 if __name__ == '__main__':
     graph = 'graph.ntu_rgb_d.Graph'
-    model = Model(graph=graph, model_layers=3,
-                  attention_layers=1, num_heads=2, )
+    model = Model(graph=graph, model_layers=1,
+                  trans_num_layers=10, num_heads=2,)
     # print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))

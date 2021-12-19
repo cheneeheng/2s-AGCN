@@ -293,4 +293,4 @@ if __name__ == '__main__':
     # print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))
-    model(torch.ones((1, 3, 300, 25, 2)))
+    # model(torch.ones((1, 3, 300, 25, 2)))
