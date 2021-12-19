@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_v12_joint/211216170001
-model_saved_name: ./data/data/ntu_result/xview/aagcn_v12_joint/211216170001/ntu_cv_aagcn_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_v12_joint/211216170001_tanh
+model_saved_name: ./data/data/ntu_result/xview/aagcn_v12_joint/211216170001_tanh/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True

@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_v11_joint/211217153001_cls_pos_mt_vc_2h_1a
-model_saved_name: ./data/data/ntu_result/xview/aagcn_v11_joint/211217153001_cls_pos_mt_vc_2h_1a/ntu_cv_aagcn_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_v11_joint/211218220001_pos_cls_mt_vc_2h_1a_3l_dropout_noproj
+model_saved_name: ./data/data/ntu_result/xview/aagcn_v11_joint/211218220001_pos_cls_mt_vc_2h_1a_3l_dropout_noproj/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
@@ -46,9 +46,10 @@ model_args:
   classifier_type: CLS
   attention_type: MT-VC
   attention_layers: 1
+  attention_projection: False
   mha_dropout: 0.2
   ffn_dropout: 0.2
-  model_layers: 3
+  model_layers: 103
 # weights: None
 
 #optim
