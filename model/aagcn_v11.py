@@ -172,10 +172,47 @@ class TransformerEncoder(nn.Module):
         return out, ffn_x, mha_attn
 
 
+class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
+    """Option for pre of postnorm"""
+
+    def __init__(self,
+                 d_model: int,
+                 nhead: int,
+                 dim_feedforward: int = 2048,
+                 dropout: float = 0.1,
+                 activation: str = "relu",
+                 layer_norm_eps: float = 1e-5,
+                 batch_first: bool = False,
+                 pre_norm: bool = False) -> None:
+        super().__init__(d_model, nhead, dim_feedforward, dropout, activation,
+                         layer_norm_eps, batch_first)
+        self.pre_norm = pre_norm
+
+    def forward(self,
+                src: torch.Tensor,
+                src_mask: Optional[torch.Tensor] = None,
+                src_key_padding_mask: Optional[torch.Tensor] = None
+                ) -> torch.Tensor:
+
+        if self.pre_norm:
+            src = self.norm1(src)
+            src2 = self.self_attn(src, src, src, attn_mask=src_mask,
+                                  key_padding_mask=src_key_padding_mask)[0]
+            src = src + self.dropout1(src2)
+            src = self.norm2(src)
+            src1 = self.dropout(self.activation(self.linear1(src)))
+            src2 = self.dropout2(self.linear2(src1))
+            src = src + src2
+            return src
+        else:
+            return super().forward(src, src_mask, src_key_padding_mask)
+
 # ------------------------------------------------------------------------------
 # Network
 # - uses transformer with feature projection.
 # ------------------------------------------------------------------------------
+
+
 class Model(BaseModel):
     def __init__(self,
                  num_class: int = 60,
@@ -197,6 +234,16 @@ class Model(BaseModel):
                  mha_dropout: float = 0.0,
                  ffn_dropout: float = 0.0,
                  attention_projection: bool = True,
+
+                 torch_trans: bool = False,
+                 trans_num_heads: int = 2,
+                 trans_model_dim: int = 16,
+                 trans_ffn_dim: int = 64,
+                 trans_dropout: float = 0.2,
+                 trans_activation: str = "gelu",
+                 trans_prenorm: bool = False,
+                 trans_num_layers: int = 1,
+
                  model_layers: int = 10):
         super().__init__(num_class, num_point, num_person,
                          in_channels, drop_out, adaptive, gbn_split)
@@ -244,6 +291,38 @@ class Model(BaseModel):
         else:
             self.proj = lambda x: x
 
+        self.torch_trans = torch_trans
+        if torch_trans:
+            if pos_enc:
+                self.pos_encoder = PositionalEncoding(
+                    trans_model_dim*num_point)
+            else:
+                self.pos_encoder = lambda x: x
+
+            self.classifier_type = classifier_type
+            if classifier_type == 'CLS':
+                self.cls_token = nn.Parameter(
+                    torch.randn(1, 1, trans_model_dim*num_point))
+            else:
+                self.cls_token = None
+
+            trans_enc_layer = TransformerEncoderLayerExt(
+                d_model=trans_model_dim*num_point,
+                nhead=trans_num_heads,
+                dim_feedforward=trans_ffn_dim*num_point,
+                dropout=trans_dropout,
+                activation=trans_activation,
+                layer_norm_eps=1e-5,
+                batch_first=True,
+                pre_norm=trans_prenorm
+            )
+
+            self.trans_enc = nn.TransformerEncoder(
+                trans_enc_layer,
+                num_layers=trans_num_layers,
+                norm=None
+            )
+
         self.trans = TransformerEncoder(
             in_channels=self.attention_out_dim,
             inter_channels=self.attention_out_dim,
@@ -270,11 +349,29 @@ class Model(BaseModel):
             x = x.view(N, T, M*C*V)   # n,t,mvc
             x = self.proj(x)   # n,t,mvc
             x, x_list, a = self.trans(x)   # n,c
+
         elif self.attention_type == 'MT-VC':
             x = x.permute(0, 1, 3, 4, 2).contiguous()   # n,m,t,v,c
             x = x.view(N, M*T, C*V)   # n,mt,vc
-            x = self.proj(x)   # n,mt,c
-            x, x_list, a = self.trans(x)   # n,c
+
+            if self.torch_trans:
+                if self.cls_token is not None:
+                    cls_tokens = self.cls_token.repeat(x.size(0), 1, 1)
+                    x = torch.cat((cls_tokens, x), dim=1)
+                x = self.pos_encoder(x)
+                x = self.trans_enc(x)
+                if self.classifier_type == 'CLS':
+                    x = x[:, 0, :]  # n,vc
+                elif self.classifier_type == 'GAP':
+                    x = x.mean(1)  # n,vc
+                else:
+                    raise ValueError("Unknown classifier_type")
+                a = None
+
+            else:
+                x = self.proj(x)   # n,mt,c
+                x, x_list, a = self.trans(x)   # n,c
+
         elif self.attention_type == 'T-VC':
             x = x.permute(0, 1, 3, 4, 2).contiguous()   # n,m,t,v,c
             x = x.view(N*M, T, C*V)   # nm,t,vc
@@ -289,8 +386,9 @@ class Model(BaseModel):
 if __name__ == '__main__':
     graph = 'graph.ntu_rgb_d.Graph'
     model = Model(graph=graph, model_layers=103,
-                  attention_layers=1, num_heads=2, attention_projection=False)
+                  attention_layers=1, num_heads=2, attention_projection=False,
+                  torch_trans=True, trans_model_dim=64)
     # print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))
-    # model(torch.ones((1, 3, 300, 25, 2)))
+    model(torch.ones((1, 3, 300, 25, 2)))

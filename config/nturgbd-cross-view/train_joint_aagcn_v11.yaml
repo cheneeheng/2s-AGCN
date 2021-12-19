@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_v11_joint/211218220001_pos_cls_mt_vc_2h_1a_3l_dropout_noproj
-model_saved_name: ./data/data/ntu_result/xview/aagcn_v11_joint/211218220001_pos_cls_mt_vc_2h_1a_3l_dropout_noproj/ntu_cv_aagcn_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_v11_joint/211218220001_pos_cls_mt_vc_2h_1a_3l_dropout_noproj_torchtrans
+model_saved_name: ./data/data/ntu_result/xview/aagcn_v11_joint/211218220001_pos_cls_mt_vc_2h_1a_3l_dropout_noproj_torchtrans/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
@@ -49,6 +49,13 @@ model_args:
   attention_projection: False
   mha_dropout: 0.2
   ffn_dropout: 0.2
+  torch_trans: True
+  trans_num_heads: 2
+  trans_model_dim: 64
+  trans_ffn_dim: 256
+  trans_dropout: 0.2
+  trans_activation: gelu
+  trans_num_layers: 3
   model_layers: 103
 # weights: None
 

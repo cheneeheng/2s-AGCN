@@ -231,6 +231,7 @@ class Model(BaseModel):
                  trans_ffn_dim: int = 64,
                  trans_dropout: float = 0.2,
                  trans_activation: str = "gelu",
+                 trans_prenorm: bool = False,
                  trans_num_layers: int = 1,
 
                  num_heads: int = 1,
@@ -285,6 +286,7 @@ class Model(BaseModel):
             activation=trans_activation,
             layer_norm_eps=1e-5,
             batch_first=True,
+            pre_norm=trans_prenorm
         )
 
         self.trans_enc = nn.TransformerEncoder(
