@@ -172,6 +172,42 @@ class TransformerEncoder(nn.Module):
         return out, ffn_x, mha_attn
 
 
+class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
+    """Option for pre of postnorm"""
+
+    def __init__(self,
+                 d_model: int,
+                 nhead: int,
+                 dim_feedforward: int = 2048,
+                 dropout: float = 0.1,
+                 activation: str = "relu",
+                 layer_norm_eps: float = 1e-5,
+                 batch_first: bool = False,
+                 pre_norm: bool = False) -> None:
+        super().__init__(d_model, nhead, dim_feedforward, dropout, activation,
+                         layer_norm_eps, batch_first)
+        self.pre_norm = pre_norm
+
+    def forward(self,
+                src: torch.Tensor,
+                src_mask: Optional[torch.Tensor] = None,
+                src_key_padding_mask: Optional[torch.Tensor] = None
+                ) -> torch.Tensor:
+
+        if self.pre_norm:
+            src = self.norm1(src)
+            src2 = self.self_attn(src, src, src, attn_mask=src_mask,
+                                  key_padding_mask=src_key_padding_mask)[0]
+            src = src + self.dropout1(src2)
+            src = self.norm2(src)
+            src1 = self.dropout(self.activation(self.linear1(src)))
+            src2 = self.dropout2(self.linear2(src1))
+            src = src + src2
+            return src
+        else:
+            return super().forward(src, src_mask, src_key_padding_mask)
+
+
 # ------------------------------------------------------------------------------
 # Network
 # - uses transformer with feature projection.
@@ -189,6 +225,13 @@ class Model(BaseModel):
                  adaptive: bool = True,
                  attention: bool = True,
                  gbn_split: Optional[int] = None,
+
+                 trans_num_heads: int = 2,
+                 trans_model_dim: int = 16,
+                 trans_ffn_dim: int = 64,
+                 trans_dropout: float = 0.2,
+                 trans_activation: str = "gelu",
+
                  num_heads: int = 1,
                  pos_enc: bool = True,
                  classifier_type: str = 'CLS',
@@ -196,100 +239,149 @@ class Model(BaseModel):
                  attention_layers: int = 1,
                  mha_dropout: float = 0.0,
                  ffn_dropout: float = 0.0,
-                 attention_projection: bool = True,
                  model_layers: int = 10):
         super().__init__(num_class, num_point, num_person,
                          in_channels, drop_out, adaptive, gbn_split)
 
-        if graph is None:
-            raise ValueError()
+        if pos_enc:
+            self.pos_encoder = PositionalEncoding(in_channels)
         else:
-            Graph = import_class(graph)
-            self.graph = Graph(**graph_args)
+            self.pos_encoder = lambda x: x
 
-        def _TCNGCNUnit(_in, _out, stride=1, residual=True):
-            return TCNGCNUnit(_in,
-                              _out,
-                              self.graph.A,
-                              num_subset=num_subset,
-                              stride=stride,
-                              residual=residual,
-                              adaptive=self.adaptive_fn,
-                              attention=attention,
-                              gbn_split=gbn_split)
-
-        self.init_model_backbone(model_layers=model_layers,
-                                 tcngcn_unit=_TCNGCNUnit)
-        self.attention_out_dim = 64*num_point
-
-        self.attention_type = attention_type
-        if attention_projection:
-            self.attention_out_dim = 256
-            if self.attention_type == 'T-MVC':
-                self.proj = FFNUnit(in_channels=256*num_point*num_person,
-                                    inter_channels=(
-                                        256*num_point*num_person)//8,
-                                    out_channels=256,
-                                    skip=False)
-            elif self.attention_type == 'MT-VC':
-                self.proj = FFNUnit(in_channels=256*num_point,
-                                    inter_channels=(256*num_point)//8,
-                                    out_channels=256,
-                                    skip=False)
-            elif self.attention_type == 'T-VC':
-                self.proj = FFNUnit(in_channels=256*num_point,
-                                    inter_channels=(256*num_point)//8,
-                                    out_channels=256,
-                                    skip=False)
+        self.classifier_type = classifier_type
+        if classifier_type == 'CLS':
+            self.cls_token = nn.Parameter(torch.randn(1, 1, in_channels))
         else:
-            self.proj = lambda x: x
+            self.cls_token = None
 
-        self.trans = TransformerEncoder(
-            in_channels=self.attention_out_dim,
-            inter_channels=self.attention_out_dim,
-            num_heads=num_heads,
-            num_layers=attention_layers,
-            mha_dropout=mha_dropout,
-            ffn_dropout=ffn_dropout,
-            pos_enc=pos_enc,
-            classifier_type=classifier_type,
+        trans_enc_layer = TransformerEncoderLayerExt(
+            d_model=trans_model_dim*num_point,
+            nhead=trans_num_heads,
+            dim_feedforward=trans_ffn_dim*num_point,
+            dropout=trans_dropout,
+            activation=trans_activation,
+            layer_norm_eps=1e-5,
+            batch_first=True,
         )
 
-        if classifier_type == 'ALL':
-            self.init_fc(256*75, num_class)
-        else:
-            self.init_fc(self.attention_out_dim, num_class)
+        self.trans_enc = nn.TransformerEncoder(
+            trans_enc_layer,
+            num_layers=3,
+            norm=None
+        )
 
-    def forward_postprocess(self, x, size):
-        # x : NM C T V
-        N, _, _, V, M = size
-        _, C, T, _ = x.size()
-        x = x.view(N, M, C, T, V)   # n,m,c,t,v
-        if self.attention_type == 'T-MVC':
-            x = x.permute(0, 3, 1, 4, 2).contiguous()   # n,t,m,v,c
-            x = x.view(N, T, M*C*V)   # n,t,mvc
-            x = self.proj(x)   # n,t,mvc
-            x, x_list, a = self.trans(x)   # n,c
-        elif self.attention_type == 'MT-VC':
-            x = x.permute(0, 1, 3, 4, 2).contiguous()   # n,m,t,v,c
-            x = x.view(N, M*T, C*V)   # n,mt,vc
-            x = self.proj(x)   # n,mt,c
-            x, x_list, a = self.trans(x)   # n,c
-        elif self.attention_type == 'T-VC':
-            x = x.permute(0, 1, 3, 4, 2).contiguous()   # n,m,t,v,c
-            x = x.view(N*M, T, C*V)   # nm,t,vc
-            x = self.proj(x)   # nm,t,c
-            x, x_list, a = self.trans(x)   # nm,c
-            x = x.view(N, M, -1).mean(1)   # n,c
+        self.init_fc(trans_model_dim*num_point, num_class)
+
+    def forward(self, x: torch.Tensor):
+        N, C, T, V, M = x.size()
+        x = x.permute(0, 4, 3, 1, 2).contiguous()  # n,m,v,c,t
+        x = x.view(N, -1, T)
+        x = self.data_bn(x)
+        x = x.view(N, M, V, C, T).permute(0, 1, 4, 2, 3).contiguous()  # n,m,t,v,c  # noqa
+        x = x.view(N, M*T, C*V)  # n,mt,vc
+
+        if self.cls_token is not None:
+            cls_tokens = self.cls_token.repeat(x.size(0), 1, 1)
+            x = torch.cat((cls_tokens, x), dim=1)
+        x = self.pos_encoder(x)
+
+        x = self.trans_enc(x)
+        if self.classifier_type == 'CLS':
+            x = x[:, 0, :]  # n,vc
+        elif self.classifier_type == 'GAP':
+            x = x.mean(1)  # n,vc
         else:
-            raise ValueError("Unknown attention_type")
-        return x, a
+            raise ValueError("Unknown classifier_type")
+
+        x = self.forward_classifier(x)
+
+        return x
+
+        # if graph is None:
+        #     raise ValueError()
+        # else:
+        #     Graph = import_class(graph)
+        #     self.graph = Graph(**graph_args)
+
+        # def _TCNGCNUnit(_in, _out, stride=1, residual=True):
+        #     return TCNGCNUnit(_in,
+        #                       _out,
+        #                       self.graph.A,
+        #                       num_subset=num_subset,
+        #                       stride=stride,
+        #                       residual=residual,
+        #                       adaptive=self.adaptive_fn,
+        #                       attention=attention,
+        #                       gbn_split=gbn_split)
+
+        # self.init_model_backbone(model_layers=model_layers,
+        #                          tcngcn_unit=_TCNGCNUnit)
+
+        # self.attention_type = attention_type
+        # if self.attention_type == 'T-MVC':
+        #     self.proj = FFNUnit(in_channels=256*num_point*num_person,
+        #                         inter_channels=(256*num_point*num_person)//8,
+        #                         out_channels=256,
+        #                         skip=False)
+        # elif self.attention_type == 'MT-VC':
+        #     self.proj = FFNUnit(in_channels=256*num_point,
+        #                         inter_channels=(256*num_point)//8,
+        #                         out_channels=256,
+        #                         skip=False)
+        # elif self.attention_type == 'T-VC':
+        #     self.proj = FFNUnit(in_channels=256*num_point,
+        #                         inter_channels=(256*num_point)//8,
+        #                         out_channels=256,
+        #                         skip=False)
+        # else:
+        #     raise ValueError("Unknown attention_type")
+
+        # self.trans = TransformerEncoder(
+        #     in_channels=256,
+        #     inter_channels=256*4,
+        #     num_heads=num_heads,
+        #     num_layers=attention_layers,
+        #     mha_dropout=mha_dropout,
+        #     ffn_dropout=ffn_dropout,
+        #     pos_enc=pos_enc,
+        #     classifier_type=classifier_type,
+        # )
+
+        # if classifier_type == 'ALL':
+        #     self.init_fc(256*75, num_class)
+        # else:
+        #     self.init_fc(256, num_class)
+
+    # def forward_postprocess(self, x, size):
+    #     # x : NM C T V
+    #     N, _, _, V, M = size
+    #     _, C, T, _ = x.size()
+    #     x = x.view(N, M, C, T, V)   # n,m,c,t,v
+    #     if self.attention_type == 'T-MVC':
+    #         x = x.permute(0, 3, 1, 4, 2).contiguous()   # n,t,m,v,c
+    #         x = x.view(N, T, M*C*V)   # n,t,mvc
+    #         x = self.proj(x)   # n,t,mvc
+    #         x, x_list, a = self.trans(x)   # n,c
+    #     elif self.attention_type == 'MT-VC':
+    #         x = x.permute(0, 1, 3, 4, 2).contiguous()   # n,m,t,v,c
+    #         x = x.view(N, M*T, C*V)   # n,mt,vc
+    #         x = self.proj(x)   # n,mt,c
+    #         x, x_list, a = self.trans(x)   # n,c
+    #     elif self.attention_type == 'T-VC':
+    #         x = x.permute(0, 1, 3, 4, 2).contiguous()   # n,m,t,v,c
+    #         x = x.view(N*M, T, C*V)   # nm,t,vc
+    #         x = self.proj(x)   # nm,t,c
+    #         x, x_list, a = self.trans(x)   # nm,c
+    #         x = x.view(N, M, -1).mean(1)   # n,c
+    #     else:
+    #         raise ValueError("Unknown attention_type")
+    #     return x, a
 
 
 if __name__ == '__main__':
     graph = 'graph.ntu_rgb_d.Graph'
-    model = Model(graph=graph, model_layers=103,
-                  attention_layers=1, num_heads=2, attention_projection=False)
+    model = Model(graph=graph, model_layers=3,
+                  attention_layers=1, num_heads=2, )
     # print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))

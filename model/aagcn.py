@@ -321,6 +321,19 @@ class TCNGCNUnit(nn.Module):
 # Network
 # ------------------------------------------------------------------------------
 class BaseModel(nn.Module):
+    """"
+    Base class for building aagcn model.
+
+    Consists of:
+    - init_model_backbone
+    - init_fc
+    - forward_preprocess
+    - forward_model_backbone
+    - forward_postprocess
+    - forward_classifier
+    - forward
+    """
+
     def __init__(self,
                  num_class: int = 60,
                  num_point: int = 25,
