@@ -156,12 +156,27 @@ aagcn_v11:
                   - did not converge
         - 211217153001_gap_mt_vc_2h_1a:
                   - did not converge
+        - 211218220001_pos_gap_mt_vc_2h_1a_3l_dropout:
+                  - did not converge
+        - 211218220001_pos_cls_mt_vc_2h_1a_3l_dropout:
+                  - did not converge
+        - 211218220001_pos_cls_mt_vc_2h_1a_3l_dropout_noproj_torchtrans:
+                  - did not converge
 
 aagcn_v12:
         - uses attention learned from conv. (unary)
-        - with relu for attention:
+        - 211216170001, with relu for attention:
                   - 90.0 %.
                   - did not overfit, may need longer training. !!!!!
-        - with tanh for attention:
+        - 211216170001_tanh, with tanh for attention:
                   - 94.2%
                   - almost identical to the original.
+
+aagcn_v13:
+        - uses original transformer layers + 1 aagcn projection block.
+        - 211219110001_pos_cls_3trans:
+                  - ~70%
+                  - converge but training was unstable.
+        - 211219110001_pos_cls_3trans_lowerlr:
+                  - 89.3%
+                  - overfit, train acc ~1

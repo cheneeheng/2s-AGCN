@@ -226,14 +226,18 @@ class Model(BaseModel):
                  adaptive: bool = True,
                  attention: bool = True,
                  gbn_split: Optional[int] = None,
-                 num_heads: int = 1,
+
                  pos_enc: bool = True,
                  classifier_type: str = 'CLS',
+
                  attention_type: str = 'MT-VC',
+                 attention_num_heads: int = 1,
                  attention_layers: int = 1,
                  mha_dropout: float = 0.0,
                  ffn_dropout: float = 0.0,
                  attention_projection: bool = True,
+                 attention_in_dim: int = 64,
+                 attention_out_dim: int = 256,
 
                  torch_trans: bool = False,
                  trans_num_heads: int = 2,
@@ -265,13 +269,17 @@ class Model(BaseModel):
                               attention=attention,
                               gbn_split=gbn_split)
 
-        self.init_model_backbone(model_layers=model_layers,
-                                 tcngcn_unit=_TCNGCNUnit)
-        self.attention_out_dim = 64*num_point
+        if torch_trans:
+            self.init_model_backbone(model_layers=model_layers,
+                                     tcngcn_unit=_TCNGCNUnit,
+                                     output_channel=trans_model_dim)
+        else:
+            self.init_model_backbone(model_layers=model_layers,
+                                     tcngcn_unit=_TCNGCNUnit,
+                                     output_channel=attention_in_dim)
 
         self.attention_type = attention_type
         if attention_projection:
-            self.attention_out_dim = 256
             if self.attention_type == 'T-MVC':
                 self.proj = FFNUnit(in_channels=256*num_point*num_person,
                                     inter_channels=(
@@ -323,21 +331,25 @@ class Model(BaseModel):
                 norm=None
             )
 
-        self.trans = TransformerEncoder(
-            in_channels=self.attention_out_dim,
-            inter_channels=self.attention_out_dim,
-            num_heads=num_heads,
-            num_layers=attention_layers,
-            mha_dropout=mha_dropout,
-            ffn_dropout=ffn_dropout,
-            pos_enc=pos_enc,
-            classifier_type=classifier_type,
-        )
-
-        if classifier_type == 'ALL':
-            self.init_fc(256*75, num_class)
         else:
-            self.init_fc(self.attention_out_dim, num_class)
+            self.trans = TransformerEncoder(
+                in_channels=attention_out_dim,
+                inter_channels=attention_out_dim*4,
+                num_heads=attention_num_heads,
+                num_layers=attention_layers,
+                mha_dropout=mha_dropout,
+                ffn_dropout=ffn_dropout,
+                pos_enc=pos_enc,
+                classifier_type=classifier_type,
+            )
+
+        if torch_trans:
+            self.init_fc(trans_model_dim*num_point, num_class)
+        else:
+            if classifier_type == 'ALL':
+                self.init_fc(attention_out_dim*75, num_class)
+            else:
+                self.init_fc(attention_out_dim, num_class)
 
     def forward_postprocess(self, x, size):
         # x : NM C T V
@@ -385,9 +397,31 @@ class Model(BaseModel):
 
 if __name__ == '__main__':
     graph = 'graph.ntu_rgb_d.Graph'
-    model = Model(graph=graph, model_layers=103,
-                  attention_layers=1, num_heads=2, attention_projection=False,
-                  torch_trans=True, trans_model_dim=64)
+    model = Model(graph=graph,
+                  model_layers=1,
+
+                  pos_enc=True,
+                  classifier_type='CLS',
+
+                  attention_type='MT-VC',
+                  attention_num_heads=2,
+                  attention_layers=3,
+                  mha_dropout=0.2,
+                  ffn_dropout=0.2,
+                  attention_projection=False,
+                  attention_in_dim=16,
+                  attention_out_dim=16*25,
+
+                  torch_trans=True,
+                  trans_num_heads=2,
+                  trans_model_dim=16,
+                  trans_ffn_dim=64,
+                  trans_dropout=0.2,
+                  trans_activation="gelu",
+                  trans_prenorm=True,
+                  trans_num_layers=3,
+
+                  )
     # print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))
