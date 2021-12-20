@@ -38,8 +38,6 @@ def read_xyz(file, max_body=4, num_joint=25):
     skel_data = np.loadtxt(file, delimiter=',')
     data = np.zeros((max_body, 1, num_joint, 3))
     for m, body_joint in enumerate(skel_data):
-        if body_joint == 0:
-            continue
         for j in range(0, len(body_joint), 3):
             if m < max_body and j//3 < num_joint:
                 data[m, 0, j//3, :] = [body_joint[j],
@@ -111,7 +109,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--num-joint',
         type=int,
-        default=num_joint)
+        default=15)
 
     parser.add_argument(
         '--gpu',
