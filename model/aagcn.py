@@ -423,7 +423,7 @@ class BaseModel(nn.Module):
     def init_model_backbone(self, model_layers, tcngcn_unit,
                             output_channel=None):
         if model_layers in [3, 6, 7, 10]:
-            self.init_original_model_backbone(self, model_layers, tcngcn_unit)
+            self.init_original_model_backbone(model_layers, tcngcn_unit)
         elif model_layers == 101:
             c = output_channel if output_channel is not None else 64
             self.l1 = tcngcn_unit(3, c, residual=False)
