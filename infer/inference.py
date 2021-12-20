@@ -184,11 +184,11 @@ if __name__ == '__main__':
         skel_file = sorted(os.listdir(skel_dir))[-1]
         skel_path = os.path.join(skel_dir, skel_file)
 
-        if skel_path == skel_path_mem:
-            continue
-        else:
-            skel_path_mem = skel_path
-            infer_flag = True
+#        if skel_path == skel_path_mem:
+#            continue
+#        else:
+#            skel_path_mem = skel_path
+        infer_flag = True
 
         if arg.timing:
             start_time = time.time()
