@@ -36,7 +36,7 @@ class DataPreprocessor(object):
             self.data[:, self.data_counter:self.data_counter+1, :, :] = data
             self.data_counter += 1
         else:
-            self.data[:, 1:, :, :] = self.data[:, 0:-2, :, :]
+            self.data[:, 0:-2, :, :] = self.data[:, 1:, :, :]
             self.data[:, -2:, :, :] = data
 
     def select_skeletons(self, num_skels: int = 2) -> np.ndarray:

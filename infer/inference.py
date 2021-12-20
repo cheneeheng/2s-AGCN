@@ -132,11 +132,11 @@ if __name__ == '__main__':
     parser.add_argument(
         '--model-path',
         type=str,
-        default='/data/2s-agcn/model/211116110001/')
+        default='/data/2s-agcn/model/ntu_15j/')
     parser.add_argument(
         '--out-folder',
         type=str,
-        default='/data/2s-agcn/prediction/211116110001/')
+        default='/data/2s-agcn/prediction/ntu_15j/')
 
     # load arg form config file ------------------------------------------------
     arg = arg_parser(parser)
@@ -204,7 +204,7 @@ if __name__ == '__main__':
         # 4. Inference. --------------------------------------------------------
         logits, pred = append_data_and_predict_fn(data=data)
 
-        output_file = os.path.join(output_dir, skel_file)
+        output_file = os.path.join(output_dir, skel_fol, skel_file)
         with open(output_file, 'w+') as f:
             output_str = ",".join([str(logit) for logit in logits])
             output_str = f'{pred},{output_str}\n'

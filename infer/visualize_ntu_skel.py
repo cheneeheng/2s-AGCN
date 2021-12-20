@@ -13,7 +13,8 @@ JOINT_COLOR = [
     (255, 0, 0),
     (255, 0, 0),
     (255, 0, 85),
-    (255, 0, 170),
+    # (255, 0, 170),
+    (255, 0, 255),
     (170, 255, 0),
     (170, 255, 0),
     (85, 255, 0),
@@ -33,7 +34,8 @@ JOINT_COLOR = [
     (255, 0, 0),
     (0, 255, 0),
     (0, 255, 0),
-    (255, 255, 0),
+    # (255, 255, 0),
+    (255, 191, 0),
     (255, 255, 0),
 ]
 
@@ -59,104 +61,100 @@ def _plot_skel(p, f, m=0):
             x=p[0, f, body, m],
             y=p[1, f, body, m],
             z=p[2, f, body, m],
-            mode='lines',
+            mode='lines+markers',
             line=dict(
                 width=5,
-                color=f'rgb{JOINT_COLOR[body[0]]}',
+                color=f'rgb{JOINT_COLOR[8]}',
             ),
+            marker=dict(size=5),
         ),
         go.Scatter3d(
             x=p[0, f, rightarm, m],
             y=p[1, f, rightarm, m],
             z=p[2, f, rightarm, m],
-            mode='lines',
+            mode='lines+markers',
             line=dict(
                 width=5,
-                color=f'rgb{JOINT_COLOR[rightarm[0]]}',
+                color=f'rgb{JOINT_COLOR[3]}',
             ),
+            marker=dict(size=5),
         ),
         go.Scatter3d(
             x=p[0, f, leftarm, m],
             y=p[1, f, leftarm, m],
             z=p[2, f, leftarm, m],
-            mode='lines',
+            mode='lines+markers',
             line=dict(
                 width=5,
                 color=f'rgb{JOINT_COLOR[leftarm[0]]}',
             ),
+            marker=dict(size=5),
         ),
         go.Scatter3d(
             x=p[0, f, righthand, m],
             y=p[1, f, righthand, m],
             z=p[2, f, righthand, m],
-            mode='lines',
+            mode='lines+markers',
             line=dict(
                 width=5,
-                color=f'rgb{JOINT_COLOR[righthand[0]]}',
+                color=f'rgb{JOINT_COLOR[3]}',
             ),
+            marker=dict(size=5),
         ),
         go.Scatter3d(
             x=p[0, f, lefthand, m],
             y=p[1, f, lefthand, m],
             z=p[2, f, lefthand, m],
-            mode='lines',
+            mode='lines+markers',
             line=dict(
                 width=5,
                 color=f'rgb{JOINT_COLOR[lefthand[0]]}',
             ),
+            marker=dict(size=5),
         ),
         go.Scatter3d(
             x=p[0, f, rightleg, m],
             y=p[1, f, rightleg, m],
             z=p[2, f, rightleg, m],
-            mode='lines',
+            mode='lines+markers',
             line=dict(
                 width=5,
                 color=f'rgb{JOINT_COLOR[rightleg[0]]}',
             ),
+            marker=dict(size=5),
         ),
         go.Scatter3d(
             x=p[0, f, leftleg, m],
             y=p[1, f, leftleg, m],
             z=p[2, f, leftleg, m],
-            mode='lines',
+            mode='lines+markers',
             line=dict(
                 width=5,
                 color=f'rgb{JOINT_COLOR[leftleg[0]]}',
             ),
+            marker=dict(size=5),
         ),
         go.Scatter3d(
             x=p[0, f, rightfeet, m],
             y=p[1, f, rightfeet, m],
             z=p[2, f, rightfeet, m],
-            mode='lines',
+            mode='lines+markers',
             line=dict(
                 width=5,
                 color=f'rgb{JOINT_COLOR[rightfeet[0]]}',
             ),
+            marker=dict(size=5),
         ),
         go.Scatter3d(
             x=p[0, f, leftfeet, m],
             y=p[1, f, leftfeet, m],
             z=p[2, f, leftfeet, m],
-            mode='lines',
+            mode='lines+markers',
             line=dict(
                 width=5,
                 color=f'rgb{JOINT_COLOR[leftfeet[0]]}',
             ),
-        ),
-        # Joints
-        go.Scatter3d(
-            x=p[0, f, :, m],
-            y=p[1, f, :, m],
-            z=p[2, f, :, m],
-            mode='markers',
-            marker=dict(
-                size=5,
-                color=[f'rgb{c}' for c in JOINT_COLOR],
-                # colorscale='Viridis',   # choose a colorscale
-                opacity=0.8
-            )
+            marker=dict(size=5),
         ),
     ]
 
