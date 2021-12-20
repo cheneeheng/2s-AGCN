@@ -385,6 +385,18 @@ class BaseModel(nn.Module):
             self.l8 = lambda x: x
             self.l9 = lambda x: x
             self.l10 = lambda x: x
+        elif model_layers == 2:
+            c = output_channel if output_channel is not None else 64
+            self.l1 = tcngcn_unit(3, c, residual=False)
+            self.l2 = tcngcn_unit(c, c)
+            self.l3 = lambda x: x
+            self.l4 = lambda x: x
+            self.l5 = lambda x: x
+            self.l6 = lambda x: x
+            self.l7 = lambda x: x
+            self.l8 = lambda x: x
+            self.l9 = lambda x: x
+            self.l10 = lambda x: x
         elif model_layers == 3:
             self.l1 = tcngcn_unit(3, 64, residual=False)
             self.l2 = lambda x: x

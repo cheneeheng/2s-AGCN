@@ -162,6 +162,13 @@ aagcn_v11:
                   - did not converge
         - 211218220001_pos_cls_mt_vc_2h_1a_3l_dropout_noproj_torchtrans:
                   - did not converge
+        - 211218220001_pos_cls_mt_vc_2h_3a_1l_dropout_noproj_torchtrans_lowerlr:
+                  - ONLY 1 INITIAL PROJECTION LAYER IS ALLOWED.
+                  - 89.3%
+                  - overfit, train acc ~1
+        - 211218220001_pos_cls_mt_vc_2h_3a_1l_dropout_noproj_lowerlr:
+                  - 88.9%
+                  - overfit, train acc ~1
 
 aagcn_v12:
         - uses attention learned from conv. (unary)
@@ -179,4 +186,25 @@ aagcn_v13:
                   - converge but training was unstable.
         - 211219110001_pos_cls_3trans_lowerlr:
                   - 89.3%
+                  - overfit, train acc ~1
+        - 211219110001_pos_cls_3trans_lowerlr_prenorm:
+                  - 89.7%
+                  - overfit, train acc ~1
+        - 211219110001_pos_cls_5trans_lowerlr_prenorm:
+                  - 89.9%
+                  - overfit, train acc ~1
+        - 211219110001_pos_cls_3trans_lowerlr_prenorm_64dim:
+                  - 89.4%
+                  - overfit, train acc ~1
+        - 211219110001_cls_3trans_lowerlr_prenorm:
+                  - 89.3%
+                  - overfit, train acc ~1
+        - 211220100001_pos_cls_8trans_lowerlr_prenorm:
+                  - 90%
+                  - overfit, train acc ~1
+        - 211220100001_pos_cls_10trans_lowerlr_prenorm:
+                  - 90.2%
+                  - overfit, train acc ~1
+        - 211220100001_pos_cls_3trans_lowerlr_prenorm_noattn:
+                  - 89.4%
                   - overfit, train acc ~1
