@@ -38,6 +38,8 @@ def read_xyz(file, max_body=4, num_joint=25):
     skel_data = np.loadtxt(file, delimiter=',')
     data = np.zeros((max_body, 1, num_joint, 3))
     for m, body_joint in enumerate(skel_data):
+        if body_joint == 0:
+            continue
         for j in range(0, len(body_joint), 3):
             if m < max_body and j//3 < num_joint:
                 data[m, 0, j//3, :] = [body_joint[j],
@@ -204,11 +206,12 @@ if __name__ == '__main__':
         # 4. Inference. --------------------------------------------------------
         logits, pred = append_data_and_predict_fn(data=data)
 
-        output_file = os.path.join(output_dir, skel_fol, skel_file)
-        with open(output_file, 'w+') as f:
+        output_file = os.path.join(output_dir, skel_file)
+        with open(output_file, 'a+') as f:
             output_str = ",".join([str(logit) for logit in logits])
             output_str = f'{pred},{output_str}\n'
             f.write(output_str)
+            print(pred)
 
         if arg.timing:
             end_time = time.time() - start_time

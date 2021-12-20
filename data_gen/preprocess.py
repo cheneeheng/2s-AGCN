@@ -2,8 +2,8 @@ from .rotation import *
 from tqdm import tqdm
 
 
-def __verbose(x, out=None):
-    if out is not None:
+def __verbose(x, out=None, verbose=False):
+    if verbose:
         print(out)
         return tqdm(x)
     else:
@@ -11,12 +11,12 @@ def __verbose(x, out=None):
 
 
 def pre_normalization(data, zaxis=[0, 1], xaxis=[8, 4], pad=True, center=True,
-                      verbose=False):
+                      verbose=False, tqdm=True):
     N, C, T, V, M = data.shape
     s = np.transpose(data, [0, 4, 2, 3, 1])  # N, C, T, V, M  to  N, M, T, V, C
 
     if pad:
-        s_list = __verbose(s, out='pad the null frames with the previous frames')  # noqa
+        s_list = __verbose(s, out='pad the null frames with the previous frames', verbose=verbose)  # noqa
         for i_s, skeleton in enumerate(s_list):  # pad
             if skeleton.sum() == 0:
                 print(i_s, ' has no skeleton')
@@ -38,7 +38,7 @@ def pre_normalization(data, zaxis=[0, 1], xaxis=[8, 4], pad=True, center=True,
                             break
 
     if center:
-        s_list = __verbose(s, out='sub the center joint #1 (spine joint in ntu and neck joint in kinetics)')  # noqa
+        s_list = __verbose(s, out='sub the center joint #1 (spine joint in ntu and neck joint in kinetics)', verbose=verbose)  # noqa
         for i_s, skeleton in enumerate(s_list):
             if skeleton.sum() == 0:
                 continue
@@ -50,7 +50,7 @@ def pre_normalization(data, zaxis=[0, 1], xaxis=[8, 4], pad=True, center=True,
                 s[i_s, i_p] = (s[i_s, i_p] - main_body_center) * mask
 
     if zaxis is not None:
-        s_list = __verbose(s, out='parallel the bone between hip(jpt 0) and spine(jpt 1) of the first person to the z axis')  # noqa
+        s_list = __verbose(s, out='parallel the bone between hip(jpt 0) and spine(jpt 1) of the first person to the z axis', verbose=verbose)  # noqa
         for i_s, skeleton in enumerate(s_list):
             if skeleton.sum() == 0:
                 continue
@@ -69,7 +69,7 @@ def pre_normalization(data, zaxis=[0, 1], xaxis=[8, 4], pad=True, center=True,
                         s[i_s, i_p, i_f, i_j] = np.dot(matrix_z, joint)
 
     if xaxis is not None:
-        s_list = __verbose(s, out='parallel the bone between right shoulder(jpt 8) and left shoulder(jpt 4) of the first person to the x axis')  # noqa
+        s_list = __verbose(s, out='parallel the bone between right shoulder(jpt 8) and left shoulder(jpt 4) of the first person to the x axis', verbose=verbose)  # noqa
         for i_s, skeleton in enumerate(s_list):
             if skeleton.sum() == 0:
                 continue

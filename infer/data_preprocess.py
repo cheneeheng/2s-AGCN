@@ -46,13 +46,13 @@ class DataPreprocessor(object):
         index = energy.argsort()[::-1][0:num_skels]
         return self.data[index]  # m', T, V, C
 
-    def normalize_data(self, data: np.ndarray) -> None:
+    def normalize_data(self, data: np.ndarray, verbose: bool = False) -> None:
         if data.ndim < 4 or data.ndim > 5:
             raise ValueError("Dimension not supported...")
         if data.ndim == 4:
             data = np.expand_dims(data, axis=0)
         data = np.transpose(data, [0, 4, 2, 3, 1])  # N, C, T, V, M
-        data = pre_normalization(data)
+        data = pre_normalization(data, verbose=verbose, tqdm=False)
         data = np.transpose(data, [0, 4, 2, 3, 1])  # N, M, T, V, C
         return data
 
