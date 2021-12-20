@@ -87,6 +87,7 @@ class Model(BaseModel):
                  adaptive: bool = True,
                  attention: bool = True,
                  gbn_split: Optional[int] = None,
+                 projection_layer: bool = True,
                  trans_num_heads: int = 2,
                  trans_model_dim: int = 16,
                  trans_ffn_dim: int = 64,
@@ -100,26 +101,28 @@ class Model(BaseModel):
         super().__init__(num_class, num_point, num_person,
                          in_channels, drop_out, adaptive, gbn_split)
 
-        if graph is None:
-            raise ValueError()
-        else:
-            Graph = import_class(graph)
-            self.graph = Graph(**graph_args)
+        self.projection_layer = projection_layer
+        if projection_layer:
+            if graph is None:
+                raise ValueError()
+            else:
+                Graph = import_class(graph)
+                self.graph = Graph(**graph_args)
 
-        def _TCNGCNUnit(_in, _out, stride=1, residual=True):
-            return TCNGCNUnit(_in,
-                              _out,
-                              self.graph.A,
-                              num_subset=num_subset,
-                              stride=stride,
-                              residual=residual,
-                              adaptive=self.adaptive_fn,
-                              attention=attention,
-                              gbn_split=gbn_split)
+            def _TCNGCNUnit(_in, _out, stride=1, residual=True):
+                return TCNGCNUnit(_in,
+                                  _out,
+                                  self.graph.A,
+                                  num_subset=num_subset,
+                                  stride=stride,
+                                  residual=residual,
+                                  adaptive=self.adaptive_fn,
+                                  attention=attention,
+                                  gbn_split=gbn_split)
 
-        self.init_model_backbone(model_layers=model_layers,
-                                 tcngcn_unit=_TCNGCNUnit,
-                                 output_channel=trans_model_dim)
+            self.init_model_backbone(model_layers=model_layers,
+                                     tcngcn_unit=_TCNGCNUnit,
+                                     output_channel=trans_model_dim)
 
         if pos_enc:
             self.pos_encoder = PositionalEncoding(trans_model_dim*num_point)
@@ -172,6 +175,15 @@ class Model(BaseModel):
             raise ValueError("Unknown classifier_type")
 
         return x, None
+
+    def forward(self, x):
+        size = x.size()
+        x = self.forward_preprocess(x, size)
+        if self.projection_layer:
+            x = self.forward_model_backbone(x, size)
+        x, _ = self.forward_postprocess(x, size)
+        x = self.forward_classifier(x, size)
+        return x
 
 
 if __name__ == '__main__':
