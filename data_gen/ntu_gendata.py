@@ -1,7 +1,9 @@
-import os
-import numpy as np
 import argparse
+import numpy as np
+import os
 import pickle
+import random
+
 from tqdm import tqdm
 
 from data_gen.preprocess import pre_normalization
@@ -14,6 +16,12 @@ max_body_true = 2
 max_body_kinect = 4
 num_joint = 25
 max_frame = 300
+
+
+def randomize(data, seed=None):
+    if seed is not None:
+        random.seed(seed)
+    random.shuffle(data)
 
 
 def read_skeleton_filter(file):
@@ -89,7 +97,8 @@ def read_xyz(file, max_body=4, num_joint=25):  # 取了前两个body
 
 
 def gendata(data_path, out_path, ignored_sample_path=None,
-            benchmark='xview', part='eval'):
+            benchmark='xview', part='eval', seed=None):
+
     if ignored_sample_path is not None:
         with open(ignored_sample_path, 'r') as f:
             ignored_samples = [
@@ -97,9 +106,11 @@ def gendata(data_path, out_path, ignored_sample_path=None,
             ]
     else:
         ignored_samples = []
+
     sample_name = []
     sample_label = []
-    for filename in os.listdir(data_path):
+    filenames = randomize(os.listdir(data_path), seed)
+    for filename in filenames:
         if filename in ignored_samples:
             continue
         action_class = int(
@@ -164,6 +175,13 @@ if __name__ == '__main__':
         nargs='+',
         help='which Top K accuracy will be shown')
 
+    parser.add_argument(
+        '--seed',
+        type=int,
+        default=1,
+        help='random seed used to select file during data generation'
+    )
+
     arg = parser.parse_args()
     benchmark = arg.benchmark
     part = arg.split
@@ -179,4 +197,5 @@ if __name__ == '__main__':
                 out_path,
                 arg.ignored_sample_path,
                 benchmark=b,
-                part=p)
+                part=p,
+                seed=arg.seed,)

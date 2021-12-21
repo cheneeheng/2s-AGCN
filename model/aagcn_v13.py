@@ -72,7 +72,7 @@ class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
 
 # ------------------------------------------------------------------------------
 # Network
-# - uses transformer with feature projection.
+# - uses original transformer
 # ------------------------------------------------------------------------------
 class Model(BaseModel):
     def __init__(self,
@@ -189,7 +189,7 @@ class Model(BaseModel):
 if __name__ == '__main__':
     graph = 'graph.ntu_rgb_d.Graph'
     model = Model(graph=graph, model_layers=1,
-                  trans_num_layers=10, num_heads=2,)
+                  trans_num_layers=10)
     # print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))

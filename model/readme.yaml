@@ -187,17 +187,17 @@ aagcn_v13:
         - 211219110001_pos_cls_3trans_lowerlr:
                   - 89.3%
                   - overfit, train acc ~1
-        - 211219110001_pos_cls_3trans_lowerlr_prenorm:
-                  - 89.7%
-                  - overfit, train acc ~1
-        - 211219110001_pos_cls_5trans_lowerlr_prenorm:
-                  - 89.9%
-                  - overfit, train acc ~1
         - 211219110001_pos_cls_3trans_lowerlr_prenorm_64dim:
                   - 89.4%
                   - overfit, train acc ~1
         - 211219110001_cls_3trans_lowerlr_prenorm:
                   - 89.3%
+                  - overfit, train acc ~1
+        - 211219110001_pos_cls_3trans_lowerlr_prenorm:
+                  - 89.7%
+                  - overfit, train acc ~1
+        - 211219110001_pos_cls_5trans_lowerlr_prenorm:
+                  - 89.9%
                   - overfit, train acc ~1
         - 211220100001_pos_cls_8trans_lowerlr_prenorm:
                   - 90%
@@ -205,6 +205,39 @@ aagcn_v13:
         - 211220100001_pos_cls_10trans_lowerlr_prenorm:
                   - 90.2%
                   - overfit, train acc ~1
+        - 211220100001_pos_cls_15trans_lowerlr_prenorm:
+                  - 89.8%
+                  - overfit, train acc ~1
         - 211220100001_pos_cls_3trans_lowerlr_prenorm_noattn:
                   - 89.4%
                   - overfit, train acc ~1
+        - 211220100001_2base_pos_cls_3trans_lowerlr_prenorm_noattn:
+                  - 89.3%
+                  - overfit, train acc ~1
+        - 211220100001_3base_pos_cls_3trans_lowerlr_prenorm:
+                  - 89.2%
+                  - overfit, train acc ~1
+        - 211220100001_2base_pos_cls_3trans_lowerlr_prenorm:
+                  - 89%
+                  - overfit, train acc ~1
+        - 211220100001_pos_cls_3trans_lowerlr_prenorm_4h:
+                  - 89.7%
+                  - overfit, train acc ~1
+        - 211220100001_pos_cls_3trans_lowerlr_prenorm_8h:
+                  - 90%
+                  - overfit, train acc ~1
+        - 211220100001_pos_cls_3trans_lowerlr_prenorm_1h:
+                  - 89.3%
+                  - overfit, train acc ~1
+        - 211220230001_0base_pos_cls_3trans_lowerlr_prenorm:
+                  - 81.3%
+                  - did not overfit.
+        - 211220230001_0base_pos_cls_5trans_lowerlr_prenorm:
+                  - 84%
+                  - did not overfit.
+        - 211220230001_0base_pos_cls_8trans_lowerlr_prenorm:
+                  - 83.9%
+                  - did not overfit.
+        - 211220230001_0base_pos_cls_10trans_lowerlr_prenorm:
+                  - 83.1%
+                  - did not overfit.
