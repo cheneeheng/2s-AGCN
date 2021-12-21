@@ -47,9 +47,10 @@ model_args:
   trans_dropout: 0.2
   trans_activation: gelu
   trans_num_layers: 1
+  trans_prenorm: True
   pos_enc: True
   classifier_type: CLS
-  model_layers: 101
+  model_layers: 103
 # weights: None
 
 #optim
