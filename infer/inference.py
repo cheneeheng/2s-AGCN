@@ -59,10 +59,7 @@ def prepare_model(arg):
     return AAGCN
 
 
-def append_data_and_predict(data: np.ndarray,
-                            preprocessor: DataPreprocessor,
-                            model: torch.nn.Module,
-                            num_skels: int) -> Tuple[list, int]:
+def append_data(data: np.ndarray, preprocessor: DataPreprocessor) -> None:
     """
     Args:
         data (np.ndarray): (M, 1, V, C)
@@ -70,6 +67,14 @@ def append_data_and_predict(data: np.ndarray,
     # 1. Batch frames to fixed length.
     preprocessor.append_data(data)
 
+
+def predict(preprocessor: DataPreprocessor,
+            model: torch.nn.Module,
+            num_skels: int) -> Tuple[list, int]:
+    """
+    Args:
+        data (np.ndarray): (M, 1, V, C)
+    """
     # 2. Normalization.
     input_data = preprocessor.select_skeletons_and_normalize_data(num_skels)
     input_data = np.transpose(input_data, [0, 4, 2, 3, 1])  # N, C, T, V, M
@@ -87,6 +92,22 @@ def append_data_and_predict(data: np.ndarray,
             _, predict_label = torch.max(output, 1)
 
     return output.tolist(), predict_label.item()
+
+
+def append_data_and_predict(data: np.ndarray,
+                            preprocessor: DataPreprocessor,
+                            model: torch.nn.Module,
+                            num_skels: int) -> Tuple[list, int]:
+    """
+    Args:
+        data (np.ndarray): (M, 1, V, C)
+    """
+    # 1. Batch frames to fixed length.
+    append_data(data, preprocessor)
+
+    # 2. Normalization.
+    # 3. Inference.
+    return predict(preprocessor, model, num_skels)
 
 
 if __name__ == '__main__':
@@ -181,13 +202,8 @@ if __name__ == '__main__':
                 start = time.time()
                 infer_flag = False
 
-        skel_file = sorted(os.listdir(skel_dir))[-1]
-        skel_path = os.path.join(skel_dir, skel_file)
+        skel_files = sorted(os.listdir(skel_dir))[-arg.max_frame:]
 
-#        if skel_path == skel_path_mem:
-#            continue
-#        else:
-#            skel_path_mem = skel_path
         infer_flag = True
 
         if arg.timing:
@@ -195,14 +211,19 @@ if __name__ == '__main__':
 
         # 1. Read raw frames. --------------------------------------------------
         # M, T, V, C
-        data = read_xyz(skel_path,
-                        max_body=arg.max_num_skeleton,
-                        num_joint=arg.num_joint)
+        for skel_file in skel_files:
+            data = read_xyz(os.path.join(skel_dir, skel_file),
+                            max_body=arg.max_num_skeleton,
+                            num_joint=arg.num_joint)
+            append_data(data=data, preprocessor=DataProc)
 
         # 2. Batch frames to fixed length. -------------------------------------
         # 3. Normalization. ----------------------------------------------------
         # 4. Inference. --------------------------------------------------------
-        logits, pred = append_data_and_predict_fn(data=data)
+        # logits, pred = append_data_and_predict_fn(data=data)
+        logits, pred = predict(preprocessor=DataProc,
+                               model=AAGCN,
+                               num_skels=arg.max_num_skeleton_true)
 
         output_file = os.path.join(output_dir, skel_file)
         with open(output_file, 'a+') as f:
