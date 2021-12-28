@@ -127,7 +127,7 @@ class TCNGCNUnit(nn.Module):
 
 # ------------------------------------------------------------------------------
 # Network
-# - uses original transformer to replace tcn
+# - puts positional encoder into tcn
 # ------------------------------------------------------------------------------
 class Model(BaseModel):
     def __init__(self,

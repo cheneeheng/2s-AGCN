@@ -150,6 +150,8 @@ aagcn_v10:
 
 aagcn_v11:
         - uses transformer layers with projection
+        - COMPARED TO aagcn_v13:
+                  - feature projection with increasing dim and striding is causing the non convergence.
         - 211217153001_cls_pos_mt_vc_2h_1a:
                   - did not converge
         - 211217153001_cls_mt_vc_2h_1a:
@@ -163,7 +165,6 @@ aagcn_v11:
         - 211218220001_pos_cls_mt_vc_2h_1a_3l_dropout_noproj_torchtrans:
                   - did not converge
         - 211218220001_pos_cls_mt_vc_2h_3a_1l_dropout_noproj_torchtrans_lowerlr:
-                  - ONLY 1 INITIAL PROJECTION LAYER IS ALLOWED.
                   - 89.3%
                   - overfit, train acc ~1
         - 211218220001_pos_cls_mt_vc_2h_3a_1l_dropout_noproj_lowerlr:
@@ -205,6 +206,8 @@ aagcn_v13:
         - 211220100001_pos_cls_10trans_lowerlr_prenorm:
                   - 90.2%
                   - overfit, train acc ~1
+        - 211220100001_pos_cls_10trans_lowerlr_prenorm_nopad:
+
         - 211220100001_pos_cls_15trans_lowerlr_prenorm:
                   - 89.8%
                   - overfit, train acc ~1
@@ -241,3 +244,26 @@ aagcn_v13:
         - 211220230001_0base_pos_cls_10trans_lowerlr_prenorm:
                   - 83.1%
                   - did not overfit.
+        - 211221113001_pos_gap_3trans_lowerlr_prenorm:
+                  - 88.8%
+                  - overfit, train acc ~1
+        - 211221113001_pos_gap_5trans_lowerlr_prenorm:
+                  - 89.2%
+                  - overfit, train acc ~1
+        - 211221113001_pos_gap_8trans_lowerlr_prenorm:
+                  - 90.0%
+                  - overfit, train acc ~1
+        - 211221113001_pos_gap_10trans_lowerlr_prenorm:
+                  - 89.5%
+                  - overfit, train acc ~1
+        - 211221113001_pos_gap_10trans_lowerlr_prenorm_nopad:
+aagcn_v14:
+        - uses original transformer to replace tcn
+        - 211221123001_pos_1trans_3l_prenorm:
+                  - 84.8%
+                  - overfit, train acc ~1
+aagcn_v16:
+        - puts positional encoder into tcn
+        - 211221140001:
+                  - 93.9%
+                  - overfit, train acc ~1

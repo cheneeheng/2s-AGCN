@@ -25,9 +25,10 @@ __all__ = ['Processor']
 class Processor():
     """Processor for Skeleton-based Action Recognition """
 
-    def __init__(self, arg):
+    def __init__(self, arg, save_arg=True):
         self.arg = arg
-        self.save_arg()
+        if save_arg:
+            self.save_arg()
         if arg.phase == 'train':
             if not arg.train_feeder_args['debug']:
                 if os.path.isdir(arg.model_saved_name):
