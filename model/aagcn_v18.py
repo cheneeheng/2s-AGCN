@@ -257,14 +257,20 @@ class Model(BaseModel):
         _, C, T, _ = x.size()  # nm,c,t,v
 
         if self.shift > 1:
-            x_new = torch.zeros(
-                (N*M, C*self.shift, T, V),
-                dtype=x.dtype,
-                device='cpu' if x.get_device() < 0 else x.get_device()
-            )
+            # x_new = torch.zeros(
+            #     (N*M, C*self.shift, T, V),
+            #     dtype=x.dtype,
+            #     device='cpu' if x.get_device() < 0 else x.get_device()
+            # )
+            # for s in range(self.shift):
+            #     x_new[:, s*C:s*C+C-s, :, :] = x[:, s:, :, :]
+            # x = x_new
+            x_list = []
+            pad = torch.nn.functional.pad
             for s in range(self.shift):
-                x_new[:, s*C:s*C+C-s, :, :] = x[:, s:, :, :]
-            x = x_new
+                x_list.append(
+                    pad(x[:, :, s:, :], pad=(0, 0, 0, s, 0, 0, 0, 0)))
+            x = torch.cat(x_list, dim=1)
             C = C*self.shift
 
         x = x.view(N, M, C, T, V).permute(0, 1, 3, 4, 2).contiguous()  # n,m,t,v,c  # noqa
