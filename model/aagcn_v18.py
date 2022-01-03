@@ -257,10 +257,13 @@ class Model(BaseModel):
         _, C, T, _ = x.size()  # nm,c,t,v
 
         if self.shift > 1:
-            x_new = torch.zeros((N*M, C*self.shift, T, V),
-                                dtype=x.dtype, device=x.get_device())
+            x_new = torch.zeros(
+                (N*M, C*self.shift, T, V),
+                dtype=x.dtype,
+                device='cpu' if x.get_device() < 0 else x.get_device()
+            )
             for s in range(self.shift):
-                x_new[:, s*C:s*(C+1)-s, :, :] = x[:, s*C+s:s*(C+1), :, :]
+                x_new[:, s*C:s*C+C-s, :, :] = x[:, s:, :, :]
             x = x_new
             C = C*self.shift
 
@@ -290,7 +293,7 @@ if __name__ == '__main__':
                   trans_num_layers=3,
                   kernel_size=3,
                   pad=True,
-                  shift=1
+                  shift=3
                   )
     # print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
