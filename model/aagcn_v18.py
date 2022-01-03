@@ -165,8 +165,10 @@ class Model(BaseModel):
                  num_point: int = 25,
                  num_person: int = 2,
                  num_subset: int = 3,
+
                  graph: Optional[str] = None,
                  graph_args: dict = dict(),
+
                  in_channels: int = 3,
                  drop_out: int = 0,
                  adaptive: bool = True,
@@ -175,6 +177,8 @@ class Model(BaseModel):
 
                  kernel_size: int = 9,
                  pad: bool = True,
+
+                 shift: int = 1,
 
                  trans_num_heads: int = 2,
                  trans_model_dim: int = 16,
@@ -190,6 +194,8 @@ class Model(BaseModel):
         super().__init__(num_class, num_point, num_person,
                          in_channels, drop_out, adaptive, gbn_split)
 
+        self.shift = shift
+
         if graph is None:
             raise ValueError()
         else:
@@ -202,7 +208,7 @@ class Model(BaseModel):
                               self.graph.A,
                               num_subset=num_subset,
                               kernel_size=kernel_size,
-                              stride=kernel_size,
+                              #   stride=kernel_size,
                               pad=pad,
                               residual=residual,
                               adaptive=self.adaptive_fn,
@@ -213,22 +219,24 @@ class Model(BaseModel):
                                  tcngcn_unit=_TCNGCNUnit,
                                  output_channel=trans_model_dim)
 
+        trans_model_dim = trans_model_dim*num_point*shift
+        trans_ffn_dim = trans_ffn_dim*num_point*shift
+
         if pos_enc:
-            self.pos_encoder = PositionalEncoding(trans_model_dim*num_point)
+            self.pos_encoder = PositionalEncoding(trans_model_dim)
         else:
             self.pos_encoder = lambda x: x
 
         self.classifier_type = classifier_type
         if classifier_type == 'CLS':
-            self.cls_token = nn.Parameter(
-                torch.randn(1, 1, trans_model_dim*num_point))
+            self.cls_token = nn.Parameter(torch.randn(1, 1, trans_model_dim))
         else:
             self.cls_token = None
 
         trans_enc_layer = TransformerEncoderLayerExt(
-            d_model=trans_model_dim*num_point,
+            d_model=trans_model_dim,
             nhead=trans_num_heads,
-            dim_feedforward=trans_ffn_dim*num_point,
+            dim_feedforward=trans_ffn_dim,
             dropout=trans_dropout,
             activation=trans_activation,
             layer_norm_eps=1e-5,
@@ -242,11 +250,19 @@ class Model(BaseModel):
             norm=None
         )
 
-        self.init_fc(trans_model_dim*num_point, num_class)
+        self.init_fc(trans_model_dim, num_class)
 
     def forward_postprocess(self, x: torch.Tensor, size: torch.Size):
         N, _, _, V, M = size
-        _, C, T, _ = x.size()
+        _, C, T, _ = x.size()  # nm,c,t,v
+
+        if self.shift > 1:
+            x_new = torch.zeros((N*M, C*self.shift, T, V), dtype=x.dtype)
+            for s in range(self.shift):
+                x_new[:, s*C:s*(C+1)-s, :, :] = x[:, s*C+s:s*(C+1), :, :]
+            x = x_new
+            C = C*self.shift
+
         x = x.view(N, M, C, T, V).permute(0, 1, 3, 4, 2).contiguous()  # n,m,t,v,c  # noqa
         x = x.view(N, M*T, C*V)  # n,mt,vc
 
@@ -268,10 +284,12 @@ class Model(BaseModel):
 
 if __name__ == '__main__':
     graph = 'graph.ntu_rgb_d.Graph'
-    model = Model(graph=graph, model_layers=101,
+    model = Model(graph=graph,
+                  model_layers=101,
                   trans_num_layers=3,
                   kernel_size=3,
-                  pad=False
+                  pad=True,
+                  shift=1
                   )
     # print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')

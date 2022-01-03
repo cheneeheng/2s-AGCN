@@ -207,7 +207,8 @@ aagcn_v13:
                   - 90.2%
                   - overfit, train acc ~1
         - 211220100001_pos_cls_10trans_lowerlr_prenorm_nopad:
-
+                  - 90.6%
+                  - overfit, train acc ~1
         - 211220100001_pos_cls_15trans_lowerlr_prenorm:
                   - 89.8%
                   - overfit, train acc ~1
@@ -257,6 +258,8 @@ aagcn_v13:
                   - 89.5%
                   - overfit, train acc ~1
         - 211221113001_pos_gap_10trans_lowerlr_prenorm_nopad:
+                  - 90.8%
+                  - overfit, train acc ~1
 aagcn_v14:
         - uses original transformer to replace tcn
         - 211221123001_pos_1trans_3l_prenorm:
@@ -267,3 +270,14 @@ aagcn_v16:
         - 211221140001:
                   - 93.9%
                   - overfit, train acc ~1
+aagcn_v17:
+        - change tcn to create patches. (no overlap during conv)
+        - 211228140001_nopad:
+                  - diverge
+        - 211228140001_nopad_3ks:
+                  - 87%
+                  - almost overfit, train acc ~1
+        - 211228140001_nopad_10ks:
+                  - diverge
+aagcn_v18:
+        - added shift operation after the gcn. This forward concats the features.
