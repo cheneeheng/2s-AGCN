@@ -257,7 +257,8 @@ class Model(BaseModel):
         _, C, T, _ = x.size()  # nm,c,t,v
 
         if self.shift > 1:
-            x_new = torch.zeros((N*M, C*self.shift, T, V), dtype=x.dtype)
+            x_new = torch.zeros((N*M, C*self.shift, T, V),
+                                dtype=x.dtype, device=x.get_device())
             for s in range(self.shift):
                 x_new[:, s*C:s*(C+1)-s, :, :] = x[:, s*C+s:s*(C+1), :, :]
             x = x_new

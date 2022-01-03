@@ -279,5 +279,10 @@ aagcn_v17:
                   - almost overfit, train acc ~1
         - 211228140001_nopad_10ks:
                   - diverge
+        - 211228140001_nopad_3ks_5trans:
+                  - 80.4%
+                  - almost overfit, train acc ~1
+        - 211228140001_nopad_3ks_adam:
+                  - diverged
 aagcn_v18:
         - added shift operation after the gcn. This forward concats the features.
