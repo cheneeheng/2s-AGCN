@@ -24,7 +24,7 @@ torch-tb-profiler
 # pillow
 # opencv-python
 
-# sklearn
+sklearn
 
 # ipython
 ipykernel

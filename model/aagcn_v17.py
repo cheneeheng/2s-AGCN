@@ -118,6 +118,28 @@ class PositionalEncoding(nn.Module):
         return x
 
 
+class CosSinPositionalEncoding(nn.Module):
+    def __init__(self,
+                 d_model: int,
+                 dropout: float = 0.0,
+                 max_len: int = 601):
+        super().__init__()
+        position = torch.arange(max_len).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2)
+                             * (-math.log(10000.0) / d_model))
+        pe = torch.zeros(1, max_len, d_model)
+        pe[0, :, 0::2] = torch.sin(position * div_term)
+        pe[0, :, 1::2] = torch.cos(position * div_term)
+        self.register_buffer('pe', pe)
+        self.dropout = nn.Dropout(p=dropout)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x : N, L, C
+        x = x + self.pe[:, :x.size(1), :]
+        x = self.dropout(x)
+        return x
+
+
 class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
     """Option for pre of postnorm"""
 
@@ -222,7 +244,7 @@ class Model(BaseModel):
                  trans_prenorm: bool = False,
                  trans_num_layers: int = 1,
 
-                 pos_enc: bool = True,
+                 pos_enc: str = 'True',
                  classifier_type: str = 'CLS',
                  model_layers: int = 10):
         super().__init__(num_class, num_point, num_person,
@@ -251,20 +273,23 @@ class Model(BaseModel):
                                  tcngcn_unit=_TCNGCNUnit,
                                  output_channel=trans_model_dim)
 
-        if pos_enc:
-            self.pos_encoder = PositionalEncoding(trans_model_dim*num_point)
+        trans_dim = trans_model_dim*num_point
+
+        if pos_enc == 'True' or pos_enc == 'original':
+            self.pos_encoder = PositionalEncoding(trans_dim)
+        elif pos_enc == 'cossin':
+            self.pos_encoder = CosSinPositionalEncoding(trans_dim)
         else:
             self.pos_encoder = lambda x: x
 
         self.classifier_type = classifier_type
         if classifier_type == 'CLS':
-            self.cls_token = nn.Parameter(
-                torch.randn(1, 1, trans_model_dim*num_point))
+            self.cls_token = nn.Parameter(torch.randn(1, 1, trans_dim))
         else:
             self.cls_token = None
 
         trans_enc_layer = TransformerEncoderLayerExt(
-            d_model=trans_model_dim*num_point,
+            d_model=trans_dim,
             nhead=trans_num_heads,
             dim_feedforward=trans_ffn_dim*num_point,
             dropout=trans_dropout,
@@ -281,7 +306,7 @@ class Model(BaseModel):
             need_attn=need_attn
         )
 
-        self.init_fc(trans_model_dim*num_point, num_class)
+        self.init_fc(trans_dim, num_class)
 
     def forward_postprocess(self, x: torch.Tensor, size: torch.Size):
         N, _, _, V, M = size
@@ -310,7 +335,8 @@ if __name__ == '__main__':
     model = Model(graph=graph, model_layers=101,
                   trans_num_layers=3,
                   kernel_size=3,
-                  pad=False
+                  pad=False,
+                  pos_enc='cossin'
                   )
     # print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')

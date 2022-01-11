@@ -6,10 +6,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
 
-label = open('./data/data/ntu/xview/val_label.pkl', 'rb')
+LABEL = './data/data/ntu/xview/val_label.pkl'
+
+BASE = f'data/data/ntu_result/xview'
+FOLDER = f'211228140001_nopad_3ks'
+SCORE = f'{BASE}/aagcn_v17_joint/{FOLDER}/epoch50_test_score.pkl'
+
+label = open(LABEL, 'rb')
 label = np.array(pickle.load(label))
-r1 = open('./data/model/211116110001/epoch50_test_score.pkl', 'rb')
+r1 = open(SCORE, 'rb')
 r1 = list(pickle.load(r1).items())
+
 right_num = total_num = right_num_5 = 0
 r_list = []
 l_list = []
@@ -38,4 +45,6 @@ ax.set_ylabel('Actual Values ')
 # ax.yaxis.set_ticklabels(['False','True'])
 
 # Display the visualization of the Confusion Matrix.
-plt.show()
+# plt.show()
+
+plt.savefig(f'sandbox_results/confmat_{FOLDER}.png', bbox_inches='tight')
