@@ -47,8 +47,8 @@ model_args:
   kernel_size: 3
   pad: False
   trans_num_heads: 2
-  trans_model_dim: 16
-  trans_ffn_dim: 64
+  trans_model_dim: 64
+  trans_ffn_dim: 256
   trans_dropout: 0.2
   trans_activation: gelu
   trans_num_layers: 3

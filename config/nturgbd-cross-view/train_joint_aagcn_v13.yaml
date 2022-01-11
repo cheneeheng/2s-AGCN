@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_v13_joint/211219110001_pos_cls_3trans
-model_saved_name: ./data/data/ntu_result/xview/aagcn_v13_joint/211219110001_pos_cls_3trans/ntu_cv_aagcn_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_v13_joint/211221113001_pos_gap_10trans_lowerlr_prenorm_nopad
+model_saved_name: ./data/data/ntu_result/xview/aagcn_v13_joint/211221113001_pos_gap_10trans_lowerlr_prenorm_nopad/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
@@ -14,8 +14,8 @@ print_log: true
 feeder: feeders.feeder.Feeder
 num_worker: 32
 train_feeder_args:
-  data_path: ./data/data/ntu/xview/train_data_joint.npy
-  label_path: ./data/data/ntu/xview/train_label.pkl
+  data_path: ./data/data/ntu_nopad/xview/train_data_joint.npy
+  label_path: ./data/data/ntu_nopad/xview/train_label.pkl
   debug: False
   random_choose: False
   random_shift: False
@@ -24,8 +24,8 @@ train_feeder_args:
   normalization: False
 
 test_feeder_args:
-  data_path: ./data/data/ntu/xview/val_data_joint.npy
-  label_path: ./data/data/ntu/xview/val_label.pkl
+  data_path: ./data/data/ntu_nopad/xview/val_data_joint.npy
+  label_path: ./data/data/ntu_nopad/xview/val_label.pkl
 
 # model
 model: model.aagcn_v13.Model
@@ -46,10 +46,12 @@ model_args:
   trans_ffn_dim: 64
   trans_dropout: 0.2
   trans_activation: gelu
-  trans_num_layers: 3
+  trans_num_layers: 10
+  trans_prenorm: True
   pos_enc: True
-  classifier_type: CLS
-  model_layers: 1
+  classifier_type: GAP
+  model_layers: 101
+  projection_layer: True
 # weights: None
 
 #optim
@@ -60,7 +62,7 @@ test_batch_size: 64
 
 optimizer: SGD
 nesterov: True
-base_lr: 0.1
+base_lr: 0.01
 step: [30, 40]
 weight_decay: 0.0001
 

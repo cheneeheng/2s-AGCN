@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_v14_joint/211221123001_pos_1trans_3l
-model_saved_name: ./data/data/ntu_result/xview/aagcn_v14_joint/211221123001_pos_1trans_3l/ntu_cv_aagcn_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_v14_joint/211221123001_pos_1trans_3l_prenorm
+model_saved_name: ./data/data/ntu_result/xview/aagcn_v14_joint/211221123001_pos_1trans_3l_prenorm/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True

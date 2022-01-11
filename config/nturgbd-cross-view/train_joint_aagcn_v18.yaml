@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_v18_joint/220103110001_nopad
-model_saved_name: ./data/data/ntu_result/xview/aagcn_v18_joint/220103110001_nopad/ntu_cv_aagcn_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_v18_joint/220103110001_nopad_5ks
+model_saved_name: ./data/data/ntu_result/xview/aagcn_v18_joint/220103110001_nopad_5ks/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
@@ -44,7 +44,7 @@ model_args:
   drop_out: 0
   adaptive: True
   attention: True
-  kernel_size: 9
+  kernel_size: 5
   pad: True
   shift: 3
   trans_num_heads: 2
