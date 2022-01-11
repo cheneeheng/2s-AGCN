@@ -511,9 +511,9 @@ class BaseModel(nn.Module):
         size = x.size()
         x = self.forward_preprocess(x, size)
         x = self.forward_model_backbone(x, size)
-        x, _ = self.forward_postprocess(x, size)
+        x, attn = self.forward_postprocess(x, size)
         x = self.forward_classifier(x, size)
-        return x
+        return x, attn
 
 
 class Model(BaseModel):

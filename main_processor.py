@@ -229,7 +229,7 @@ class Processor():
             timer['dataloader'] += self.split_time()
 
             # forward
-            output = self.model(data)
+            output, _ = self.model(data)
             # if batch_idx == 0 and epoch == 0:
             #     self.train_writer.add_graph(self.model, output)
             if isinstance(output, tuple):
@@ -300,7 +300,7 @@ class Processor():
                 with torch.no_grad():
                     data = data.float().cuda(self.output_device)
                     label = label.long().cuda(self.output_device)
-                    output = self.model(data)
+                    output, _ = self.model(data)
                     if isinstance(output, tuple):
                         output, l1 = output
                         l1 = l1.mean()

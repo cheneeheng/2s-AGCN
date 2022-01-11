@@ -142,16 +142,52 @@ class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
 
         if self.pre_norm:
             src = self.norm1(src)
-            src2 = self.self_attn(src, src, src, attn_mask=src_mask,
-                                  key_padding_mask=src_key_padding_mask)[0]
+            src2, attn = self.self_attn(src, src, src, attn_mask=src_mask,
+                                        key_padding_mask=src_key_padding_mask)
             src = src + self.dropout1(src2)
             src = self.norm2(src)
             src1 = self.dropout(self.activation(self.linear1(src)))
             src2 = self.dropout2(self.linear2(src1))
             src = src + src2
-            return src
+            return src, attn
         else:
-            return super().forward(src, src_mask, src_key_padding_mask)
+            src2, attn = self.self_attn(src, src, src, attn_mask=src_mask,
+                                        key_padding_mask=src_key_padding_mask)
+            src = src + self.dropout1(src2)
+            src = self.norm1(src)
+            src2 = self.linear2(self.dropout(
+                self.activation(self.linear1(src))))
+            src = src + self.dropout2(src2)
+            src = self.norm2(src)
+            return src, attn
+
+
+class TransformerEncoderExt(nn.TransformerEncoder):
+
+    def __init__(self, encoder_layer, num_layers, norm=None,
+                 need_attn: bool = False):
+        super().__init__(encoder_layer, num_layers, norm)
+        self.need_attn = need_attn
+
+    def forward(self,
+                src: torch.Tensor,
+                mask: Optional[torch.Tensor] = None,
+                src_key_padding_mask: Optional[torch.Tensor] = None,
+                ) -> torch.Tensor:
+        output = src
+
+        attn_list = []
+
+        for mod in self.layers:
+            output, attn = mod(output, src_mask=mask,
+                               src_key_padding_mask=src_key_padding_mask)
+            if self.need_attn:
+                attn_list.append(attn)
+
+        if self.norm is not None:
+            output = self.norm(output)
+
+        return output, attn_list
 
 
 # ------------------------------------------------------------------------------
@@ -175,6 +211,8 @@ class Model(BaseModel):
 
                  kernel_size: int = 9,
                  pad: bool = True,
+
+                 need_attn: bool = False,
 
                  trans_num_heads: int = 2,
                  trans_model_dim: int = 16,
@@ -236,10 +274,11 @@ class Model(BaseModel):
             pre_norm=trans_prenorm
         )
 
-        self.trans_enc = nn.TransformerEncoder(
+        self.trans_enc = TransformerEncoderExt(
             trans_enc_layer,
             num_layers=trans_num_layers,
-            norm=None
+            norm=None,
+            need_attn=need_attn
         )
 
         self.init_fc(trans_model_dim*num_point, num_class)
@@ -255,7 +294,7 @@ class Model(BaseModel):
             x = torch.cat((cls_tokens, x), dim=1)
         x = self.pos_encoder(x)
 
-        x = self.trans_enc(x)
+        x, attn = self.trans_enc(x)
         if self.classifier_type == 'CLS':
             x = x[:, 0, :]  # n,vc
         elif self.classifier_type == 'GAP':
@@ -263,7 +302,7 @@ class Model(BaseModel):
         else:
             raise ValueError("Unknown classifier_type")
 
-        return x, None
+        return x, attn
 
 
 if __name__ == '__main__':
