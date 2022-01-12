@@ -307,14 +307,14 @@ class Model(BaseModel):
         s_trans_dim = trans_model_dim
         s_trans_enc_layer = TransformerEncoderLayerExt(
             d_model=s_trans_dim,
-            nhead=3,
+            nhead=trans_num_heads,
             dim_feedforward=trans_ffn_dim,
             dropout=trans_dropout,
             activation=trans_activation,
             layer_norm_eps=1e-5,
             batch_first=True,
             pre_norm=trans_prenorm,
-            A=self.graph.A
+#            A=self.graph.A
         )
         self.s_trans_enc_layers = torch.nn.ModuleList(
             [copy.deepcopy(s_trans_enc_layer) for _ in range(trans_num_layers)])
@@ -361,23 +361,23 @@ class Model(BaseModel):
             # x, a = t_layer(x)
             # attn[1].append(a)
 
-            # x = x.reshape(-1, V, C)  # nmt,v,c
-            # x, a = s_layer(x)
-            # attn[0].append(a)
-
-            # x = x.reshape(N, -1, V*C)  # n,mt,vc
-            # x, a = t_layer(x)
-            # attn[1].append(a)
-
             x = x.reshape(-1, V, C)  # nmt,v,c
-            A = s_layer.PA  # 3,v,v
-            mask = A.repeat(N*(M*T+1), 1, 1)
-            x, a = s_layer(x, mask)
+            x, a = s_layer(x)
             attn[0].append(a)
 
             x = x.reshape(N, -1, V*C)  # n,mt,vc
             x, a = t_layer(x)
             attn[1].append(a)
+
+            #x = x.reshape(-1, V, C)  # nmt,v,c
+            #A = s_layer.PA  # 3,v,v
+            #mask = A.repeat(N*(M*T+1), 1, 1)
+            #x, a = s_layer(x, mask)
+            #attn[0].append(a)
+
+            #x = x.reshape(N, -1, V*C)  # n,mt,vc
+            #x, a = t_layer(x)
+            #attn[1].append(a)
 
         if self.classifier_type == 'CLS':
             x = x[:, 0, :]  # n,vc
