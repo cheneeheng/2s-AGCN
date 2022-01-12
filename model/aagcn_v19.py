@@ -399,6 +399,12 @@ if __name__ == '__main__':
                   trans_num_layers=3,
                   trans_model_dim=24,
                   trans_ffn_dim=96,
+                  trans_num_heads=3,
+                  s_trans_num_layers=3,
+                  s_trans_model_dim=24,
+                  s_trans_ffn_dim=96,
+                  s_trans_num_heads=3,
+                  add_A=True,
                   kernel_size=3,
                   pad=False,
                   pos_enc='cossin'
