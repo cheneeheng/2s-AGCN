@@ -330,10 +330,10 @@ class Model(BaseModel):
         _, C, T, _ = x.size()
         x = x.view(N, M, C, T, V).permute(0, 1, 3, 4, 2).contiguous()  # n,m,t,v,c  # noqa
 
-        x = x.view(N*M*T, V, C)
+        x = x.reshape(N*M*T, V, C)
         x = self.s_pos_encoder(x)
 
-        x = x.view(N, M*T, V*C)
+        x = x.reshape(N, M*T, V*C)
         if self.cls_token is not None:
             cls_tokens = self.cls_token.repeat(x.size(0), 1, 1)
             x = torch.cat((cls_tokens, x), dim=1)
@@ -345,11 +345,11 @@ class Model(BaseModel):
 
             x0 = x[:, 0:1, :]  # n,1,vc
             x = x[:, 1:, :]  # n,mt,vc
-            x = x.view(N*M*T, V, C)
+            x = x.reshape(N*M*T, V, C)
             x, a = s_layer(x)
             attn[0].append(a)
 
-            x = x.view(N, M*T, V*C)
+            x = x.reshape(N, M*T, V*C)
             x = torch.cat((x0, x), dim=1)
             x, a = t_layer(x)
             attn[1].append(a)
@@ -375,4 +375,4 @@ if __name__ == '__main__':
     # print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))
-    model(torch.ones((1, 3, 300, 25, 2)))
+    model(torch.ones((3, 3, 300, 25, 2)))

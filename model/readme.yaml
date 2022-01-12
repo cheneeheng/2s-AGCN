@@ -295,7 +295,11 @@ aagcn_v17:
         - 220111210001_nopad_3ks_cossin:
                   - diverged
         - 220111210001_nopad_3ks_cossin_lowerlr:
+                  - 89.2%
+                  - overfit, train acc ~1
         - 220111210001_nopad_3ks_cossin_noaug_lowerlr:
+                  - 90.7%
+                  - overfit, train acc ~1
         - 220111210001_nopad_3ks_cossin_100div_noaug:
                   - converged at warmup but diverged afterwards.
         - 220111210001_nopad_3ks_cossin_100div_noaug_lowerlr:
@@ -303,12 +307,16 @@ aagcn_v17:
                   - overfit, train acc ~1
                   - converged really fast at the beginning (val acc was higher)
         - 220111210001_nopad_3ks_cossin_100div_lowerlr:
+                  - 87.5%
+                  - overfit, train acc ~1
 
         - 220111210001_nopad_3ks_rerun:
                   - same as 211228140001_nopad_3ks
                   - 87%
                   - almost overfit, train acc ~1
         - 220111210001_nopad_3ks_rerun_lowerlr:
+                  - 84.6%
+                  - overfit, train acc ~1
         - 220111210001_nopad_3ks_rerun_noaug:
                   - 77.8%
                   - only converged midway
