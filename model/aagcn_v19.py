@@ -247,6 +247,16 @@ class Model(BaseModel):
                  trans_prenorm: bool = False,
                  trans_num_layers: int = 1,
 
+                 s_trans_num_heads: int = 2,
+                 s_trans_model_dim: int = 16,
+                 s_trans_ffn_dim: int = 64,
+                 s_trans_dropout: float = 0.2,
+                 s_trans_activation: str = "gelu",
+                 s_trans_prenorm: bool = False,
+                 s_trans_num_layers: int = 1,
+
+                 add_A: bool = False,
+
                  pos_enc: str = 'True',
                  classifier_type: str = 'CLS',
                  model_layers: int = 10):
@@ -287,7 +297,8 @@ class Model(BaseModel):
             pre_norm=trans_prenorm
         )
         self.t_trans_enc_layers = torch.nn.ModuleList(
-            [copy.deepcopy(t_trans_enc_layer) for _ in range(trans_num_layers)])
+            [copy.deepcopy(t_trans_enc_layer)
+             for _ in range(trans_num_layers)])
 
         pos_enc = str(pos_enc)
         if pos_enc == 'True' or pos_enc == 'original':
@@ -304,20 +315,21 @@ class Model(BaseModel):
             self.cls_token = None
 
         # 4. transformer (spatial)
-        s_trans_dim = trans_model_dim
+        s_trans_dim = s_trans_model_dim
         s_trans_enc_layer = TransformerEncoderLayerExt(
             d_model=s_trans_dim,
-            nhead=trans_num_heads,
-            dim_feedforward=trans_ffn_dim,
-            dropout=trans_dropout,
-            activation=trans_activation,
+            nhead=s_trans_num_heads,
+            dim_feedforward=s_trans_ffn_dim,
+            dropout=s_trans_dropout,
+            activation=s_trans_activation,
             layer_norm_eps=1e-5,
             batch_first=True,
-            pre_norm=trans_prenorm,
-#            A=self.graph.A
+            pre_norm=s_trans_prenorm,
+            A=self.graph.A if add_A else None
         )
         self.s_trans_enc_layers = torch.nn.ModuleList(
-            [copy.deepcopy(s_trans_enc_layer) for _ in range(trans_num_layers)])
+            [copy.deepcopy(s_trans_enc_layer)
+             for _ in range(s_trans_num_layers)])
 
         pos_enc = str(pos_enc)
         if pos_enc == 'True' or pos_enc == 'original':
@@ -362,22 +374,14 @@ class Model(BaseModel):
             # attn[1].append(a)
 
             x = x.reshape(-1, V, C)  # nmt,v,c
-            x, a = s_layer(x)
+            A = s_layer.PA  # 3,v,v
+            mask = None if A is None else A.repeat(N*(M*T+1), 1, 1)
+            x, a = s_layer(x, mask)
             attn[0].append(a)
 
             x = x.reshape(N, -1, V*C)  # n,mt,vc
             x, a = t_layer(x)
             attn[1].append(a)
-
-            #x = x.reshape(-1, V, C)  # nmt,v,c
-            #A = s_layer.PA  # 3,v,v
-            #mask = A.repeat(N*(M*T+1), 1, 1)
-            #x, a = s_layer(x, mask)
-            #attn[0].append(a)
-
-            #x = x.reshape(N, -1, V*C)  # n,mt,vc
-            #x, a = t_layer(x)
-            #attn[1].append(a)
 
         if self.classifier_type == 'CLS':
             x = x[:, 0, :]  # n,vc

@@ -338,3 +338,8 @@ aagcn_v19:
                   - diverged
         - 220112150001_nopad_3ks_cossin:
                   - diverged
+        - 220112150001_nopad_3ks_nosplittingclstoken_PA:
+                  - diverged
+        - 220112150001_nopad_3ks_nosplittingclstoken:
+                  - diverged
+        - 220112150001_nopad_3ks_nosplittingclstoken_lowerlr:
