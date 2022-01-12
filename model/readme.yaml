@@ -331,3 +331,10 @@ aagcn_v18:
         - 220103110001_nopad_5ks:
                   - 73.1%
                   - almost overfit, train acc ~1
+
+aagcn_v19:
+        - dual transformer in helix form. spatial + temporal, 2 PE.
+        - 220112150001_nopad_3ks:
+                  - diverged
+        - 220112150001_nopad_3ks_cossin:
+                  - diverged

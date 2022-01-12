@@ -152,10 +152,16 @@ class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
                  activation: str = "relu",
                  layer_norm_eps: float = 1e-5,
                  batch_first: bool = False,
-                 pre_norm: bool = False) -> None:
+                 pre_norm: bool = False,
+                 A: np.ndarray = None) -> None:
         super().__init__(d_model, nhead, dim_feedforward, dropout, activation,
                          layer_norm_eps, batch_first)
         self.pre_norm = pre_norm
+        if A is None:
+            self.PA = None
+        else:
+            self.PA = nn.Parameter(
+                torch.from_numpy(A.astype(np.float32)))  # Bk
 
     def forward(self,
                 src: torch.Tensor,
@@ -301,13 +307,14 @@ class Model(BaseModel):
         s_trans_dim = trans_model_dim
         s_trans_enc_layer = TransformerEncoderLayerExt(
             d_model=s_trans_dim,
-            nhead=trans_num_heads,
+            nhead=3,
             dim_feedforward=trans_ffn_dim,
             dropout=trans_dropout,
             activation=trans_activation,
             layer_norm_eps=1e-5,
             batch_first=True,
-            pre_norm=trans_prenorm
+            pre_norm=trans_prenorm,
+            A=self.graph.A
         )
         self.s_trans_enc_layers = torch.nn.ModuleList(
             [copy.deepcopy(s_trans_enc_layer) for _ in range(trans_num_layers)])
@@ -343,14 +350,32 @@ class Model(BaseModel):
         for s_layer, t_layer in zip(self.s_trans_enc_layers,
                                     self.t_trans_enc_layers):
 
-            x0 = x[:, 0:1, :]  # n,1,vc
-            x = x[:, 1:, :]  # n,mt,vc
-            x = x.reshape(N*M*T, V, C)
-            x, a = s_layer(x)
+            # x0 = x[:, 0:1, :]  # n,1,vc
+            # x = x[:, 1:, :]  # n,mt,vc
+            # x = x.reshape(N*M*T, V, C)
+            # x, a = s_layer(x)
+            # attn[0].append(a)
+
+            # x = x.reshape(N, M*T, V*C)
+            # x = torch.cat((x0, x), dim=1)
+            # x, a = t_layer(x)
+            # attn[1].append(a)
+
+            # x = x.reshape(-1, V, C)  # nmt,v,c
+            # x, a = s_layer(x)
+            # attn[0].append(a)
+
+            # x = x.reshape(N, -1, V*C)  # n,mt,vc
+            # x, a = t_layer(x)
+            # attn[1].append(a)
+
+            x = x.reshape(-1, V, C)  # nmt,v,c
+            A = s_layer.PA  # 3,v,v
+            mask = A.repeat(N*(M*T+1), 1, 1)
+            x, a = s_layer(x, mask)
             attn[0].append(a)
 
-            x = x.reshape(N, M*T, V*C)
-            x = torch.cat((x0, x), dim=1)
+            x = x.reshape(N, -1, V*C)  # n,mt,vc
             x, a = t_layer(x)
             attn[1].append(a)
 
@@ -368,6 +393,8 @@ if __name__ == '__main__':
     graph = 'graph.ntu_rgb_d.Graph'
     model = Model(graph=graph, model_layers=101,
                   trans_num_layers=3,
+                  trans_model_dim=24,
+                  trans_ffn_dim=96,
                   kernel_size=3,
                   pad=False,
                   pos_enc='cossin'
