@@ -371,6 +371,13 @@ class BaseModel(nn.Module):
 
         self.drop_out = nn.Dropout(drop_out) if drop_out else lambda x: x
 
+    def init_graph(self, graph, graph_args):
+        if graph is None:
+            raise ValueError()
+        else:
+            Graph = import_class(graph)
+            self.graph = Graph(**graph_args)
+
     def init_original_model_backbone(self, model_layers, tcngcn_unit):
         if model_layers == 3:
             self.l1 = tcngcn_unit(3, 64, residual=False)

@@ -282,6 +282,7 @@ aagcn_v17:
         - 211228140001_nopad_3ks_5trans:
                   - 80.4%
                   - almost overfit, train acc ~1
+                  - only converged midway
         - 211228140001_nopad_3ks_adam:
                   - diverged
         - 211228140001_nopad_3ks_adam_0_01lr:
@@ -290,6 +291,30 @@ aagcn_v17:
                   - diverged
         - 211228140001_nopad_5ks_64dim:
                   - diverged
+
+        - 220111210001_nopad_3ks_cossin:
+                  - diverged
+        - 220111210001_nopad_3ks_cossin_lowerlr:
+        - 220111210001_nopad_3ks_cossin_noaug_lowerlr:
+        - 220111210001_nopad_3ks_cossin_100div_noaug:
+                  - converged at warmup but diverged afterwards.
+        - 220111210001_nopad_3ks_cossin_100div_noaug_lowerlr:
+                  - 90.5%
+                  - overfit, train acc ~1
+                  - converged really fast at the beginning (val acc was higher)
+        - 220111210001_nopad_3ks_cossin_100div_lowerlr:
+
+        - 220111210001_nopad_3ks_rerun:
+                  - same as 211228140001_nopad_3ks
+                  - 87%
+                  - almost overfit, train acc ~1
+        - 220111210001_nopad_3ks_rerun_lowerlr:
+        - 220111210001_nopad_3ks_rerun_noaug:
+                  - 77.8%
+                  - only converged midway
+        - 220111210001_nopad_3ks_rerun_noaug_lowerlr:
+                  - 88.2%
+                  - converged really fast at the beginning (val acc was higher)
 
 aagcn_v18:
         - added shift operation after the gcn. This forward concats the features.
