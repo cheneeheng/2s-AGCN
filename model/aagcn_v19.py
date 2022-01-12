@@ -233,8 +233,6 @@ class Model(BaseModel):
                  kernel_size: int = 9,
                  pad: bool = True,
 
-                 need_attn: bool = False,
-
                  trans_num_heads: int = 2,
                  trans_model_dim: int = 16,
                  trans_ffn_dim: int = 64,
