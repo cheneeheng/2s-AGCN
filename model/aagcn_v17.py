@@ -235,6 +235,7 @@ class Model(BaseModel):
                  pad: bool = True,
 
                  need_attn: bool = False,
+                 attn_masking: bool = False,
 
                  trans_num_heads: int = 2,
                  trans_model_dim: int = 16,
@@ -249,6 +250,11 @@ class Model(BaseModel):
                  model_layers: int = 10):
         super().__init__(num_class, num_point, num_person,
                          in_channels, drop_out, adaptive, gbn_split)
+
+        self.attn_masking = attn_masking
+        self.attn_mask = None
+        self.trans_num_heads = trans_num_heads
+        self.kernel_size = kernel_size
 
         self.init_graph(graph, graph_args)
 
@@ -305,6 +311,24 @@ class Model(BaseModel):
 
         self.init_fc(trans_dim, num_class)
 
+    def forward_preprocess(self, x, size):
+        if self.attn_masking:
+            N, C, T, V, M = size
+            attn_valid = (x.sum((1, 3)) != 0.0).int()
+            attn_valid = attn_valid[:, ::self.kernel_size, :]  # windowing
+            attn_valid = attn_valid.reshape(N, -1)
+            attn_valid = torch.cat(
+                [attn_valid, torch.ones(N, 1, dtype=torch.int)], -1)
+            self.attn_mask = torch.matmul(attn_valid.unsqueeze(-1),
+                                          attn_valid.unsqueeze(1)).bool()
+            self.attn_mask = self.attn_mask.unsqueeze(1).repeat(
+                1, self.trans_num_heads, 1, 1)
+            self.attn_mask = self.attn_mask.view(
+                N*self.trans_num_heads,
+                T//self.kernel_size + 1,
+                T//self.kernel_size + 1).detach()
+        return super().forward_preprocess(x, size)
+
     def forward_postprocess(self, x: torch.Tensor, size: torch.Size):
         N, _, _, V, M = size
         _, C, T, _ = x.size()
@@ -316,7 +340,7 @@ class Model(BaseModel):
             x = torch.cat((cls_tokens, x), dim=1)
         x = self.pos_encoder(x)
 
-        x, attn = self.trans_enc(x)
+        x, attn = self.trans_enc(x, self.attn_mask)
         if self.classifier_type == 'CLS':
             x = x[:, 0, :]  # n,vc
         elif self.classifier_type == 'GAP':
@@ -333,9 +357,12 @@ if __name__ == '__main__':
                   trans_num_layers=3,
                   kernel_size=3,
                   pad=False,
-                  pos_enc='cossin'
+                  pos_enc='cossin',
+                  attn_masking=False,
                   )
     # print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))
-    model(torch.ones((1, 3, 300, 25, 2)))
+    x = torch.ones((5, 3, 300, 25, 2))
+    x[:, :, 200:, :, :] = 0.0
+    model(x)
