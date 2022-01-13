@@ -239,6 +239,8 @@ class Model(BaseModel):
                  kernel_size: int = 9,
                  pad: bool = True,
 
+                 need_attn: bool = False,
+
                  trans_num_heads: int = 2,
                  trans_model_dim: int = 16,
                  trans_ffn_dim: int = 64,
@@ -262,6 +264,8 @@ class Model(BaseModel):
                  model_layers: int = 10):
         super().__init__(num_class, num_point, num_person,
                          in_channels, drop_out, adaptive, gbn_split)
+
+        self.need_attn = need_attn
 
         # 1. joint graph
         self.init_graph(graph, graph_args)
@@ -377,11 +381,13 @@ class Model(BaseModel):
             A = s_layer.PA  # 3,v,v
             mask = None if A is None else A.repeat(N*(M*T+1), 1, 1)
             x, a = s_layer(x, mask)
-            attn[0].append(a)
+            if self.need_attn:
+                attn[0].append(a)
 
             x = x.reshape(N, -1, V*C)  # n,mt,vc
             x, a = t_layer(x)
-            attn[1].append(a)
+            if self.need_attn:
+                attn[1].append(a)
 
         if self.classifier_type == 'CLS':
             x = x[:, 0, :]  # n,vc
@@ -412,4 +418,5 @@ if __name__ == '__main__':
     # print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))
+    print([i[0] for i in model.named_parameters() if 'PA' in i[0]])
     model(torch.ones((3, 3, 300, 25, 2)))
