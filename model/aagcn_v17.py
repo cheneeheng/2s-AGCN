@@ -314,11 +314,11 @@ class Model(BaseModel):
     def forward_preprocess(self, x, size):
         if self.attn_masking:
             N, C, T, V, M = size
+            ones = torch.ones(N, 1, dtype=torch.int, device=x.get_device())
             attn_valid = (x.sum((1, 3)) != 0.0).int()
             attn_valid = attn_valid[:, ::self.kernel_size, :]  # windowing
             attn_valid = attn_valid.reshape(N, -1)
-            attn_valid = torch.cat(
-                [attn_valid, torch.ones(N, 1, dtype=torch.int)], -1)
+            attn_valid = torch.cat([attn_valid, ones], -1)
             self.attn_mask = torch.matmul(attn_valid.unsqueeze(-1),
                                           attn_valid.unsqueeze(1)).bool()
             self.attn_mask = self.attn_mask.unsqueeze(1).repeat(
