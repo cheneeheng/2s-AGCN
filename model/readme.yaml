@@ -323,6 +323,13 @@ aagcn_v17:
         - 220111210001_nopad_3ks_rerun_noaug_lowerlr:
                   - 88.2%
                   - converged really fast at the beginning (val acc was higher)
+        - 220112190001_nopad_3ks_noaug_lowerlr_dropout05:
+                  - 86.2%
+                  - almost overfit, train acc ~1
+        - 220112190001_nopad_3ks_noaug_lowerlr_attnmask_softmask_testing:
+                  - uses attention masking => doest seem to have a diff
+                  - 89.0%
+                  - almost overfit, train acc ~1
 
 aagcn_v18:
         - added shift operation after the gcn. This forward concats the features.
@@ -378,3 +385,6 @@ aagcn_v19:
                   - 89.3%
                   - almost overfit, train acc ~1
                   - converged really fast at the beginning
+
+aagcn_v20:
+        - added dual transformer, and merge at the end.
