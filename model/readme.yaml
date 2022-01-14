@@ -388,3 +388,6 @@ aagcn_v19:
 
 aagcn_v20:
         - added dual transformer, and merge at the end.
+        - 220114130001_nopad_3ks_lowerlr_noaug:
+                  - 87.1%
+                  - almost overfit, train acc ~1

@@ -212,11 +212,20 @@ class TransformerEncoderExt(nn.TransformerEncoder):
         return output, attn_list
 
 
+def generate_square_subsequent_mask(sz: int, device: str) -> torch.Tensor:
+    """From nn.Transformer"""
+    mask = (torch.triu(torch.ones(sz, sz, device=device)) == 1).transpose(0, 1)
+    mask = mask.float().masked_fill(mask == 0, float(
+        '-inf')).masked_fill(mask == 1, float(0.0))
+    return mask
+
 # ------------------------------------------------------------------------------
 # Network
 # - uses original transformer
 # - from v13
 # ------------------------------------------------------------------------------
+
+
 class Model(BaseModel):
     def __init__(self,
                  num_class: int = 60,
@@ -235,7 +244,7 @@ class Model(BaseModel):
                  pad: bool = True,
 
                  need_attn: bool = False,
-                 attn_masking: bool = False,
+                 attn_masking: str = 'False',
 
                  trans_num_heads: int = 2,
                  trans_model_dim: int = 16,
@@ -251,6 +260,7 @@ class Model(BaseModel):
         super().__init__(num_class, num_point, num_person,
                          in_channels, drop_out, adaptive, gbn_split)
 
+        attn_masking = str(attn_masking)
         self.attn_masking = attn_masking
         self.attn_mask = None
         self.trans_num_heads = trans_num_heads
@@ -312,8 +322,8 @@ class Model(BaseModel):
         self.init_fc(trans_dim, num_class)
 
     def forward_preprocess(self, x, size):
-        if self.attn_masking:
-            N, C, T, V, M = size
+        N, C, T, V, M = size
+        if self.attn_masking == 'True' or self.attn_masking == 'frame':
             zeros = torch.zeros(
                 N, 1,
                 dtype=torch.float,
@@ -332,6 +342,11 @@ class Model(BaseModel):
                 T*M//self.kernel_size + 1,
                 T*M//self.kernel_size + 1
             ).detach()
+        elif self.attn_masking == 'forward':
+            self.attn_mask = generate_square_subsequent_mask(
+                T*M//self.kernel_size + 1,
+                device='cpu' if x.get_device() < 0 else x.get_device()
+            )
         return super().forward_preprocess(x, size)
 
     def forward_postprocess(self, x: torch.Tensor, size: torch.Size):
@@ -363,7 +378,7 @@ if __name__ == '__main__':
                   kernel_size=3,
                   pad=False,
                   pos_enc='cossin',
-                  attn_masking=True,
+                  attn_masking='forward',
                   )
     # print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
