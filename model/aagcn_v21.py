@@ -169,7 +169,7 @@ class PositionalEncoding2D(nn.Module):
         x = self.dropout(x)
         return x
 
-    def pe(self):
+    def pe_val(self):
         return self.pe
 
 
@@ -384,7 +384,9 @@ class Model(BaseModel):
         x = self.pos_encoder(x)
 
         if self.attn_masking is not None:
-            self.attn_mask = [self.am1.pe(), self.am2.pe(), self.am3.pe()]
+            self.attn_mask = [self.am1.pe_val(),
+                              self.am2.pe_val(),
+                              self.am3.pe_val()]
 
         x, attn = self.trans_enc(x, self.attn_mask)
         if self.classifier_type == 'CLS':
