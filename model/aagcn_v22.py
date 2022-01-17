@@ -111,7 +111,10 @@ class PositionalEncodingBase(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x : N, L, C
-        x = x + self.pe[:, :x.size(1), :]
+        if self.pe is None:
+            x = x + getattr(self, self.buffer_name)[:, :x.size(1), :]
+        else:
+            x = x + self.pe[:, :x.size(1), :]
         x = self.dropout(x)
         return x
 
@@ -140,7 +143,8 @@ class CosSinPositionalEncoding(PositionalEncodingBase):
         pe = torch.zeros(1, max_len, d_model)
         pe[0, :, 0::2] = torch.sin(position * div_term)
         pe[0, :, 1::2] = torch.cos(position * div_term)
-        self.register_buffer('pe'+name, pe)
+        self.register_buffer('pe' + name, pe)
+        self.buffer_name = 'pe' + name
 
 
 class PositionalEncoding2D(nn.Module):
@@ -396,7 +400,7 @@ if __name__ == '__main__':
                   trans_num_layers=3,
                   kernel_size=3,
                   pad=False,
-                  pos_enc=None,
+                  pos_enc='cossin',
                   attn_masking={'d_p': 8, 'dropout': 0, 'length': 101},
                   )
     # print(model)
