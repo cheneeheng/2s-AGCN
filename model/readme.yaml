@@ -420,3 +420,8 @@ aagcn_v20:
         - 220114130001_nopad_3ks_lowerlr_noaug_cossin_64d:
                   - 89.5%
                   - almost overfit, train acc ~1
+
+aagcn_v21:
+        - 220117150001_nopad_3ks_noaug_lowerlr_8dp:
+                  - 88.3%
+                  - almost overfit, train acc ~1

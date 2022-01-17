@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_v17_joint/220117150001_nopad_3ks_noaug_lowerlr_8dp
-model_saved_name: ./data/data/ntu_result/xview/aagcn_v17_joint/220117150001_nopad_3ks_noaug_lowerlr_8dp/ntu_cv_aagcn_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_v21_joint/220117150001_nopad_3ks_noaug_lowerlr_8dp
+model_saved_name: ./data/data/ntu_result/xview/aagcn_v21_joint/220117150001_nopad_3ks_noaug_lowerlr_8dp/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
@@ -31,7 +31,7 @@ test_feeder_args:
   label_path: ./data/data/ntu_nopad/xview/val_label.pkl
 
 # model
-model: model.aagcn_v17.Model
+model: model.aagcn_v21.Model
 model_args:
   num_class: 60
   num_point: 25
