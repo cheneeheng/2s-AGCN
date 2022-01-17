@@ -1,5 +1,5 @@
 work_dir: ./data/data/ntu_result/xview/aagcn_v17_joint/220117150001_nopad_3ks_noaug_lowerlr_8dp
-model_saved_name: ./data/data/ntu_result/xview/aagcn_v17_joint/220117150001_nopad_3ks_noaug_lowerlr8dp/ntu_cv_aagcn_joint
+model_saved_name: ./data/data/ntu_result/xview/aagcn_v17_joint/220117150001_nopad_3ks_noaug_lowerlr_8dp/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
