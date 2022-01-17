@@ -91,7 +91,7 @@ class TCNGCNUnit(nn.Module):
         y = self.gcn1(x)
         y = self.tcn1(y)
         y = y + self.residual(x)
-        y = self.relu(y)
+#        y = self.relu(y)
         return y
 
 
@@ -135,7 +135,7 @@ class CosSinPositionalEncoding(PositionalEncodingBase):
         super().__init__(d_model, dropout, max_len)
         position = torch.arange(max_len).unsqueeze(1)
         div_term = torch.exp(torch.arange(0, d_model, 2)
-                             * (-math.log(10000.0) / d_model))
+                             * (-math.log(100.0) / d_model))
         pe = torch.zeros(1, max_len, d_model)
         pe[0, :, 0::2] = torch.sin(position * div_term)
         pe[0, :, 1::2] = torch.cos(position * div_term)

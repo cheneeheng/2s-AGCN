@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_v19_joint/220112150001_nopad_3ks_nosplittingclstoken_lowerlr_PA
-model_saved_name: ./data/data/ntu_result/xview/aagcn_v19_joint/220112150001_nopad_3ks_nosplittingclstoken_lowerlr_PA/ntu_cv_aagcn_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_v19_joint/220112150001_nopad_3ks_lowerlr_noaug_PA_96d
+model_saved_name: ./data/data/ntu_result/xview/aagcn_v19_joint/220112150001_nopad_3ks_lowerlr_noaug_PA_96d/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
@@ -22,9 +22,9 @@ train_feeder_args:
   random_move: False
   window_size: -1
   normalization: False
-  random_zaxis_flip: True
-  random_xaxis_shift: True
-  random_yaxis_shift: True
+#  random_zaxis_flip: True
+#  random_xaxis_shift: True
+#  random_yaxis_shift: True
 
 test_feeder_args:
   data_path: ./data/data/ntu_nopad/xview/val_data_joint.npy
@@ -47,14 +47,14 @@ model_args:
   kernel_size: 3
   pad: False
   trans_num_heads: 3
-  trans_model_dim: 24
-  trans_ffn_dim: 96
+  trans_model_dim: 96
+  trans_ffn_dim: 384
   trans_dropout: 0.2
   trans_activation: gelu
   trans_num_layers: 3
-  s_trans_num_heads: 2
-  s_trans_model_dim: 24
-  s_trans_ffn_dim: 96
+  s_trans_num_heads: 3
+  s_trans_model_dim: 96
+  s_trans_ffn_dim: 384
   s_trans_dropout: 0.2
   s_trans_activation: gelu
   s_trans_num_layers: 3
