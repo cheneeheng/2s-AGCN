@@ -326,9 +326,29 @@ aagcn_v17:
         - 220112190001_nopad_3ks_noaug_lowerlr_dropout05:
                   - 86.2%
                   - almost overfit, train acc ~1
+
         - 220112190001_nopad_3ks_noaug_lowerlr_attnmask_softmask_testing:
                   - uses attention masking => doest seem to have a diff
                   - 89.0%
+                  - almost overfit, train acc ~1
+        - 220112190001_nopad_3ks_noaug_lowerlowerlr_attnmask_forward:
+                  - uses forward masking.
+                  - masking starts after warmup epochs.
+                  - goes up during warmup epochs and decreases afterwards.
+                  - 24.4%
+                  - almost overfit, train acc ~1
+
+        - 220117110001_nopad_3ks_noaug_lowerlr_notcngcnrelu:
+                  - no relu after tcngcn unit.
+                  - 88.3%
+                  - almost overfit, train acc ~1
+        - 220117110001_nopad_3ks_noaug_lowerlr_notcngcnrelu_100div_cossin:
+                  - no relu after tcngcn unit.
+                  - 90.2%
+                  - almost overfit, train acc ~1
+        - 220117110001_nopad_3ks_noaug_lowerlr_notcngcnrelu_100div_cossin_mul:
+                  - no relu after tcngcn unit.
+                  - 88.6%
                   - almost overfit, train acc ~1
 
 aagcn_v18:
@@ -353,6 +373,9 @@ aagcn_v19:
                   - 90.0%
                   - almost overfit, train acc ~1
                   - converged really fast at the beginning
+        - 220112150001_nopad_3ks_lowerlr_noaug_PA_96d:
+                  - 89.9%
+                  - almost overfit, train acc ~1
         - 220112150001_nopad_3ks_nosplittingclstoken:
                   - diverged
         - 220112150001_nopad_3ks_nosplittingclstoken_PA:
@@ -390,4 +413,10 @@ aagcn_v20:
         - added dual transformer, and merge at the end.
         - 220114130001_nopad_3ks_lowerlr_noaug:
                   - 87.1%
+                  - almost overfit, train acc ~1
+        - 220114130001_nopad_3ks_lowerlr_noaug_cossin:
+                  - 88.7%
+                  - almost overfit, train acc ~1
+        - 220114130001_nopad_3ks_lowerlr_noaug_cossin_64d:
+                  - 89.5%
                   - almost overfit, train acc ~1

@@ -4,7 +4,7 @@ from torchinfo import summary
 
 import numpy as np
 import math
-from typing import Optional
+from typing import Optional, List
 
 from model.aagcn import import_class
 from model.aagcn import conv_init
@@ -142,6 +142,34 @@ class CosSinPositionalEncoding(PositionalEncodingBase):
         self.register_buffer('pe', pe)
 
 
+class PositionalEncoding2D(nn.Module):
+    def __init__(self,
+                 d_p: Optional[int] = None,
+                 dropout: float = 0.0,
+                 length: int = 101):
+        super().__init__()
+        if d_p is None:
+            _pe = torch.empty(length, length)
+            nn.init.normal_(_pe, std=0.02)  # bert
+            self.pe = nn.Parameter(_pe)
+        else:
+            _peq = torch.empty(length, d_p)
+            _pek = torch.empty(length, d_p)
+            nn.init.normal_(_peq, std=0.02)  # bert
+            nn.init.normal_(_pek, std=0.02)  # bert
+            peq = nn.Parameter(_peq)
+            pek = nn.Parameter(_pek)
+            self.pe = torch.matmul(peq, pek.transpose(-2, -1))
+
+        self.dropout = nn.Dropout(p=dropout)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x : N, L, L
+        x = x + self.pe
+        x = self.dropout(x)
+        return x
+
+
 class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
     """Option for pre of postnorm"""
 
@@ -195,15 +223,18 @@ class TransformerEncoderExt(nn.TransformerEncoder):
 
     def forward(self,
                 src: torch.Tensor,
-                mask: Optional[torch.Tensor] = None,
+                mask: Optional[List[torch.Tensor]] = None,
                 src_key_padding_mask: Optional[torch.Tensor] = None,
                 ) -> torch.Tensor:
         output = src
 
         attn_list = []
 
-        for mod in self.layers:
-            output, attn = mod(output, src_mask=mask,
+        if mask is None:
+            mask = [None for _ in range(self.num_layers)]
+
+        for mod, mask_i in zip(self.layers, mask):
+            output, attn = mod(output, src_mask=mask_i,
                                src_key_padding_mask=src_key_padding_mask)
             if self.need_attn:
                 attn_list.append(attn)
@@ -221,13 +252,12 @@ def generate_square_subsequent_mask(sz: int, device: str) -> torch.Tensor:
         '-inf')).masked_fill(mask == 1, float(0.0))
     return mask
 
+
 # ------------------------------------------------------------------------------
 # Network
-# - uses original transformer
-# - from v13
+# - A Simple and Effective Positional Encoding for Transformers
+# - from v17
 # ------------------------------------------------------------------------------
-
-
 class Model(BaseModel):
     def __init__(self,
                  num_class: int = 60,
@@ -246,7 +276,7 @@ class Model(BaseModel):
                  pad: bool = True,
 
                  need_attn: bool = False,
-                 attn_masking: str = 'False',
+                 attn_masking: Optional[dict] = None,
 
                  trans_num_heads: int = 2,
                  trans_model_dim: int = 16,
@@ -262,7 +292,6 @@ class Model(BaseModel):
         super().__init__(num_class, num_point, num_person,
                          in_channels, drop_out, adaptive, gbn_split)
 
-        attn_masking = str(attn_masking)
         self.attn_masking = attn_masking
         self.attn_mask = None
         self.trans_num_heads = trans_num_heads
@@ -325,31 +354,13 @@ class Model(BaseModel):
 
     def forward_preprocess(self, x, size):
         N, C, T, V, M = size
-        if self.attn_masking == 'True' or self.attn_masking == 'frame':
-            zeros = torch.zeros(
-                N, 1,
-                dtype=torch.float,
-                device='cpu' if x.get_device() < 0 else x.get_device()
-            )
-            attn_mask = (x.sum((1, 3)) == 0.0).float()
-            attn_mask = attn_mask[:, ::self.kernel_size, :]  # windowing
-            attn_mask = attn_mask.reshape(N, -1)
-            attn_mask = torch.cat([zeros, attn_mask], -1)
-            self.attn_mask = torch.matmul(attn_mask.unsqueeze(-1),
-                                          attn_mask.unsqueeze(1)).bool()
-            self.attn_mask = self.attn_mask.unsqueeze(1).repeat(
-                1, self.trans_num_heads, 1, 1)
-            self.attn_mask = self.attn_mask.view(
-                N*self.trans_num_heads,
-                T*M//self.kernel_size + 1,
-                T*M//self.kernel_size + 1
-            ).detach()
-        elif self.attn_masking == 'forward':
-            if self.l1.gcn1.agcn.PA.requires_grad:
-                self.attn_mask = generate_square_subsequent_mask(
-                    T*M//self.kernel_size + 1,
-                    device='cpu' if x.get_device() < 0 else x.get_device()
-                )
+        if self.attn_masking is not None:
+            self.attn_mask = [
+                PositionalEncoding2D(self.attn_masking['d_p'],
+                                     self.attn_masking['dropout'],
+                                     T*M//self.kernel_size+1).pe
+                for _ in range(self.trans_enc.num_layers)
+            ]
         return super().forward_preprocess(x, size)
 
     def forward_postprocess(self, x: torch.Tensor, size: torch.Size):
@@ -376,12 +387,13 @@ class Model(BaseModel):
 
 if __name__ == '__main__':
     graph = 'graph.ntu_rgb_d.Graph'
-    model = Model(graph=graph, model_layers=101,
+    model = Model(graph=graph,
+                  model_layers=101,
                   trans_num_layers=3,
                   kernel_size=3,
                   pad=False,
-                  pos_enc='cossin',
-                  attn_masking='forward',
+                  pos_enc=None,
+                  attn_masking={'d_p': 8, 'dropout': 0, 'length': 101},
                   )
     # print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
