@@ -297,6 +297,14 @@ class Model(BaseModel):
         self.trans_num_heads = trans_num_heads
         self.kernel_size = kernel_size
 
+        if self.attn_masking is not None:
+            self.attn_mask = [
+                PositionalEncoding2D(self.attn_masking['d_p'],
+                                     self.attn_masking['dropout'],
+                                     300*num_person//self.kernel_size+1).pe
+                for _ in range(trans_num_layers)
+            ]
+
         self.init_graph(graph, graph_args)
 
         def _TCNGCNUnit(_in, _out, stride=1, residual=True):
@@ -351,17 +359,6 @@ class Model(BaseModel):
         )
 
         self.init_fc(trans_dim, num_class)
-
-    def forward_preprocess(self, x, size):
-        N, C, T, V, M = size
-        if self.attn_masking is not None:
-            self.attn_mask = [
-                PositionalEncoding2D(self.attn_masking['d_p'],
-                                     self.attn_masking['dropout'],
-                                     T*M//self.kernel_size+1).pe
-                for _ in range(self.trans_enc.num_layers)
-            ]
-        return super().forward_preprocess(x, size)
 
     def forward_postprocess(self, x: torch.Tensor, size: torch.Size):
         N, _, _, V, M = size
