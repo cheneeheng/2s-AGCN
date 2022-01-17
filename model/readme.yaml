@@ -395,8 +395,8 @@ aagcn_v19:
                   - almost overfit, train acc ~1
                   - converged really fast at the beginning
 
-                  - attn_220112150001_nopad_3ks_nosplittingclstoken_lowerlr_PA_noaug
-                  - spatial attention seems to be work as intended for som cases.
+        - attn_220112150001_nopad_3ks_nosplittingclstoken_lowerlr_PA_noaug:
+                  - spatial attention seems to be work as intended for some cases.
                   - it is always highly influenced by J1
                   - there are cases where it is attending "correctly" but false prediction
                   - i.e. 43-7, 60, 1
@@ -427,4 +427,19 @@ aagcn_v21:
                   - almost overfit, train acc ~1
         - 220117150001_nopad_3ks_noaug_lowerlr_Nonedp:
                   - 88.3%
+                  - almost overfit, train acc ~1
+        - 220117150001_nopad_3ks_noaug_lowerlr_0dp:
+                  - 88.1%
+                  - almost overfit, train acc ~1
+        - 220117150001_nopad_3ks_noaug_lowerlr_8dp:
+                  - 88.4%
+                  - almost overfit, train acc ~1
+
+aagcn_v22:
+        - adds pe to each of the layers.
+        - 220117190001_nopad_3ks_noaug_lowerlr:
+                  - 89.1%
+                  - almost overfit, train acc ~1
+        - 220117190001_nopad_3ks_noaug_lowerlr_cossin:
+                  - 90.4%
                   - almost overfit, train acc ~1
