@@ -131,7 +131,8 @@ class CosSinPositionalEncoding(PositionalEncodingBase):
     def __init__(self,
                  d_model: int,
                  dropout: float = 0.0,
-                 max_len: int = 601):
+                 max_len: int = 601,
+                 name: str = ''):
         super().__init__(d_model, dropout, max_len)
         position = torch.arange(max_len).unsqueeze(1)
         div_term = torch.exp(torch.arange(0, d_model, 2)
@@ -139,7 +140,7 @@ class CosSinPositionalEncoding(PositionalEncodingBase):
         pe = torch.zeros(1, max_len, d_model)
         pe[0, :, 0::2] = torch.sin(position * div_term)
         pe[0, :, 1::2] = torch.cos(position * div_term)
-        self.register_buffer('pe', pe)
+        self.register_buffer('pe'+name, pe)
 
 
 class PositionalEncoding2D(nn.Module):
@@ -334,8 +335,8 @@ class Model(BaseModel):
             ])
         elif pos_enc == 'cossin':
             self.pos_encoder = nn.ModuleList([
-                CosSinPositionalEncoding(trans_dim)
-                for _ in range(trans_num_layers)
+                CosSinPositionalEncoding(trans_dim, name=str(i))
+                for i in range(trans_num_layers)
             ])
         else:
             self.pos_encoder = [lambda x: x for _ in range(trans_num_layers)]

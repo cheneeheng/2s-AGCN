@@ -425,3 +425,6 @@ aagcn_v21:
         - 220117150001_nopad_3ks_noaug_lowerlr_8dp:
                   - 88.3%
                   - almost overfit, train acc ~1
+        - 220117150001_nopad_3ks_noaug_lowerlr_Nonedp:
+                  - 88.3%
+                  - almost overfit, train acc ~1
