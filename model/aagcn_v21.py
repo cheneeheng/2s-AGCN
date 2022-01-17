@@ -157,20 +157,21 @@ class PositionalEncoding2D(nn.Module):
             _pek = torch.empty(length, d_p)
             nn.init.normal_(_peq, std=0.02)  # bert
             nn.init.normal_(_pek, std=0.02)  # bert
-            peq = nn.Parameter(_peq)
-            pek = nn.Parameter(_pek)
-            self.pe = torch.matmul(peq, pek.transpose(-2, -1))
+            self.peq = nn.Parameter(_peq)
+            self.pek = nn.Parameter(_pek)
+            self.pe = None
 
         self.dropout = nn.Dropout(p=dropout)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # x : N, L, L
-        x = x + self.pe
-        x = self.dropout(x)
-        return x
-
-    def pe_val(self):
-        return self.pe
+    def forward(self, x: Optional[torch.Tensor] = None) -> torch.Tensor:
+        # # x : N, L, L
+        # x = x + self.pe
+        # x = self.dropout(x)
+        # return x
+        if self.pe is None:
+            return torch.matmul(self.peq, self.pek.transpose(-2, -1))
+        else:
+            return self.pe
 
 
 class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
@@ -384,9 +385,7 @@ class Model(BaseModel):
         x = self.pos_encoder(x)
 
         if self.attn_masking is not None:
-            self.attn_mask = [self.am1.pe_val(),
-                              self.am2.pe_val(),
-                              self.am3.pe_val()]
+            self.attn_mask = [self.am1(), self.am2(), self.am3()]
 
         x, attn = self.trans_enc(x, self.attn_mask)
         if self.classifier_type == 'CLS':
