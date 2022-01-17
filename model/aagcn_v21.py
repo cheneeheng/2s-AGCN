@@ -169,6 +169,9 @@ class PositionalEncoding2D(nn.Module):
         x = self.dropout(x)
         return x
 
+    def pe(self):
+        return self.pe
+
 
 class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
     """Option for pre of postnorm"""
@@ -298,12 +301,21 @@ class Model(BaseModel):
         self.kernel_size = kernel_size
 
         if self.attn_masking is not None:
-            self.attn_mask = nn.ParameterList([
-                PositionalEncoding2D(self.attn_masking['d_p'],
-                                     self.attn_masking['dropout'],
-                                     300*num_person//self.kernel_size+1).pe
-                for _ in range(trans_num_layers)
-            ])
+            # self.attn_mask = nn.ParameterList([
+            #     PositionalEncoding2D(self.attn_masking['d_p'],
+            #                          self.attn_masking['dropout'],
+            #                          300*num_person//self.kernel_size+1).pe
+            #     for _ in range(trans_num_layers)
+            # ])
+            self.am1 = PositionalEncoding2D(self.attn_masking['d_p'],
+                                            self.attn_masking['dropout'],
+                                            300*num_person//self.kernel_size+1)
+            self.am2 = PositionalEncoding2D(self.attn_masking['d_p'],
+                                            self.attn_masking['dropout'],
+                                            300*num_person//self.kernel_size+1)
+            self.am3 = PositionalEncoding2D(self.attn_masking['d_p'],
+                                            self.attn_masking['dropout'],
+                                            300*num_person//self.kernel_size+1)
 
         self.init_graph(graph, graph_args)
 
@@ -370,6 +382,9 @@ class Model(BaseModel):
             cls_tokens = self.cls_token.repeat(x.size(0), 1, 1)
             x = torch.cat((cls_tokens, x), dim=1)
         x = self.pos_encoder(x)
+
+        if self.attn_masking is not None:
+            self.attn_mask = [self.am1.pe(), self.am2.pe(), self.am3.pe()]
 
         x, attn = self.trans_enc(x, self.attn_mask)
         if self.classifier_type == 'CLS':
