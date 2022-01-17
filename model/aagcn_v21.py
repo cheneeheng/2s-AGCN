@@ -148,7 +148,7 @@ class PositionalEncoding2D(nn.Module):
                  dropout: float = 0.0,
                  length: int = 101):
         super().__init__()
-        if d_p is None:
+        if d_p is None or d_p == 0:
             _pe = torch.empty(length, length)
             nn.init.normal_(_pe, std=0.02)  # bert
             self.pe = nn.Parameter(_pe)
@@ -298,12 +298,12 @@ class Model(BaseModel):
         self.kernel_size = kernel_size
 
         if self.attn_masking is not None:
-            self.attn_mask = [
+            self.attn_mask = nn.ParameterList([
                 PositionalEncoding2D(self.attn_masking['d_p'],
                                      self.attn_masking['dropout'],
                                      300*num_person//self.kernel_size+1).pe
                 for _ in range(trans_num_layers)
-            ]
+            ])
 
         self.init_graph(graph, graph_args)
 
