@@ -272,6 +272,7 @@ aagcn_v16:
                   - overfit, train acc ~1
 aagcn_v17:
         - change tcn to create patches. (no overlap during conv)
+        - uses transformer - temporal
         - 211228140001_nopad:
                   - diverge
         - 211228140001_nopad_3ks:
@@ -452,3 +453,18 @@ aagcn_v23:
         - 220117210001_nopad_3ks_lowerlr_noaug_cossin:
                   - 89.1%
                   - almost overfit, train acc ~1
+
+aagcn_v24:
+        - only spatial transformer
+        - 220118110001_nopad_3ks_noaug_lowerlr:
+                  - 65.1%
+                  - no overfit
+        - 220118110001_nopad_3ks_noaug_lowerlr_64d:
+                  - 75.2%
+                  - no overfit
+        - 220118110001_nopad_3ks_noaug_lowerlr_cossin:
+                  - .%
+                  - no overfit
+        - 220118110001_nopad_3ks_noaug_lowerlr_64_cossind:
+                  - .%
+                  - no overfit

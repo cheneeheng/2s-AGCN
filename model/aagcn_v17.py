@@ -106,7 +106,6 @@ class PositionalEncodingBase(nn.Module):
                  dropout: float = 0.0,
                  max_len: int = 601):
         super().__init__()
-        self.pe = None
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -242,6 +241,8 @@ class Model(BaseModel):
                  attention: bool = True,
                  gbn_split: Optional[int] = None,
 
+                 data_norm: str = 'bn',
+
                  kernel_size: int = 9,
                  pad: bool = True,
 
@@ -260,7 +261,7 @@ class Model(BaseModel):
                  classifier_type: str = 'CLS',
                  model_layers: int = 10):
         super().__init__(num_class, num_point, num_person,
-                         in_channels, drop_out, adaptive, gbn_split)
+                         in_channels, drop_out, adaptive, gbn_split, data_norm)
 
         attn_masking = str(attn_masking)
         self.attn_masking = attn_masking
@@ -376,12 +377,14 @@ class Model(BaseModel):
 
 if __name__ == '__main__':
     graph = 'graph.ntu_rgb_d.Graph'
-    model = Model(graph=graph, model_layers=101,
+    model = Model(graph=graph,
+                  model_layers=101,
                   trans_num_layers=3,
                   kernel_size=3,
                   pad=False,
                   pos_enc='cossin',
-                  attn_masking='forward',
+                  #   attn_masking='forward',
+                  data_norm='ln'
                   )
     # print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
