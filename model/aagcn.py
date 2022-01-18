@@ -357,7 +357,7 @@ class BaseModel(nn.Module):
             self.data_bn = batch_norm_1d(num_person*in_channels*num_point,
                                          gbn_split)
         elif data_norm == 'ln':
-            self.data_bn = nn.LayerNorm(num_person*in_channels*num_point)
+            self.data_bn = nn.LayerNorm(in_channels*num_point)
         else:
             raise ValueError("Unknown data_bn")
         bn_init(self.data_bn, 1)  # naming for backward compatibility
@@ -491,10 +491,10 @@ class BaseModel(nn.Module):
             x = self.data_bn(x)
             x = x.view(N, M, V, C, T).permute(0, 1, 3, 4, 2).contiguous()  # n,m,c,t,v  # noqa
         elif self.data_norm == 'ln':
-            x = x.permute(0, 2, 4, 3, 1).contiguous()  # n,t,m,v,c
-            x = x.view(N, T, -1)
+            x = x.permute(0, 4, 2, 3, 1).contiguous()  # n,t,m,v,c
+            x = x.view(N*M, T, -1)
             x = self.data_bn(x)
-            x = x.view(N, T, M, V, C).permute(0, 2, 4, 1, 3).contiguous()  # n,m,c,t,v  # noqa
+            x = x.view(N, M, T, V, C).permute(0, 1, 4, 2, 3).contiguous()  # n,m,c,t,v  # noqa
 
         x = x.view(-1, C, T, V)  # nm,c,t,v
         return x
