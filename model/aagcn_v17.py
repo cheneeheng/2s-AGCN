@@ -91,7 +91,7 @@ class TCNGCNUnit(nn.Module):
         y = self.gcn1(x)
         y = self.tcn1(y)
         y = y + self.residual(x)
-#        y = self.relu(y)
+        y = self.relu(y)
         return y
 
 
@@ -260,8 +260,15 @@ class Model(BaseModel):
                  pos_enc: str = 'True',
                  classifier_type: str = 'CLS',
                  model_layers: int = 10):
-        super().__init__(num_class, num_point, num_person,
-                         in_channels, drop_out, adaptive, gbn_split, data_norm)
+
+        super().__init__(num_class=num_class,
+                         num_point=num_point,
+                         num_person=num_person,
+                         in_channels=in_channels,
+                         drop_out=drop_out,
+                         adaptive=adaptive,
+                         gbn_split=gbn_split,
+                         data_norm=data_norm)
 
         attn_masking = str(attn_masking)
         self.attn_masking = attn_masking
