@@ -84,6 +84,7 @@ class TCNGCNUnit(nn.Module):
                                     out_channels,
                                     kernel_size=1,
                                     stride=stride,
+                                    pad=pad,
                                     gbn_split=gbn_split)
 
         self.relu = nn.ReLU(inplace=True)
@@ -294,14 +295,15 @@ class Model(BaseModel):
         self.init_graph(graph, graph_args)
 
         # 2. aagcn layer
-        def _TCNGCNUnit(_in, _out, stride=1, residual=True):
+        def _TCNGCNUnit(_in, _out, stride=kernel_size, padding=pad,
+                        residual=True):
             return TCNGCNUnit(_in,
                               _out,
                               self.graph.A,
                               num_subset=num_subset,
                               kernel_size=kernel_size,
-                              stride=kernel_size,
-                              pad=pad,
+                              stride=stride,
+                              pad=padding,
                               residual=residual,
                               adaptive=self.adaptive_fn,
                               attention=attention,
@@ -372,7 +374,7 @@ class Model(BaseModel):
 if __name__ == '__main__':
     graph = 'graph.ntu_rgb_d.Graph'
     model = Model(graph=graph,
-                  model_layers=101,
+                  model_layers=102,
                   s_trans_cfg={
                       'num_heads': 2,
                       'model_dim': 16,

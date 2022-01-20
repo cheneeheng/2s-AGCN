@@ -474,6 +474,30 @@ class BaseModel(nn.Module):
             self.l8 = lambda x: x
             self.l9 = lambda x: x
             self.l10 = lambda x: x
+        elif model_layers == 1002:
+            c = output_channel if output_channel is not None else 64
+            self.l1 = tcngcn_unit(3, c, stride=1, padding=True, residual=False)
+            self.l2 = tcngcn_unit(c, c)
+            self.l3 = lambda x: x
+            self.l4 = lambda x: x
+            self.l5 = lambda x: x
+            self.l6 = lambda x: x
+            self.l7 = lambda x: x
+            self.l8 = lambda x: x
+            self.l9 = lambda x: x
+            self.l10 = lambda x: x
+        elif model_layers == 1003:
+            c = output_channel if output_channel is not None else 64
+            self.l1 = tcngcn_unit(3, c, stride=1, padding=True, residual=False)
+            self.l2 = tcngcn_unit(c, c, stride=1, padding=True)
+            self.l3 = tcngcn_unit(c, c)
+            self.l4 = lambda x: x
+            self.l5 = lambda x: x
+            self.l6 = lambda x: x
+            self.l7 = lambda x: x
+            self.l8 = lambda x: x
+            self.l9 = lambda x: x
+            self.l10 = lambda x: x
         else:
             raise ValueError(
                 f"Model with {model_layers} layers is not supported.")

@@ -292,7 +292,7 @@ aagcn_v17:
                   - diverged
         - 211228140001_nopad_5ks_64dim:
                   - diverged
-
+        # COSSIN PE -----------------------------------------
         - 220111210001_nopad_3ks_cossin:
                   - diverged
         - 220111210001_nopad_3ks_cossin_lowerlr:
@@ -303,14 +303,25 @@ aagcn_v17:
                   - overfit, train acc ~1
         - 220111210001_nopad_3ks_cossin_100div_noaug:
                   - converged at warmup but diverged afterwards.
-        - 220111210001_nopad_3ks_cossin_100div_noaug_lowerlr:
+        - 220111210001_nopad_3ks_cossin_100div_noaug_lowerlr: #####
                   - 90.5%
                   - overfit, train acc ~1
                   - converged really fast at the beginning (val acc was higher)
         - 220111210001_nopad_3ks_cossin_100div_lowerlr:
                   - 87.5%
                   - overfit, train acc ~1
-
+        - 220118230001_nopad_3ks_noaug_lowerlr_100div_cossin_32d:
+                  - 88.9%
+                  - almost overfit, train acc ~1
+        - 220118230001_nopad_3ks_noaug_lowerlr_100div_cossin_64d:
+                  - 85.0%
+                  - almost overfit, train acc ~1
+        - 220118230001_nopad_3ks_noaug_lowerlr_100div_cossin_128d:
+                  - 87.6%
+                  - almost overfit, train acc ~1
+        - 220118230001_nopad_3ks_noaug_lowerlr_100div_cossin_256d:
+                  - GPU mem error
+        # RERUN WITH POS PE -----------------------------------------
         - 220111210001_nopad_3ks_rerun:
                   - same as 211228140001_nopad_3ks
                   - 87%
@@ -324,10 +335,7 @@ aagcn_v17:
         - 220111210001_nopad_3ks_rerun_noaug_lowerlr:
                   - 88.2%
                   - converged really fast at the beginning (val acc was higher)
-        - 220112190001_nopad_3ks_noaug_lowerlr_dropout05:
-                  - 86.2%
-                  - almost overfit, train acc ~1
-
+        # ATTENTION MASKING -----------------------------------------
         - 220112190001_nopad_3ks_noaug_lowerlr_attnmask_softmask_testing:
                   - uses attention masking => doest seem to have a diff
                   - 89.0%
@@ -338,7 +346,7 @@ aagcn_v17:
                   - goes up during warmup epochs and decreases afterwards.
                   - 24.4%
                   - almost overfit, train acc ~1
-
+        # NO RELU IN TCNGCN UNIT -----------------------------------------
         - 220117110001_nopad_3ks_noaug_lowerlr_notcngcnrelu:
                   - no relu after tcngcn unit.
                   - 88.3%
@@ -350,6 +358,23 @@ aagcn_v17:
         - 220117110001_nopad_3ks_noaug_lowerlr_notcngcnrelu_100div_cossin_mul:
                   - no relu after tcngcn unit.
                   - 88.6%
+                  - almost overfit, train acc ~1
+        # ADAM
+        - 220118160001_nopad_3ks_noaug_lowerlr_100div_cossin_adam:
+                  - 52.9%
+        # LN for data_norm
+        - 220118160001_nopad_3ks_noaug_lowerlr_100div_cossin_ln:
+                  - 89.2%
+                  - almost overfit, train acc ~1
+        # DROPOUT
+        - 220112190001_nopad_3ks_noaug_lowerlr_dropout05:
+                  - 86.2%
+                  - almost overfit, train acc ~1
+        - 220118160001_nopad_3ks_noaug_lowerlr_100div_cossin_nodropout:
+                  - 89.1%
+                  - almost overfit, train acc ~1
+        - 220118160001_nopad_3ks_noaug_lowerlr_100div_cossin_dropout05:
+                  - 89.0%
                   - almost overfit, train acc ~1
 
 aagcn_v18:
@@ -423,6 +448,7 @@ aagcn_v20:
                   - almost overfit, train acc ~1
 
 aagcn_v21:
+        - positional masking instead of PE at input.
         - 220117150001_nopad_3ks_noaug_lowerlr_8dp:
                   - 88.3%
                   - almost overfit, train acc ~1
@@ -459,12 +485,41 @@ aagcn_v24:
         - 220118110001_nopad_3ks_noaug_lowerlr:
                   - 65.1%
                   - no overfit
+        - 220118110001_nopad_3ks_noaug_lowerlr_32d:
+                  - 72.2%
+                  - no overfit
         - 220118110001_nopad_3ks_noaug_lowerlr_64d:
                   - 75.2%
                   - no overfit
+        - 220118110001_nopad_3ks_noaug_lowerlr_128d:
+                  - 80.9%
+                  - no overfit
+        - 220118110001_nopad_3ks_noaug_lowerlr_256d:
+                  - 83.8%
+                  - no overfit
+
         - 220118110001_nopad_3ks_noaug_lowerlr_cossin:
-                  - .%
+                  - 62.7%
+                  - no overfit
+        - 220118110001_nopad_3ks_noaug_lowerlr_cossin_32d:
+                  - 71.4%
                   - no overfit
         - 220118110001_nopad_3ks_noaug_lowerlr_64_cossind:
-                  - .%
-                  - no overfit
+                  - 75.6%
+                  - almost overfit
+        - 220118110001_nopad_3ks_noaug_lowerlr_cossin_128d:
+                  - 84.3%
+                  - almost overfit
+        - 220118110001_nopad_3ks_noaug_lowerlr_cossin_256d:
+                  - 83.7%
+                  - almost overfit
+
+        - 220118110001_nopad_3ks_noaug_lowerlr_cossin_128d_5l:
+                  - 84.1%
+                  - almost overfit
+        - 220118110001_nopad_3ks_noaug_lowerlr_cossin_128d_7l:
+                  - 83.1%
+                  - almost overfit
+
+        - 220118110001_nopad_3ks_noaug_lowerlr_cossin_128d_2aagcn:
+        - 220118110001_nopad_3ks_noaug_lowerlr_cossin_128d_3aagcn:
