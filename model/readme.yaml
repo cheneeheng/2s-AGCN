@@ -521,5 +521,19 @@ aagcn_v24:
                   - 83.1%
                   - almost overfit
 
+        - 220118110001_nopad_3ks_noaug_lowerlr_cossin_128d_4h:
+                  - 82.2%
+                  - almost overfit
+        - 220118110001_nopad_3ks_noaug_lowerlr_cossin_128d_8h:
+                  - 82.6%
+                  - almost overfit
+        - 220118110001_nopad_3ks_noaug_lowerlr_cossin_128d_16h:
+                  - 83.9%
+                  - almost overfit
+
         - 220118110001_nopad_3ks_noaug_lowerlr_cossin_128d_2aagcn:
+                  - 83.3%
+                  - almost overfit
         - 220118110001_nopad_3ks_noaug_lowerlr_cossin_128d_3aagcn:
+                  - 80.3%
+                  - almost overfit
