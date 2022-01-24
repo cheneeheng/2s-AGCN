@@ -160,7 +160,8 @@ def transformer_config_checker(cfg: dict):
         'position_biased_input',
         'attention_head_size'
     ]
-    for x in cfg.__dict__.keys():
+    keys = cfg.keys() if isinstance(cfg, dict) else cfg.__dict__.keys()
+    for x in keys:
         assert f'{x}' in trans_cfg_names, f'{x} not in transformer config'
 
 
