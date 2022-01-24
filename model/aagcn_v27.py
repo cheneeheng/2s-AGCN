@@ -130,7 +130,17 @@ def default_transformer_config():
     config.position_biased_input = False  # whether to add PE to input
     config.attention_head_size = 8
 
-    return config.__dict__
+    return config
+
+
+def update_transformer_config(cfg: dict = None):
+    if cfg is None:
+        return default_transformer_config()
+    else:
+        def_cfg = default_transformer_config()
+        for k, v in cfg.items():
+            setattr(def_cfg, k, v)
+        return def_cfg
 
 
 def transformer_config_checker(cfg: dict):
@@ -160,8 +170,7 @@ def transformer_config_checker(cfg: dict):
         'position_biased_input',
         'attention_head_size'
     ]
-    keys = cfg.keys() if isinstance(cfg, dict) else cfg.__dict__.keys()
-    for x in keys:
+    for x in cfg.__dict__.keys():
         assert f'{x}' in trans_cfg_names, f'{x} not in transformer config'
 
 
@@ -284,8 +293,7 @@ class Model(BaseModel):
         super().__init__(num_class, num_point, num_person,
                          in_channels, drop_out, adaptive, gbn_split)
 
-        if s_trans_cfg is None:
-            s_trans_cfg = default_transformer_config()
+        s_trans_cfg = update_transformer_config(s_trans_cfg)
         transformer_config_checker(s_trans_cfg)
 
         self.need_attn = need_attn
