@@ -303,23 +303,28 @@ aagcn_v17:
                   - overfit, train acc ~1
         - 220111210001_nopad_3ks_cossin_100div_noaug:
                   - converged at warmup but diverged afterwards.
+        - 220111210001_nopad_3ks_cossin_100div_lowerlr:
+                  - 87.5%
+                  - overfit, train acc ~1
         - 220111210001_nopad_3ks_cossin_100div_noaug_lowerlr: #####
                   - 90.5%
                   - overfit, train acc ~1
                   - converged really fast at the beginning (val acc was higher)
-        - 220111210001_nopad_3ks_cossin_100div_lowerlr:
-                  - 87.5%
-                  - overfit, train acc ~1
-        - 220118230001_nopad_3ks_noaug_lowerlr_100div_cossin_32d:
+        - 220121120001_nopad_3ks_noaug_lowerlr_100div_cossin_32d:
+                  - 90.4%
+                  - almost overfit, train acc ~1
+        - 220121120001_nopad_3ks_noaug_lowerlr_100div_cossin_64d:
+        - 220121120001_nopad_3ks_noaug_lowerlr_100div_cossin_128d:
+        - 220118230001_nopad_3ks_noaug_lowerlr_100div_cossin_32d: (0.5dropout)
                   - 88.9%
                   - almost overfit, train acc ~1
-        - 220118230001_nopad_3ks_noaug_lowerlr_100div_cossin_64d:
+        - 220118230001_nopad_3ks_noaug_lowerlr_100div_cossin_64d: (0.5dropout)
                   - 85.0%
                   - almost overfit, train acc ~1
-        - 220118230001_nopad_3ks_noaug_lowerlr_100div_cossin_128d:
+        - 220118230001_nopad_3ks_noaug_lowerlr_100div_cossin_128d: (0.5dropout)
                   - 87.6%
                   - almost overfit, train acc ~1
-        - 220118230001_nopad_3ks_noaug_lowerlr_100div_cossin_256d:
+        - 220118230001_nopad_3ks_noaug_lowerlr_100div_cossin_256d: (0.5dropout)
                   - GPU mem error
         # RERUN WITH POS PE -----------------------------------------
         - 220111210001_nopad_3ks_rerun:
@@ -373,8 +378,24 @@ aagcn_v17:
         - 220118160001_nopad_3ks_noaug_lowerlr_100div_cossin_nodropout:
                   - 89.1%
                   - almost overfit, train acc ~1
+        - 220118160001_nopad_3ks_noaug_lowerlr_100div_cossin_dropout01:
+                  - 89.9%
+                  - almost overfit, train acc ~1
+        - 220118160001_nopad_3ks_noaug_lowerlr_100div_cossin_dropout03:
+                  - 90.4%
+                  - almost overfit, train acc ~1
+        - 220118160001_nopad_3ks_noaug_lowerlr_100div_cossin_dropout04:
+                  - 89.8%
+                  - almost overfit, train acc ~1
         - 220118160001_nopad_3ks_noaug_lowerlr_100div_cossin_dropout05:
                   - 89.0%
+                  - almost overfit, train acc ~1
+
+        - 220121110001_nopad_1ks_noaug_lowerlr_100div_cossin:
+                  - 90.2%
+                  - almost overfit, train acc ~1
+        - 220121110001_nopad_2ks_noaug_lowerlr_100div_cossin:
+                  - 90.6%
                   - almost overfit, train acc ~1
 
 aagcn_v18:
@@ -507,7 +528,7 @@ aagcn_v24:
         - 220118110001_nopad_3ks_noaug_lowerlr_64_cossind:
                   - 75.6%
                   - almost overfit
-        - 220118110001_nopad_3ks_noaug_lowerlr_cossin_128d:
+        - 220118110001_nopad_3ks_noaug_lowerlr_cossin_128d: ####
                   - 84.3%
                   - almost overfit
         - 220118110001_nopad_3ks_noaug_lowerlr_cossin_256d:
@@ -537,3 +558,19 @@ aagcn_v24:
         - 220118110001_nopad_3ks_noaug_lowerlr_cossin_128d_3aagcn:
                   - 80.3%
                   - almost overfit
+
+aagcn_v25:
+        - only temporal transformer with tcn proj
+        - 220121103001_nopad_3ks_noaug_lowerlr:
+                  - 89.5%
+                  - almost overfit
+        - 220121103001_nopad_3ks_noaug_lowerlr_cossin:
+                  - 89.6%
+                  - almost overfit
+
+aagcn_v26:
+        - only spatial transformer with tcn proj
+        - 220121100001_nopad_3ks_noaug_lowerlr:
+                  - 54.1%
+        - 220121100001_nopad_3ks_noaug_lowerlr_cossin:
+                  - 53.5%

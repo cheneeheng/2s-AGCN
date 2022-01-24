@@ -24,3 +24,4 @@ from . import aagcn_v23
 from . import aagcn_v24
 from . import aagcn_v25
 from . import aagcn_v26
+from . import aagcn_v27
