@@ -110,7 +110,7 @@ def default_transformer_config():
     config.hidden_size = 16
     config.initializer_range = 0.02
     config.intermediate_size = 64
-    config.max_position_embeddings = 51
+    config.max_position_embeddings = 201
     config.layer_norm_eps = 1e-7
     config.num_attention_heads = 2
     config.num_hidden_layers = 3
@@ -128,7 +128,7 @@ def default_transformer_config():
 
     config.max_relative_positions = -1  # if -1, uses max_position_embeddings
     config.position_biased_input = False  # whether to add PE to input
-    config.attention_head_size = 8
+    config.attention_head_size = 200
 
     return config
 
@@ -260,8 +260,8 @@ class DeBERTa(torch.nn.Module):
 # - uses deberta
 # - DEBERTA: DECODING-ENHANCED BERT WITH DISENTANGLED ATTENTION
 # - attention PE, context-context, position-context, context-position.
-# - from v24
-# - only spatial attention
+# - from v27 and v17
+# - only temporal attention
 # n,mt,vc => temp trans (v17)
 # nmt,v,c => spatial trans (individual)
 # nt,mv,c => spatial trans (joint+individual)
@@ -282,7 +282,7 @@ class Model(BaseModel):
                  kernel_size: int = 9,
                  pad: bool = True,
                  need_attn: bool = False,
-                 s_trans_cfg: Optional[dict] = None,
+                 trans_cfg: Optional[dict] = None,
                  add_A: bool = False,
                  pos_enc: str = 'True',
                  classifier_type: str = 'CLS',
@@ -292,8 +292,8 @@ class Model(BaseModel):
         super().__init__(num_class, num_point, num_person,
                          in_channels, drop_out, adaptive, gbn_split)
 
-        s_trans_cfg = update_transformer_config(s_trans_cfg)
-        transformer_config_checker(s_trans_cfg)
+        trans_cfg = update_transformer_config(trans_cfg)
+        transformer_config_checker(trans_cfg)
 
         self.need_attn = need_attn
 
@@ -317,44 +317,43 @@ class Model(BaseModel):
 
         self.init_model_backbone(model_layers=model_layers,
                                  tcngcn_unit=_TCNGCNUnit,
-                                 output_channel=s_trans_cfg.hidden_size)
+                                 output_channel=trans_cfg.hidden_size)
 
         # 4. transformer (spatial)
-        self.deberta = DeBERTa(config=s_trans_cfg)
+        trans_cfg.hidden_size = trans_cfg.hidden_size*num_point
+        self.deberta = DeBERTa(config=trans_cfg)
 
         # 5. classifier
         self.classifier_type = classifier_type
         if classifier_type == 'CLS':
-            self.s_cls_token = nn.Parameter(
-                torch.randn(1, 1, s_trans_cfg.hidden_size))
+            self.cls_token = nn.Parameter(
+                torch.randn(1, 1, trans_cfg.hidden_size))
         else:
-            self.s_cls_token = None
+            self.cls_token = None
 
-        self.init_fc(s_trans_cfg.hidden_size, num_class)
+        self.init_fc(trans_cfg.hidden_size, num_class)
 
     def forward_postprocess(self, x: torch.Tensor, size: torch.Size):
         N, _, _, V, M = size
         _, C, T, _ = x.size()
+        x = x.view(N, M, C, T, V).permute(0, 1, 3, 4, 2).contiguous()  # n,m,t,v,c  # noqa
+        x = x.view(N, M*T, C*V)  # n,mt,vc
 
-        s_x = x.view(N, M, C, T, V).permute(0, 3, 1, 4, 2).contiguous()  # n,t,m,v,c  # noqa
-        s_x = s_x.reshape(N*T, M*V, C)  # nt,mv,c
-        if self.s_cls_token is not None:
-            cls_tokens = self.s_cls_token.repeat(N*T, 1, 1)
-            s_x = torch.cat((cls_tokens, s_x), dim=1)  # nt,mv+1,c
+        if self.cls_token is not None:
+            cls_tokens = self.cls_token.repeat(x.size(0), 1, 1)
+            x = torch.cat((cls_tokens, x), dim=1)
 
-        encoding = self.deberta(s_x, return_att=self.need_attn)
+        encoding = self.deberta(x, return_att=self.need_attn)
 
         if self.need_attn:
-            s_x, attn = encoding
+            x, attn = encoding
         else:
-            s_x, attn = encoding, []
+            x, attn = encoding, []
 
         if self.classifier_type == 'CLS':
-            s_x = s_x[-1][:, 0, :]  # nt,c
-            s_x = s_x.reshape(N, -1, C)  # n,t,c
-            x = s_x.mean(1)  # n,c
-        # elif self.classifier_type == 'GAP':
-        #     x = x.mean(1)  # n,vc
+            x = x[-1][:, 0, :]  # n,vc
+        elif self.classifier_type == 'GAP':
+            x = x[-1].mean(1)  # n,vc
         else:
             raise ValueError("Unknown classifier_type")
 
