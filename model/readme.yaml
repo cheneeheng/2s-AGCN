@@ -314,7 +314,11 @@ aagcn_v17:
                   - 90.4%
                   - almost overfit, train acc ~1
         - 220121120001_nopad_3ks_noaug_lowerlr_100div_cossin_64d:
+                  - 90.5%
+                  - almost overfit, train acc ~1
         - 220121120001_nopad_3ks_noaug_lowerlr_100div_cossin_128d:
+                  - 89.7%
+                  - almost overfit, train acc ~1
         - 220118230001_nopad_3ks_noaug_lowerlr_100div_cossin_32d: (0.5dropout)
                   - 88.9%
                   - almost overfit, train acc ~1

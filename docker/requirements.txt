@@ -32,3 +32,5 @@ ipywidgets
 # ipympl
 
 torchinfo
+
+deberta
