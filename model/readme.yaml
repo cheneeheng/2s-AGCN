@@ -578,3 +578,26 @@ aagcn_v26:
                   - 54.1%
         - 220121100001_nopad_3ks_noaug_lowerlr_cossin:
                   - 53.5%
+
+aagcn_v27:
+        - spatial transformer, deberta
+        - 220124163001_nopad_3ks_noaug_lowerlr:
+                  - 62.8%
+        - 220124163001_nopad_3ks_noaug_lowerlre4:
+                  - 2.73%
+                  - did not converge
+        - 220124163001_nopad_3ks_noaug_lowerlre5_adam:
+                  - 6.23%
+                  - did not converge
+
+aagcn_v28:
+        - temporal transformer, deberta
+        - 220124183001_nopad_3ks_noaug_lowerlr:
+                  - 89.7%
+                  - almost overfit
+        - 220124183001_nopad_3ks_noaug_lowerlre4:
+                  - 73.4%
+                  - almost overfit
+        - 220124183001_nopad_3ks_noaug_lowerlre5_adam:
+                  - 77.1%
+                  - almost overfit

@@ -275,6 +275,7 @@ class Model(BaseModel):
                  kernel_size: int = 9,
                  pad: bool = True,
                  need_attn: bool = False,
+                 attn_masking: str = '',
                  s_trans_cfg: Optional[dict] = None,
                  add_A: bool = False,
                  pos_enc: str = 'True',
@@ -342,6 +343,14 @@ class Model(BaseModel):
 
         self.init_fc(s_trans_dim, num_class)
 
+    def forward_preprocess(self, x, size):
+        N, C, T, V, M = size
+        if self.classifier_type == 'CLS_MASK':
+            attn_mask = (x.sum((1, 3, 4)) == 0.0).float()
+            attn_mask = attn_mask[:, ::self.kernel_size]  # windowing
+            self.attn_mask = attn_mask.bool().unsqueeze(-1).detach()  # n,t,1
+        return super().forward_preprocess(x, size)
+
     def forward_postprocess(self, x: torch.Tensor, size: torch.Size):
         N, _, _, V, M = size
         _, C, T, _ = x.size()
@@ -362,6 +371,11 @@ class Model(BaseModel):
         if self.classifier_type == 'CLS':
             s_x = s_x[:, 0, :]  # nt,c
             s_x = s_x.reshape(N, -1, C)  # n,t,c
+            x = s_x.mean(1)  # n,c
+        elif self.classifier_type == 'CLS_MASK':
+            s_x = s_x[:, 0, :]  # nt,c
+            s_x = s_x.reshape(N, -1, C)  # n,t,c
+            s_x = s_x * self.attn_mask
             x = s_x.mean(1)  # n,c
         # elif self.classifier_type == 'GAP':
         #     x = x.mean(1)  # n,vc
