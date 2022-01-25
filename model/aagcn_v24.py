@@ -275,7 +275,6 @@ class Model(BaseModel):
                  kernel_size: int = 9,
                  pad: bool = True,
                  need_attn: bool = False,
-                 attn_masking: str = '',
                  s_trans_cfg: Optional[dict] = None,
                  add_A: bool = False,
                  pos_enc: str = 'True',
@@ -291,6 +290,7 @@ class Model(BaseModel):
         transformer_config_checker(s_trans_cfg)
 
         self.need_attn = need_attn
+        self.kernel_size = kernel_size
 
         # 1. joint graph
         self.init_graph(graph, graph_args)
