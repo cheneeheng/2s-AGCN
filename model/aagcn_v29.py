@@ -2,6 +2,7 @@ import torch
 from torch import nn
 from torchinfo import summary
 
+import copy
 import numpy as np
 import math
 from typing import Optional
@@ -16,7 +17,7 @@ from model.aagcn import BaseModel
 
 
 # ------------------------------------------------------------------------------
-# Modules
+# AAGCN Modules
 # ------------------------------------------------------------------------------
 class TCNUnit(nn.Module):
     def __init__(self,
@@ -96,16 +97,19 @@ class TCNGCNUnit(nn.Module):
 
 
 # ------------------------------------------------------------------------------
-# Blocks
+# Transformer Modules
 # - pre-LN : On Layer Normalization in the Transformer Architecture
 # - https: // pytorch.org/tutorials/beginner/transformer_tutorial.html
 # ------------------------------------------------------------------------------
-class PositionalEncodingBase(nn.Module):
+class PositionalEncoding(nn.Module):
     def __init__(self,
                  d_model: int,
                  dropout: float = 0.0,
                  max_len: int = 601):
         super().__init__()
+        _pe = torch.empty(1, max_len, d_model)
+        nn.init.normal_(_pe, std=0.02)  # bert
+        self.pe = nn.Parameter(_pe)
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -115,30 +119,26 @@ class PositionalEncodingBase(nn.Module):
         return x
 
 
-class PositionalEncoding(PositionalEncodingBase):
+class CosSinPositionalEncoding(nn.Module):
     def __init__(self,
                  d_model: int,
                  dropout: float = 0.0,
                  max_len: int = 601):
-        super().__init__(d_model, dropout, max_len)
-        _pe = torch.empty(1, max_len, d_model)
-        nn.init.normal_(_pe, std=0.02)  # bert
-        self.pe = nn.Parameter(_pe)
-
-
-class CosSinPositionalEncoding(PositionalEncodingBase):
-    def __init__(self,
-                 d_model: int,
-                 dropout: float = 0.0,
-                 max_len: int = 601):
-        super().__init__(d_model, dropout, max_len)
+        super().__init__()
         position = torch.arange(max_len).unsqueeze(1)
         div_term = torch.exp(torch.arange(0, d_model, 2)
-                             * (-math.log(100.0) / d_model))
+                             * (-math.log(10000.0) / d_model))
         pe = torch.zeros(1, max_len, d_model)
         pe[0, :, 0::2] = torch.sin(position * div_term)
         pe[0, :, 1::2] = torch.cos(position * div_term)
         self.register_buffer('pe', pe)
+        self.dropout = nn.Dropout(p=dropout)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x : N, L, C
+        x = x + self.pe[:, :x.size(1), :]
+        x = self.dropout(x)
+        return x
 
 
 class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
@@ -152,17 +152,22 @@ class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
                  activation: str = "relu",
                  layer_norm_eps: float = 1e-5,
                  batch_first: bool = False,
-                 pre_norm: bool = False) -> None:
+                 pre_norm: bool = False,
+                 A: np.ndarray = None) -> None:
         super().__init__(d_model, nhead, dim_feedforward, dropout, activation,
                          layer_norm_eps, batch_first)
         self.pre_norm = pre_norm
+        if A is None:
+            self.PA = None
+        else:
+            self.PA = nn.Parameter(
+                torch.from_numpy(A.astype(np.float32)))  # Bk
 
     def forward(self,
                 src: torch.Tensor,
                 src_mask: Optional[torch.Tensor] = None,
                 src_key_padding_mask: Optional[torch.Tensor] = None
                 ) -> torch.Tensor:
-
         if self.pre_norm:
             src = self.norm1(src)
             src2, attn = self.self_attn(src, src, src, attn_mask=src_mask,
@@ -178,11 +183,30 @@ class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
                                         key_padding_mask=src_key_padding_mask)
             src = src + self.dropout1(src2)
             src = self.norm1(src)
-            src2 = self.linear2(self.dropout(
-                self.activation(self.linear1(src))))
-            src = src + self.dropout2(src2)
+            src1 = self.dropout(self.activation(self.linear1(src)))
+            src2 = self.dropout2(self.linear2(src1))
+            src = src + src2
             src = self.norm2(src)
             return src, attn
+
+
+class TransformerEncoderLayerExtV2(TransformerEncoderLayerExt):
+    """Option for pre of postnorm"""
+
+    def __init__(self,
+                 cfg: dict,
+                 A: np.ndarray = None) -> None:
+        super().__init__(
+            d_model=cfg['model_dim'],
+            nhead=cfg['num_heads'],
+            dim_feedforward=cfg['ffn_dim'],
+            dropout=cfg['dropout'],
+            activation=cfg['activation'],
+            layer_norm_eps=cfg['layer_norm_eps'],
+            batch_first=cfg['batch_first'],
+            pre_norm=cfg['prenorm'],
+            A=A,
+        )
 
 
 class TransformerEncoderExt(nn.TransformerEncoder):
@@ -198,33 +222,40 @@ class TransformerEncoderExt(nn.TransformerEncoder):
                 src_key_padding_mask: Optional[torch.Tensor] = None,
                 ) -> torch.Tensor:
         output = src
-
         attn_list = []
-
         for mod in self.layers:
             output, attn = mod(output, src_mask=mask,
                                src_key_padding_mask=src_key_padding_mask)
             if self.need_attn:
                 attn_list.append(attn)
-
         if self.norm is not None:
             output = self.norm(output)
-
         return output, attn_list
 
 
-def generate_square_subsequent_mask(sz: int, device: str) -> torch.Tensor:
-    """From nn.Transformer"""
-    mask = (torch.triu(torch.ones(sz, sz, device=device)) == 1).transpose(0, 1)
-    mask = mask.float().masked_fill(mask == 0, float(
-        '-inf')).masked_fill(mask == 1, float(0.0))
-    return mask
+def transformer_config_checker(cfg: dict):
+    trans_cfg_names = [
+        'num_heads',
+        'model_dim',
+        'ffn_dim',
+        'dropout',
+        'activation',
+        'prenorm',
+        'batch_first',
+        'layer_norm_eps',
+        'num_layers'
+    ]
+    for x in cfg:
+        assert f'{x}' in trans_cfg_names, f'{x} not in transformer config'
 
 
 # ------------------------------------------------------------------------------
 # Network
 # - uses original transformer
-# - from v13
+# - from v20
+# n,mt,vc => temp trans (v17)
+# nmt,v,c => spatial trans (individual)
+# nt,mv,c => spatial trans (joint+individual)
 # ------------------------------------------------------------------------------
 class Model(BaseModel):
     def __init__(self,
@@ -239,44 +270,33 @@ class Model(BaseModel):
                  adaptive: bool = True,
                  attention: bool = True,
                  gbn_split: Optional[int] = None,
-
-                 data_norm: str = 'bn',
-
                  kernel_size: int = 9,
                  pad: bool = True,
-
                  need_attn: bool = False,
-                 attn_masking: str = 'False',
-
-                 trans_num_heads: int = 2,
-                 trans_model_dim: int = 16,
-                 trans_ffn_dim: int = 64,
-                 trans_dropout: float = 0.2,
-                 trans_activation: str = "gelu",
-                 trans_prenorm: bool = False,
-                 trans_num_layers: int = 1,
-
+                 t_trans_cfg: Optional[dict] = None,
+                 s_trans_cfg: Optional[dict] = None,
+                 add_A: bool = False,
                  pos_enc: str = 'True',
                  classifier_type: str = 'CLS',
-                 model_layers: int = 10):
+                 model_layers: int = 10
+                 ):
 
-        super().__init__(num_class=num_class,
-                         num_point=num_point,
-                         num_person=num_person,
-                         in_channels=in_channels,
-                         drop_out=drop_out,
-                         adaptive=adaptive,
-                         gbn_split=gbn_split,
-                         data_norm=data_norm)
+        super().__init__(num_class, num_point, num_person,
+                         in_channels, drop_out, adaptive, gbn_split)
 
-        attn_masking = str(attn_masking)
-        self.attn_masking = attn_masking
-        self.attn_mask = None
-        self.trans_num_heads = trans_num_heads
-        self.kernel_size = kernel_size
+        t_trans_cfg['layer_norm_eps'] = 1e-5
+        s_trans_cfg['layer_norm_eps'] = 1e-5
+        t_trans_cfg['batch_first'] = True
+        s_trans_cfg['batch_first'] = True
+        transformer_config_checker(t_trans_cfg)
+        transformer_config_checker(s_trans_cfg)
 
+        self.need_attn = need_attn
+
+        # 1. joint graph
         self.init_graph(graph, graph_args)
 
+        # 2. aagcn layer
         def _TCNGCNUnit(_in, _out, stride=1, residual=True):
             return TCNGCNUnit(_in,
                               _out,
@@ -292,89 +312,98 @@ class Model(BaseModel):
 
         self.init_model_backbone(model_layers=model_layers,
                                  tcngcn_unit=_TCNGCNUnit,
-                                 output_channel=trans_model_dim)
+                                 output_channel=t_trans_cfg['model_dim'])
 
-        trans_dim = trans_model_dim*num_point
+        # 3. transformer (temporal)
+        t_trans_dim = t_trans_cfg['model_dim'] * num_point
+        t_trans_cfg['model_dim'] = t_trans_dim
+        t_trans_enc_layer = TransformerEncoderLayerExtV2(cfg=t_trans_cfg)
+        self.t_trans_enc_layers = torch.nn.ModuleList(
+            [copy.deepcopy(t_trans_enc_layer)
+             for _ in range(t_trans_cfg['num_layers'])])
 
         pos_enc = str(pos_enc)
         if pos_enc == 'True' or pos_enc == 'original':
-            self.pos_encoder = PositionalEncoding(trans_dim)
+            self.t_pos_encoder = PositionalEncoding(t_trans_dim)
         elif pos_enc == 'cossin':
-            self.pos_encoder = CosSinPositionalEncoding(trans_dim)
+            self.t_pos_encoder = CosSinPositionalEncoding(t_trans_dim)
         else:
-            self.pos_encoder = lambda x: x
+            self.t_pos_encoder = lambda x: x
 
+        # 4. transformer (spatial)
+        s_trans_dim = s_trans_cfg['model_dim']
+        s_trans_enc_layer = TransformerEncoderLayerExtV2(
+            cfg=s_trans_cfg,
+            A=self.graph.A if add_A else None
+        )
+        self.s_trans_enc_layers = torch.nn.ModuleList(
+            [copy.deepcopy(s_trans_enc_layer)
+             for _ in range(s_trans_cfg['num_layers'])])
+
+        pos_enc = str(pos_enc)
+        if pos_enc == 'True' or pos_enc == 'original':
+            self.s_pos_encoder = PositionalEncoding(
+                s_trans_dim, max_len=100)
+        elif pos_enc == 'cossin':
+            self.s_pos_encoder = CosSinPositionalEncoding(
+                s_trans_dim, max_len=100)
+        else:
+            self.s_pos_encoder = lambda x: x
+
+        # 5. classifier
         self.classifier_type = classifier_type
         if classifier_type == 'CLS':
-            self.cls_token = nn.Parameter(torch.randn(1, 1, trans_dim))
+            self.s_cls_token = nn.Parameter(torch.randn(1, 1, s_trans_dim))
+            self.t_cls_token = nn.Parameter(torch.randn(1, 1, t_trans_dim))
         else:
-            self.cls_token = None
+            self.s_cls_token = None
+            self.t_cls_token = None
 
-        trans_enc_layer = TransformerEncoderLayerExt(
-            d_model=trans_dim,
-            nhead=trans_num_heads,
-            dim_feedforward=trans_ffn_dim*num_point,
-            dropout=trans_dropout,
-            activation=trans_activation,
-            layer_norm_eps=1e-5,
-            batch_first=True,
-            pre_norm=trans_prenorm
-        )
-
-        self.trans_enc = TransformerEncoderExt(
-            trans_enc_layer,
-            num_layers=trans_num_layers,
-            norm=None,
-            need_attn=need_attn
-        )
-
-        self.init_fc(trans_dim, num_class)
-
-    def forward_preprocess(self, x, size):
-        N, C, T, V, M = size
-        if self.attn_masking == 'True' or self.attn_masking == 'frame':
-            zeros = torch.zeros(
-                N, 1,
-                dtype=torch.float,
-                device='cpu' if x.get_device() < 0 else x.get_device()
-            )
-            attn_mask = (x.sum((1, 3)) == 0.0).float()
-            attn_mask = attn_mask[:, ::self.kernel_size, :]  # windowing
-            attn_mask = attn_mask.reshape(N, -1)
-            attn_mask = torch.cat([zeros, attn_mask], -1)
-            self.attn_mask = torch.matmul(attn_mask.unsqueeze(-1),
-                                          attn_mask.unsqueeze(1)).bool()
-            self.attn_mask = self.attn_mask.unsqueeze(1).repeat(
-                1, self.trans_num_heads, 1, 1)
-            self.attn_mask = self.attn_mask.view(
-                N*self.trans_num_heads,
-                T*M//self.kernel_size + 1,
-                T*M//self.kernel_size + 1
-            ).detach()
-        elif self.attn_masking == 'forward':
-            if self.l1.gcn1.agcn.PA.requires_grad:
-                self.attn_mask = generate_square_subsequent_mask(
-                    T*M//self.kernel_size + 1,
-                    device='cpu' if x.get_device() < 0 else x.get_device()
-                )
-        return super().forward_preprocess(x, size)
+        self.init_fc(t_trans_dim//num_point * (1+num_point), num_class)
 
     def forward_postprocess(self, x: torch.Tensor, size: torch.Size):
         N, _, _, V, M = size
         _, C, T, _ = x.size()
-        x = x.view(N, M, C, T, V).permute(0, 1, 3, 4, 2).contiguous()  # n,m,t,v,c  # noqa
-        x = x.view(N, M*T, C*V)  # n,mt,vc
 
-        if self.cls_token is not None:
-            cls_tokens = self.cls_token.repeat(x.size(0), 1, 1)
-            x = torch.cat((cls_tokens, x), dim=1)
-        x = self.pos_encoder(x)
+        s_x = x.view(N, M, C, T, V).permute(0, 3, 1, 4, 2).contiguous()  # n,t,m,v,c  # noqa
+        s_x = s_x.reshape(N*T, M*V, C)  # nt,mv,c
+        if self.s_cls_token is not None:
+            cls_tokens = self.s_cls_token.repeat(N*T, 1, 1)
+            s_x = torch.cat((cls_tokens, s_x), dim=1)
+        s_x = self.s_pos_encoder(s_x)  # nt,mv+1,c
 
-        x, attn = self.trans_enc(x, self.attn_mask)
+        t_x = x.view(N, M, C, T, V).permute(0, 1, 3, 4, 2).contiguous()  # n,m,t,v,c  # noqa
+        t_x = t_x.reshape(N, M*T, V*C)  # n,mt,vc
+        if self.t_cls_token is not None:
+            cls_tokens = self.t_cls_token.repeat(N, 1, 1)
+            t_x = torch.cat((cls_tokens, t_x), dim=1)
+        t_x = self.t_pos_encoder(t_x)  # n,mt+1,vc
+
+        attn = [[], []]
+        for s_layer, t_layer in zip(self.s_trans_enc_layers,
+                                    self.t_trans_enc_layers):
+            s_x, a = s_layer(s_x)
+            if self.need_attn:
+                attn[0].append(a)
+
+            t_x, a = t_layer(t_x)
+            if self.need_attn:
+                attn[1].append(a)
+
+            s_m = s_x[:, 1:, :].view(N, T, M, V, C).permute(0, 2, 1, 3, 4).contiguous()  # noqa
+            t_m = t_x[:, 1:, :].view(N, M, T, V, C)
+            m = s_m + t_m
+            s_x[:, 1:, :] = m.permute(0, 2, 1, 3, 4).contiguous().reshape(N*T, M*V, C)  # noqa
+            t_x[:, 1:, :] = m.reshape(N, M*T, V*C)
+
         if self.classifier_type == 'CLS':
-            x = x[:, 0, :]  # n,vc
-        elif self.classifier_type == 'GAP':
-            x = x.mean(1)  # n,vc
+            s_x = s_x[:, 0, :]  # nt,c
+            s_x = s_x.reshape(N, -1, C)  # n,t,c
+            s_x = s_x.mean(1)
+            t_x = t_x[:, 0, :]  # n,vc
+            x = torch.cat([s_x, t_x], dim=1)  # n,(v+1)c
+        # elif self.classifier_type == 'GAP':
+        #     x = x.mean(1)  # n,vc
         else:
             raise ValueError("Unknown classifier_type")
 
@@ -385,16 +414,39 @@ if __name__ == '__main__':
     graph = 'graph.ntu_rgb_d.Graph'
     model = Model(graph=graph,
                   model_layers=101,
-                  trans_num_layers=3,
+                  t_trans_cfg={
+                      'num_heads': 2,
+                      'model_dim': 16,
+                      'ffn_dim': 64,
+                      'dropout': 0,
+                      'activation': 'gelu',
+                      'prenorm': False,
+                      'num_layers': 3
+                  },
+                  s_trans_cfg={
+                      'num_heads': 2,
+                      'model_dim': 16,
+                      'ffn_dim': 64,
+                      'dropout': 0,
+                      'activation': 'gelu',
+                      'prenorm': False,
+                      'num_layers': 3
+                  },
+                  #   trans_num_layers=3,
+                  #   trans_model_dim=24,
+                  #   trans_ffn_dim=96,
+                  #   trans_num_heads=3,
+                  #   s_trans_num_layers=3,
+                  #   s_trans_model_dim=24,
+                  #   s_trans_ffn_dim=96,
+                  #   s_trans_num_heads=3,
+                  #   add_A=True,
                   kernel_size=3,
                   pad=False,
-                  pos_enc='cossin',
-                  #   attn_masking='forward',
-                  data_norm='ln'
+                  pos_enc='cossin'
                   )
     # print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))
-    x = torch.ones((5, 3, 300, 25, 2))
-    x[:, :, 200:, :, :] = 0.0
-    model(x)
+    print([i[0] for i in model.named_parameters() if 'PA' in i[0]])
+    model(torch.ones((3, 3, 300, 25, 2)))
