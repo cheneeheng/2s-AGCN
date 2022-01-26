@@ -337,6 +337,8 @@ class Model(BaseModel):
                       s_trans_cfg['model_dim']+t_trans_cfg['model_dim']),
         )
 
+        self.alpha = nn.Parameter(torch.zeros(1))
+
         # 3. transformer (temporal)
         t_trans_dim = t_trans_cfg['model_dim'] * num_point
         t_trans_cfg['model_dim'] = t_trans_dim
@@ -411,7 +413,7 @@ class Model(BaseModel):
         attn = [[], []]
         for s_layer, t_layer in zip(self.s_trans_enc_layers,
                                     self.t_trans_enc_layers):
-            s_x, a = s_layer(s_x, s_layer.PA)
+            s_x, a = s_layer(s_x, s_layer.PA * self.alpha)
             if self.need_attn:
                 attn[0].append(a)
 
