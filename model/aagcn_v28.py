@@ -130,7 +130,7 @@ def default_transformer_config():
     config.position_biased_input = False  # whether to add PE to input
     config.attention_head_size = 200
 
-    config.emd = True
+    config.emd = False
 
     return config
 

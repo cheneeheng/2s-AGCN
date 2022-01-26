@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_v28_joint/220124183001_nopad_3ks_noaug_lowerlre5_adam
-model_saved_name: ./data/data/ntu_result/xview/aagcn_v28_joint/220124183001_nopad_3ks_noaug_lowerlre5_adam/ntu_cv_aagcn_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_v28_joint/220126153001_nopad_3ks_noaug_lowerlr_emd
+model_saved_name: ./data/data/ntu_result/xview/aagcn_v28_joint/220126153001_nopad_3ks_noaug_lowerlr_emd/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
@@ -58,14 +58,15 @@ model_args:
     num_attention_heads: 2
     num_hidden_layers: 3
     type_vocab_size: 0
-    vocab_size: -1 # not used
+    vocab_size: 300 # used if emd is True
+    emd: True
     relative_attention: True
     position_buckets: 50 # the relative attn map span
     norm_rel_ebd: "layer_norm" # relative embedding norm
     share_att_key: True # whether to share the proj mat for pos and context attention caöculation.  # noqa
     pos_att_type: "p2c | c2p" # p2p possible also
-    # conv_kernel_size: 3 # whether to use conv in the first layer
-    # conv_act: "gelu"
+    conv_kernel_size: 3 # whether to use conv in the first layer
+    conv_act: "gelu"
     max_relative_positions: -1 # if -1, uses max_position_embeddings
     position_biased_input: False # whether to add PE to input
     attention_head_size: 200
@@ -81,9 +82,9 @@ device: [0, 1]
 batch_size: 64
 test_batch_size: 64
 
-optimizer: Adam
+optimizer: SGD
 nesterov: True
-base_lr: 0.00001
+base_lr: 0.01
 step: [30, 40]
 weight_decay: 0.0001
 
