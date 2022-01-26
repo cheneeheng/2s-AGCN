@@ -612,5 +612,6 @@ aagcn_v28:
 aagcn_v29:
         - from 20, merge FM after S and T transformer in each layer.
         - 220125200001_nopad_3ks_lowerlr_noaug_cossin:
+                  - mean was applied to spatial trans before classifier
                   - 88.7%
                   - almost overfit

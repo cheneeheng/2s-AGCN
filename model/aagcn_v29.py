@@ -26,6 +26,7 @@ class TCNUnit(nn.Module):
                  kernel_size: int = 9,
                  stride: int = 1,
                  pad: bool = True,
+                 relu: bool = False,
                  gbn_split: Optional[int] = None):
         super().__init__()
         padding = (kernel_size - 1) // 2 if pad else 0
@@ -35,6 +36,7 @@ class TCNUnit(nn.Module):
                               padding=(padding, 0),
                               stride=(stride, 1))
         self.bn = batch_norm_2d(out_channels, gbn_split)
+        self.relu = nn.ReLU(inplace=True) if relu else None
         conv_init(self.conv)
         bn_init(self.bn, 1)
 
@@ -42,6 +44,8 @@ class TCNUnit(nn.Module):
         # relu is done after residual.
         x = self.conv(x)
         x = self.bn(x)
+        if self.relu is not None:
+            x = self.relu(x)
         return x
 
 
@@ -272,6 +276,7 @@ class Model(BaseModel):
                  gbn_split: Optional[int] = None,
                  kernel_size: int = 9,
                  pad: bool = True,
+                 backbone_dim: int = 16,
                  need_attn: bool = False,
                  t_trans_cfg: Optional[dict] = None,
                  s_trans_cfg: Optional[dict] = None,
@@ -312,7 +317,25 @@ class Model(BaseModel):
 
         self.init_model_backbone(model_layers=model_layers,
                                  tcngcn_unit=_TCNGCNUnit,
-                                 output_channel=t_trans_cfg['model_dim'])
+                                 output_channel=backbone_dim)
+
+        self.t_proj = TCNUnit(backbone_dim,
+                              t_trans_cfg['model_dim'],
+                              kernel_size=1,
+                              relu=True,
+                              gbn_split=gbn_split)
+        self.s_proj = TCNUnit(backbone_dim,
+                              s_trans_cfg['model_dim'],
+                              kernel_size=1,
+                              relu=True,
+                              gbn_split=gbn_split)
+        self.m_proj = nn.Sequential(
+            nn.Linear(s_trans_cfg['model_dim']+t_trans_cfg['model_dim'],
+                      s_trans_cfg['model_dim']+t_trans_cfg['model_dim']),
+            nn.ReLU(),
+            nn.Linear(s_trans_cfg['model_dim']+t_trans_cfg['model_dim'],
+                      s_trans_cfg['model_dim']+t_trans_cfg['model_dim']),
+        )
 
         # 3. transformer (temporal)
         t_trans_dim = t_trans_cfg['model_dim'] * num_point
@@ -343,10 +366,10 @@ class Model(BaseModel):
         pos_enc = str(pos_enc)
         if pos_enc == 'True' or pos_enc == 'original':
             self.s_pos_encoder = PositionalEncoding(
-                s_trans_dim, max_len=100)
+                s_trans_dim, max_len=300//kernel_size)
         elif pos_enc == 'cossin':
             self.s_pos_encoder = CosSinPositionalEncoding(
-                s_trans_dim, max_len=100)
+                s_trans_dim, max_len=300//kernel_size)
         else:
             self.s_pos_encoder = lambda x: x
 
@@ -359,21 +382,24 @@ class Model(BaseModel):
             self.s_cls_token = None
             self.t_cls_token = None
 
-        self.init_fc(t_trans_dim//num_point * (1+num_point), num_class)
+        self.init_fc(t_trans_dim + (300//kernel_size)*s_trans_dim, num_class)
 
     def forward_postprocess(self, x: torch.Tensor, size: torch.Size):
         N, _, _, V, M = size
-        _, C, T, _ = x.size()
+        _, _, T, _ = x.size()  # nm,c,t,v
 
-        s_x = x.view(N, M, C, T, V).permute(0, 3, 1, 4, 2).contiguous()  # n,t,m,v,c  # noqa
-        s_x = s_x.reshape(N*T, M*V, C)  # nt,mv,c
+        s_x = self.s_proj(x)  # nm,c,t,v
+        t_x = self.t_proj(x)  # nm,c,t,v
+
+        s_x = s_x.view(N, M, -1, T, V).permute(0, 3, 1, 4, 2).contiguous()  # n,t,m,v,c  # noqa
+        s_x = s_x.reshape(N*T, M*V, -1)  # nt,mv,c
         if self.s_cls_token is not None:
             cls_tokens = self.s_cls_token.repeat(N*T, 1, 1)
             s_x = torch.cat((cls_tokens, s_x), dim=1)
         s_x = self.s_pos_encoder(s_x)  # nt,mv+1,c
 
-        t_x = x.view(N, M, C, T, V).permute(0, 1, 3, 4, 2).contiguous()  # n,m,t,v,c  # noqa
-        t_x = t_x.reshape(N, M*T, V*C)  # n,mt,vc
+        t_x = t_x.view(N, M, -1, T, V).permute(0, 1, 3, 4, 2).contiguous()  # n,m,t,v,c  # noqa
+        t_x = t_x.reshape(N, M*T, -1)  # n,mt,vc
         if self.t_cls_token is not None:
             cls_tokens = self.t_cls_token.repeat(N, 1, 1)
             t_x = torch.cat((cls_tokens, t_x), dim=1)
@@ -390,18 +416,20 @@ class Model(BaseModel):
             if self.need_attn:
                 attn[1].append(a)
 
-            s_m = s_x[:, 1:, :].view(N, T, M, V, C).permute(0, 2, 1, 3, 4).contiguous()  # noqa
-            t_m = t_x[:, 1:, :].view(N, M, T, V, C)
-            m = s_m + t_m
-            s_x[:, 1:, :] = m.permute(0, 2, 1, 3, 4).contiguous().reshape(N*T, M*V, C)  # noqa
-            t_x[:, 1:, :] = m.reshape(N, M*T, V*C)
+            s_m = s_x[:, 1:, :].view(N, T, M, V, -1).permute(0, 2, 1, 3, 4).contiguous()  # noqa
+            t_m = t_x[:, 1:, :].view(N, M, T, V, -1)
+            m = self.m_proj(torch.cat([s_m, t_m], dim=-1))  # n,m,t,v,c'
+            s_x[:, 1:, :] = m[:, :, :, :, :s_m.size(-1)].permute(0, 2, 1, 3, 4).contiguous().reshape(N*T, M*V, -1)  # noqa
+            t_x[:, 1:, :] = m[:, :, :, :, s_m.size(-1):].reshape(N, M*T, -1)
+            # m = s_m + t_m
+            # s_x[:, 1:, :] = m.permute(0, 2, 1, 3, 4).contiguous().reshape(N*T, M*V, -1)  # noqa
+            # t_x[:, 1:, :] = m.reshape(N, M*T, -1)
 
         if self.classifier_type == 'CLS':
             s_x = s_x[:, 0, :]  # nt,c
-            s_x = s_x.reshape(N, -1, C)  # n,t,c
-            s_x = s_x.mean(1)
+            s_x = s_x.reshape(N, -1)  # n,tc
             t_x = t_x[:, 0, :]  # n,vc
-            x = torch.cat([s_x, t_x], dim=1)  # n,(v+1)c
+            x = torch.cat([s_x, t_x], dim=1)  # n,vc+tc
         # elif self.classifier_type == 'GAP':
         #     x = x.mean(1)  # n,vc
         else:
@@ -426,7 +454,7 @@ if __name__ == '__main__':
                   s_trans_cfg={
                       'num_heads': 2,
                       'model_dim': 16,
-                      'ffn_dim': 64,
+                      'ffn_dim': 512,
                       'dropout': 0,
                       'activation': 'gelu',
                       'prenorm': False,
