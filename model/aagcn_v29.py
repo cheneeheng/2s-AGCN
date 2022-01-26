@@ -354,10 +354,13 @@ class Model(BaseModel):
             self.t_pos_encoder = lambda x: x
 
         # 4. transformer (spatial)
+        A = np.ones((51, 51))
+        A[1:26, 1:26] = self.graph.A[0, :, :]
+        A[26:, 26:] = self.graph.A[0, :, :]
         s_trans_dim = s_trans_cfg['model_dim']
         s_trans_enc_layer = TransformerEncoderLayerExtV2(
             cfg=s_trans_cfg,
-            A=self.graph.A if add_A else None
+            A=A if add_A else None
         )
         self.s_trans_enc_layers = torch.nn.ModuleList(
             [copy.deepcopy(s_trans_enc_layer)
@@ -408,7 +411,7 @@ class Model(BaseModel):
         attn = [[], []]
         for s_layer, t_layer in zip(self.s_trans_enc_layers,
                                     self.t_trans_enc_layers):
-            s_x, a = s_layer(s_x)
+            s_x, a = s_layer(s_x, s_layer.PA)
             if self.need_attn:
                 attn[0].append(a)
 
@@ -471,7 +474,8 @@ if __name__ == '__main__':
                   #   add_A=True,
                   kernel_size=3,
                   pad=False,
-                  pos_enc='cossin'
+                  pos_enc='cossin',
+                  add_A=True
                   )
     # print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
