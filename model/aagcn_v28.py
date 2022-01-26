@@ -222,7 +222,8 @@ class DeBERTa(torch.nn.Module):
             token_type_ids = torch.zeros_like(input_ids[:, :, 0])
 
         if self.emd:
-            embedding_ids = torch.arange(L).unsqueeze(0).repeat(N, 1)
+            device = 'cpu' if input_ids.get_device() < 0 else input_ids.get_device()  # noqa
+            embedding_ids = torch.arange(L, device=device).unsqueeze(0).repeat(N, 1)  # noqa
             embedding_output = self.embeddings(
                 embedding_ids.to(torch.long),
                 token_type_ids.to(torch.long),

@@ -354,9 +354,10 @@ aagcn_v17:
                   - masking starts after warmup epochs.
                   - goes up during warmup epochs and decreases afterwards.
                   - 24.4%
-                  - almost overfit, train acc ~1
         - 220125120001_nopad_3ks_noaug_lowerlr_100div_cossin_forward:
                   - uses forward masking in last layer.
+                  - 89.1%
+                  - almost overfit, train acc ~1
         # NO RELU IN TCNGCN UNIT -----------------------------------------
         - 220117110001_nopad_3ks_noaug_lowerlr_notcngcnrelu:
                   - no relu after tcngcn unit.
