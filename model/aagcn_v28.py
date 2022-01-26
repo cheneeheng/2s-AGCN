@@ -115,7 +115,7 @@ def default_transformer_config():
     config.num_attention_heads = 2
     config.num_hidden_layers = 3
     config.type_vocab_size = 0
-    config.vocab_size = -1  # not used
+    config.vocab_size = 300  # used if emd is True
 
     config.relative_attention = True
     config.position_buckets = 25  # the relative attn map span
@@ -129,6 +129,8 @@ def default_transformer_config():
     config.max_relative_positions = -1  # if -1, uses max_position_embeddings
     config.position_biased_input = False  # whether to add PE to input
     config.attention_head_size = 200
+
+    config.emd = True
 
     return config
 
@@ -168,7 +170,8 @@ def transformer_config_checker(cfg: dict):
         'conv_act',
         'max_relative_positions',
         'position_biased_input',
-        'attention_head_size'
+        'attention_head_size',
+        'emd'
     ]
     for x in cfg.__dict__.keys():
         assert f'{x}' in trans_cfg_names, f'{x} not in transformer config'
@@ -191,12 +194,13 @@ class DeBERTa(torch.nn.Module):
         #                      'max_position_embeddings']:
         #             model_config.__dict__[k] = config.__dict__[k]
         #     config = copy.copy(model_config)
-        # self.embeddings = BertEmbeddings(config)
+        self.embeddings = deberta.BertEmbeddings(config)
         # attn -> linear residual -> linear -> linear residual
         self.encoder = deberta.BertEncoder(config)
         self.config = config
         self.pre_trained = pre_trained
         self.apply_state(state)
+        self.emd = getattr(config, 'emd', False)
 
     def forward(self,
                 input_ids,
@@ -210,26 +214,53 @@ class DeBERTa(torch.nn.Module):
         attention_mask masks the attention map.
         token_type_ids used to label segments.
         """
+        N, L, C = input_ids.shape
 
         if attention_mask is None:
             attention_mask = torch.ones_like(input_ids[:, :, 0])
         if token_type_ids is None:
             token_type_ids = torch.zeros_like(input_ids[:, :, 0])
 
-        # embedding_output = self.embeddings(
-        #     input_ids.to(torch.long),
-        #     token_type_ids.to(torch.long),
-        #     position_ids,
-        #     attention_mask
-        # )
+        if self.emd:
+            embedding_ids = torch.arange(L).unsqueeze(0).repeat(N, 1)
+            embedding_output = self.embeddings(
+                embedding_ids.to(torch.long),
+                token_type_ids.to(torch.long),
+                position_ids,
+                attention_mask
+            )
+
         encoded_layers = self.encoder(
             input_ids,
             attention_mask,
-            output_all_encoded_layers=output_all_encoded_layers,
+            output_all_encoded_layers=True,
             return_att=return_att
         )
+
         if return_att:
             encoded_layers, att_matrixs = encoded_layers
+
+        if self.emd:
+            layers = [self.encoder.layer[-1] for _ in range(2)]
+            hidden_states = encoded_layers[-2]
+            query_mask = self.get_attention_mask(attention_mask)
+            z_states = embedding_output
+            z_states += hidden_states
+            query_states = z_states
+            rel_embeddings = self.encoder.get_rel_embedding()
+            for layer in layers:
+                # TODO: pass relative pos ids
+                output_states = layer(hidden_states,
+                                      query_mask,
+                                      return_att=return_att,
+                                      query_states=query_states,
+                                      relative_pos=None,
+                                      rel_embeddings=rel_embeddings)
+                if return_att:
+                    output_states, att_m = output_states
+                    att_matrixs.append(att_m)
+                query_states = output_states
+                encoded_layers.append(query_states)
 
         if not output_all_encoded_layers:
             encoded_layers = encoded_layers[-1:]
@@ -253,6 +284,16 @@ class DeBERTa(torch.nn.Module):
         for c in current.keys():
             current[c] = state[key_match(c, state.keys())]
         self.load_state_dict(current)
+
+    def get_attention_mask(self, attention_mask):
+        if attention_mask.dim() <= 2:
+            extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
+            attention_mask = extended_attention_mask * \
+                extended_attention_mask.squeeze(-2).unsqueeze(-1)
+            attention_mask = attention_mask.byte()
+        elif attention_mask.dim() == 3:
+            attention_mask = attention_mask.unsqueeze(1)
+        return attention_mask
 
 
 # ------------------------------------------------------------------------------
@@ -377,7 +418,7 @@ if __name__ == '__main__':
                   pad=False,
                   pos_enc='cossin'
                   )
-    print(model)
+    # print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))
     print([i[0] for i in model.named_parameters() if 'PA' in i[0]])
