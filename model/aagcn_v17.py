@@ -2,6 +2,7 @@ import torch
 from torch import nn
 from torchinfo import summary
 
+import copy
 import numpy as np
 import math
 from typing import Optional
@@ -274,6 +275,7 @@ class Model(BaseModel):
         self.attn_mask = None
         self.trans_num_heads = trans_num_heads
         self.kernel_size = kernel_size
+        self.need_attn = need_attn
 
         self.init_graph(graph, graph_args)
 
@@ -321,12 +323,15 @@ class Model(BaseModel):
             pre_norm=trans_prenorm
         )
 
-        self.trans_enc = TransformerEncoderExt(
-            trans_enc_layer,
-            num_layers=trans_num_layers,
-            norm=None,
-            need_attn=need_attn
-        )
+        # self.trans_enc = TransformerEncoderExt(
+        #     trans_enc_layer,
+        #     num_layers=trans_num_layers,
+        #     norm=None,
+        #     need_attn=need_attn
+        # )
+
+        self.trans_enc = torch.nn.ModuleList(
+            [copy.deepcopy(trans_enc_layer) for _ in range(trans_num_layers)])
 
         self.init_fc(trans_dim, num_class)
 
@@ -370,7 +375,16 @@ class Model(BaseModel):
             x = torch.cat((cls_tokens, x), dim=1)
         x = self.pos_encoder(x)
 
-        x, attn = self.trans_enc(x, self.attn_mask)
+        # x, attn = self.trans_enc(x, self.attn_mask)
+        attn = []
+        for i, layer in enumerate(self.trans_enc):
+            if i == len(self.trans_enc)-1:
+                x, a = layer(x, self.attn_mask)
+            else:
+                x, a = layer(x)
+            if self.need_attn:
+                attn.append(a)
+
         if self.classifier_type == 'CLS':
             x = x[:, 0, :]  # n,vc
         elif self.classifier_type == 'GAP':
@@ -389,7 +403,7 @@ if __name__ == '__main__':
                   kernel_size=3,
                   pad=False,
                   pos_enc='cossin',
-                  #   attn_masking='forward',
+                  attn_masking='forward',
                   data_norm='ln'
                   )
     # print(model)

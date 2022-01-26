@@ -375,9 +375,11 @@ class Model(BaseModel):
         elif self.classifier_type == 'CLS_MASK':
             s_x = s_x[:, 0, :]  # nt,c
             s_x = s_x.reshape(N, -1, C)  # n,t,c
+            # x = torch.masked_select(s_x, self.attn_mask)  # nt'c
+            # s_x = s_x * self.attn_mask  # n,t,c
+            # x = s_x.sum(1) / self.attn_mask.sum(1)  # n,c
             s_x = s_x * self.attn_mask  # n,t,c
-            s_x = s_x.sum(1) / self.attn_mask.sum(1)  # n,c
-            # x = s_x.mean(1)  # n,c
+            x = s_x.mean(1)  # n,c
         # elif self.classifier_type == 'GAP':
         #     x = x.mean(1)  # n,vc
         else:
@@ -389,7 +391,7 @@ class Model(BaseModel):
 if __name__ == '__main__':
     graph = 'graph.ntu_rgb_d.Graph'
     model = Model(graph=graph,
-                  model_layers=102,
+                  model_layers=101,
                   s_trans_cfg={
                       'num_heads': 2,
                       'model_dim': 16,
@@ -401,7 +403,8 @@ if __name__ == '__main__':
                   },
                   kernel_size=3,
                   pad=False,
-                  pos_enc='cossin'
+                  pos_enc='cossin',
+                  classifier_type='CLS_MASK'
                   )
     # print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
