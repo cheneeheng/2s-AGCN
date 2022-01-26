@@ -16,6 +16,10 @@ from collections import OrderedDict
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
+from sam.sam.sam import SAM
+from sam.sam.example.utility.bypass_bn import enable_running_stats
+from sam.sam.example.utility.bypass_bn import disable_running_stats
+
 from main_utils import *
 
 
@@ -131,12 +135,12 @@ class Processor():
         else:
             raise ValueError()
 
-        lr_scheduler_post = optim.lr_scheduler.MultiStepLR(
-            self.optimizer, milestones=self.arg.step, gamma=0.1)
-        self.lr_scheduler = GradualWarmupScheduler(
-            self.optimizer,
-            total_epoch=self.arg.warm_up_epoch,
-            after_scheduler=lr_scheduler_post)
+        # lr_scheduler_post = optim.lr_scheduler.MultiStepLR(
+        #     self.optimizer, milestones=self.arg.step, gamma=0.1)
+        # self.lr_scheduler = GradualWarmupScheduler(
+        #     self.optimizer,
+        #     total_epoch=self.arg.warm_up_epoch,
+        #     after_scheduler=lr_scheduler_post)
 
         self.print_log(f'using warm up, epoch: {self.arg.warm_up_epoch}')
 
@@ -162,7 +166,8 @@ class Processor():
             worker_init_fn=init_seed)
 
     def adjust_learning_rate(self, epoch):
-        if self.arg.optimizer == 'SGD' or self.arg.optimizer == 'Adam':
+        opts = ['SGD', 'SAM_SGD', 'Adam']
+        if self.arg.optimizer in opts:
             if epoch < self.arg.warm_up_epoch:
                 lr = self.arg.base_lr * (epoch + 1) / self.arg.warm_up_epoch
             else:
@@ -228,21 +233,49 @@ class Processor():
             label = label.long().cuda(self.output_device)
             timer['dataloader'] += self.split_time()
 
-            # forward
-            output, _ = self.model(data)
-            # if batch_idx == 0 and epoch == 0:
-            #     self.train_writer.add_graph(self.model, output)
-            if isinstance(output, tuple):
-                output, l1 = output
-                l1 = l1.mean()
-            else:
-                l1 = 0
-            loss = self.loss(output, label) + l1
+            if self.arg.optimizer == 'SAM_SGD':
+                # 1. first forward-backward pass
+                enable_running_stats(self.model)
+                output, _ = self.model(data)
+                if isinstance(output, tuple):
+                    output, l1 = output
+                    l1 = l1.mean()
+                else:
+                    l1 = 0
+                loss = self.loss(output, label) + l1
+                with self.model.no_sync():
+                    loss.backward()
+                self.optimizer.first_step(zero_grad=True)
+                # 2. second forward-backward pass
+                # make sure to do a full forward pass
+                disable_running_stats(self.model)
+                output, _ = self.model(data)
+                if isinstance(output, tuple):
+                    output, l1 = output
+                    l1 = l1.mean()
+                else:
+                    l1 = 0
+                loss = self.loss(output, label) + l1
+                loss.backward()
+                self.optimizer.second_step(zero_grad=True)
 
-            # backward
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
+            else:
+                # forward
+                output, _ = self.model(data)
+                # if batch_idx == 0 and epoch == 0:
+                #     self.train_writer.add_graph(self.model, output)
+                if isinstance(output, tuple):
+                    output, l1 = output
+                    l1 = l1.mean()
+                else:
+                    l1 = 0
+                loss = self.loss(output, label) + l1
+
+                # backward
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()
+
             loss_value.append(loss.data.item())
             timer['model'] += self.split_time()
 

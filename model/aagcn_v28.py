@@ -107,9 +107,9 @@ def default_transformer_config():
     config.attention_probs_dropout_prob = 0.2
     config.hidden_act = "gelu"
     config.hidden_dropout_prob = 0.2
-    config.hidden_size = 16
+    config.hidden_size = 128
     config.initializer_range = 0.02
-    config.intermediate_size = 64
+    config.intermediate_size = 512
     config.max_position_embeddings = 201
     config.layer_norm_eps = 1e-7
     config.num_attention_heads = 2
@@ -182,6 +182,7 @@ class DeBERTa(torch.nn.Module):
     def __init__(self, config=None, pre_trained=None):
         super().__init__()
         state = None
+        self.emd = getattr(config, 'emd', False)
         # if pre_trained is not None:
         #     state, model_config = load_model_state(pre_trained)
         #     if config is not None and model_config is not None:
@@ -194,13 +195,13 @@ class DeBERTa(torch.nn.Module):
         #                      'max_position_embeddings']:
         #             model_config.__dict__[k] = config.__dict__[k]
         #     config = copy.copy(model_config)
-        self.embeddings = deberta.BertEmbeddings(config)
+        if self.emd:
+            self.embeddings = deberta.BertEmbeddings(config)
         # attn -> linear residual -> linear -> linear residual
         self.encoder = deberta.BertEncoder(config)
         self.config = config
         self.pre_trained = pre_trained
         self.apply_state(state)
-        self.emd = getattr(config, 'emd', False)
 
     def forward(self,
                 input_ids,
