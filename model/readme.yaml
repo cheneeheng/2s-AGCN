@@ -611,6 +611,9 @@ aagcn_v28:
         - 220124183001_nopad_3ks_noaug_lowerlre5_adam:
                   - 77.1%
                   - almost overfit
+        - 220126153001_nopad_3ks_noaug_lowerlr_emd:
+                  - 89.2%
+                  - almost overfit
 
 aagcn_v29:
         - from 20, merge FM after S and T transformer in each layer.
@@ -621,4 +624,13 @@ aagcn_v29:
         - 220126110001_nopad_3ks_lowerlr_noaug_cossin:
                   - concat features from both trans before classifier
                   - 87.9%
+                  - almost overfit
+        - 220126110001_nopad_3ks_lowerlr_noaug_cossin_16_128:
+                  - concat features from both trans before classifier
+                  - 88.0%
+                  - almost overfit
+        - 220126110001_nopad_3ks_lowerlr_noaug_cossin_PA:
+                  - concat features from both trans before classifier
+                  - PA for spatial trans
+                  - 87.8%
                   - almost overfit

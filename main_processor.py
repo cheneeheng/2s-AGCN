@@ -116,16 +116,16 @@ class Processor():
 
         if type(self.arg.device) is list:
             if len(self.arg.device) > 1:
-                torch.distributed.init_process_group(
-                    backend='nccl', world_size=len(self.arg.device))
-                self.model = nn.parallel.DistributedDataParallel(
-                    self.model,
-                    device_ids=self.arg.device,
-                    output_device=output_device)
-                # self.model = nn.DataParallel(
+                # torch.distributed.init_process_group(
+                #     backend='nccl', world_size=len(self.arg.device))
+                # self.model = nn.parallel.DistributedDataParallel(
                 #     self.model,
                 #     device_ids=self.arg.device,
                 #     output_device=output_device)
+                self.model = nn.DataParallel(
+                    self.model,
+                    device_ids=self.arg.device,
+                    output_device=output_device)
 
     def load_optimizer(self):
         if self.arg.optimizer == 'SGD':
