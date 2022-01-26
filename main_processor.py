@@ -132,6 +132,13 @@ class Processor():
             self.optimizer = optim.Adam(self.model.parameters(),
                                         lr=self.arg.base_lr,
                                         weight_decay=self.arg.weight_decay)
+        elif self.arg.optimizer == 'SAM_SGD':
+            self.optimizer = SAM(params=self.model.parameters(),
+                                 base_optimizer=optim.SGD,
+                                 lr=self.arg.base_lr,
+                                 momentum=0.9,
+                                 nesterov=self.arg.nesterov,
+                                 weight_decay=self.arg.weight_decay)
         else:
             raise ValueError()
 
