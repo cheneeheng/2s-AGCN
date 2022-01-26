@@ -563,6 +563,13 @@ aagcn_v24:
                   - 80.3%
                   - almost overfit
 
+        - 220125170001_nopad_3ks_noaug_lowerlr_cossin_16d:
+                  - cls masking
+                  - 60.9%
+        - 220125170001_nopad_3ks_noaug_lowerlr_cossin_128d:
+                  - cls masking
+                  - 71.7%
+
 aagcn_v25:
         - only temporal transformer with tcn proj
         - 220121103001_nopad_3ks_noaug_lowerlr:
@@ -600,4 +607,10 @@ aagcn_v28:
                   - almost overfit
         - 220124183001_nopad_3ks_noaug_lowerlre5_adam:
                   - 77.1%
+                  - almost overfit
+
+aagcn_v29:
+        - from 20, merge FM after S and T transformer in each layer.
+        - 220125200001_nopad_3ks_lowerlr_noaug_cossin:
+                  - 88.7%
                   - almost overfit
