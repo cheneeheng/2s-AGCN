@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_v27_joint/220124163001_nopad_3ks_noaug_lowerlr
-model_saved_name: ./data/data/ntu_result/xview/aagcn_v27_joint/220124163001_nopad_3ks_noaug_lowerlr/ntu_cv_aagcn_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_v27_joint/220124163001_nopad_3ks_noaug_lowerlre5_adam
+model_saved_name: ./data/data/ntu_result/xview/aagcn_v27_joint/220124163001_nopad_3ks_noaug_lowerlre5_adam/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
@@ -54,7 +54,7 @@ model_args:
     initializer_range: 0.02
     intermediate_size: 64
     max_position_embeddings: 51
-    layer_norm_eps: 1e-7
+    layer_norm_eps: 0.0000001
     num_attention_heads: 2
     num_hidden_layers: 3
     type_vocab_size: 0
@@ -62,7 +62,7 @@ model_args:
     relative_attention: True
     position_buckets: 25 # the relative attn map span
     norm_rel_ebd: "layer_norm" # relative embedding norm
-    share_att_key: True # whether to share the proj mat for pos and context attention caöculation.  # noqa
+    share_att_key: False # whether to share the proj mat for pos and context attention caöculation.  # noqa
     pos_att_type: "p2c | c2p" # p2p possible also
     # conv_kernel_size: 3 # whether to use conv in the first layer
     # conv_act: "gelu"
@@ -81,9 +81,9 @@ device: [0, 1]
 batch_size: 64
 test_batch_size: 64
 
-optimizer: SGD
+optimizer: Adam
 nesterov: True
-base_lr: 0.01
+base_lr: 0.00001
 step: [30, 40]
 weight_decay: 0.0001
 

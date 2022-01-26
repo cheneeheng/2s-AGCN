@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_v25_joint/220121103001_nopad_3ks_noaug_lowerlr
-model_saved_name: ./data/data/ntu_result/xview/aagcn_v25_joint/220121103001_nopad_3ks_noaug_lowerlr/ntu_cv_aagcn_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_v25_joint/220121103001_nopad_3ks_noaug_lowerlr_cossin
+model_saved_name: ./data/data/ntu_result/xview/aagcn_v25_joint/220121103001_nopad_3ks_noaug_lowerlr_cossin/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
@@ -52,7 +52,7 @@ model_args:
   trans_dropout: 0.2
   trans_activation: gelu
   trans_num_layers: 3
-  pos_enc: True
+  pos_enc: cossin
   classifier_type: CLS
   model_layers: 101
   attn_masking: False

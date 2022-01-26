@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_v28_joint/220124183001_nopad_3ks_noaug_lowerlr
-model_saved_name: ./data/data/ntu_result/xview/aagcn_v28_joint/220124183001_nopad_3ks_noaug_lowerlr/ntu_cv_aagcn_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_v28_joint/220124183001_nopad_3ks_noaug_lowerlre5_adam
+model_saved_name: ./data/data/ntu_result/xview/aagcn_v28_joint/220124183001_nopad_3ks_noaug_lowerlre5_adam/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
@@ -81,9 +81,9 @@ device: [0, 1]
 batch_size: 64
 test_batch_size: 64
 
-optimizer: SGD
+optimizer: Adam
 nesterov: True
-base_lr: 0.01
+base_lr: 0.00001
 step: [30, 40]
 weight_decay: 0.0001
 
