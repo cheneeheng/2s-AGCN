@@ -384,7 +384,7 @@ class Processor():
                 zip(self.data_loader[ln].dataset.sample_name, score))
             self.print_log(f'\tMean {ln} '
                            f'loss of {len(self.data_loader[ln])} '
-                           f'batches: {np.mean(loss_value)}')
+                           f'batches: {np.mean(loss_value):.4f}')
             for k in self.arg.show_topk:
                 top_k = 100 * self.data_loader[ln].dataset.top_k(score, k)
                 self.print_log(f'\tTop{k}: {top_k:.2f}%')
