@@ -92,6 +92,10 @@ def get_parser():
         type=str2bool,
         default=False,
         help='if ture, the classification score will be stored')
+    parser.add_argument(
+        '--dist',
+        type=str2bool,
+        default=False)
 
     # visulize and debug
     parser.add_argument(
