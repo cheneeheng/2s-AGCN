@@ -70,6 +70,8 @@ class Processor():
             yaml.dump(arg_dict, f)
 
     def load_model(self):
+        torch.distributed.init_process_group(
+            backend='nccl-', init_method='env://')
         output_device = self.arg.device[0] if type(
             self.arg.device) is list else self.arg.device
         self.output_device = output_device
@@ -118,14 +120,14 @@ class Processor():
             if len(self.arg.device) > 1:
                 # torch.distributed.init_process_group(
                 #     backend='nccl', world_size=len(self.arg.device))
-                # self.model = nn.parallel.DistributedDataParallel(
-                #     self.model,
-                #     device_ids=self.arg.device,
-                #     output_device=output_device)
-                self.model = nn.DataParallel(
+                self.model = nn.parallel.DistributedDataParallel(
                     self.model,
                     device_ids=self.arg.device,
                     output_device=output_device)
+                # self.model = nn.DataParallel(
+                #     self.model,
+                #     device_ids=self.arg.device,
+                #     output_device=output_device)
 
     def load_optimizer(self):
         if self.arg.optimizer == 'SGD':
@@ -163,17 +165,33 @@ class Processor():
         if self.arg.phase == 'train':
             assert os.path.exists(self.arg.train_feeder_args['data_path'])
             assert os.path.exists(self.arg.train_feeder_args['label_path'])
-            self.data_loader['train'] = torch.utils.data.DataLoader(
-                dataset=Feeder(**self.arg.train_feeder_args),
-                batch_size=self.arg.batch_size,
+            dataset = Feeder(**self.arg.train_feeder_args)
+            self.sampler = torch.utils.data.distributed.DistributedSampler(
+                dataset=dataset,
                 shuffle=True,
+                seed=self.arg.seed,
+                drop_last=True,
+            )
+            self.data_loader['train'] = torch.utils.data.DataLoader(
+                dataset=dataset,
+                sampler=self.sampler,
+                batch_size=self.arg.batch_size,
+                # shuffle=True,
                 num_workers=self.arg.num_worker,
                 drop_last=True,
                 worker_init_fn=init_seed)
-        self.data_loader['test'] = torch.utils.data.DataLoader(
-            dataset=Feeder(**self.arg.test_feeder_args),
-            batch_size=self.arg.test_batch_size,
+        dataset = Feeder(**self.arg.test_feeder_args)
+        self.sampler = torch.utils.data.distributed.DistributedSampler(
+            dataset=dataset,
             shuffle=False,
+            seed=self.arg.seed,
+            drop_last=False,
+        )
+        self.data_loader['test'] = torch.utils.data.DataLoader(
+            dataset=dataset,
+            sampler=self.sampler,
+            batch_size=self.arg.test_batch_size,
+            # shuffle=False,
             num_workers=self.arg.num_worker,
             drop_last=False,
             worker_init_fn=init_seed)
@@ -404,6 +422,7 @@ class Processor():
                 save_model = \
                     ((epoch + 1) % self.arg.save_interval == 0) or \
                     ((epoch + 1) == self.arg.num_epoch)
+                self.sampler.set_epoch(epoch)
                 self.train(epoch, save_model=save_model)
                 self.eval(epoch, save_score=self.arg.save_score,
                           loader_name=['test'])
@@ -425,3 +444,7 @@ class Processor():
             self.eval(epoch=0, save_score=self.arg.save_score,
                       loader_name=['test'], wrong_file=wf, result_file=rf)
             self.print_log('Done.\n')
+
+    def end(self):
+        # Tear down the process group
+        torch.distributed.destroy_process_group()
