@@ -306,6 +306,12 @@ aagcn_v17:
         - 220111210001_nopad_3ks_cossin_100div_lowerlr:
                   - 87.5%
                   - overfit, train acc ~1
+        - 220125120001_nopad_3ks_lowerlr_100div_cossin_rerun_randommoveshift:
+                  - 89.5%
+                  - almost overfit, train acc ~1
+        - ...: # 220125120001_nopad_3ks_lowerlr_100div_cossin_rerun_randommoveshift_drop_out:
+                  - 89.5%
+                  - almost overfit, train acc ~1
         - 220111210001_nopad_3ks_cossin_100div_noaug_lowerlr: #####
                   - 90.5%
                   - overfit, train acc ~1
@@ -371,14 +377,18 @@ aagcn_v17:
                   - no relu after tcngcn unit.
                   - 88.6%
                   - almost overfit, train acc ~1
-        # ADAM
+        # SAM ---------------------------------------------------------------
+        - 220125120001_nopad_3ks_noaug_lowerlr_100div_cossin_sam:
+                  - 90.5%
+                  - almost overfit, train acc ~1
+        # ADAM ---------------------------------------------------------------
         - 220118160001_nopad_3ks_noaug_lowerlr_100div_cossin_adam:
                   - 52.9%
-        # LN for data_norm
+        # LN for data_norm -------------------------------------------------
         - 220118160001_nopad_3ks_noaug_lowerlr_100div_cossin_ln:
                   - 89.2%
                   - almost overfit, train acc ~1
-        # DROPOUT
+        # DROPOUT ----------------------------------------------------
         - 220112190001_nopad_3ks_noaug_lowerlr_dropout05:
                   - 86.2%
                   - almost overfit, train acc ~1
@@ -614,6 +624,9 @@ aagcn_v28:
         - 220126153001_nopad_3ks_noaug_lowerlr_emd:
                   - 89.2%
                   - almost overfit
+        - 220126153001_nopad_3ks_noaug_lowerlr_emd_128d:
+                  - 90.0%
+                  - almost overfit
 
 aagcn_v29:
         - from 20, merge FM after S and T transformer in each layer.
@@ -633,4 +646,9 @@ aagcn_v29:
                   - concat features from both trans before classifier
                   - PA for spatial trans
                   - 87.8%
+                  - almost overfit
+        - 220126110001_nopad_3ks_lowerlr_noaug_cossin_PAa:
+                  - concat features from both trans before classifier
+                  - PA for spatial trans wit gate variable.
+                  - 88.0%
                   - almost overfit
