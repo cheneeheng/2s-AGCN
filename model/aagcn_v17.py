@@ -362,6 +362,12 @@ class Model(BaseModel):
                     T*M//self.kernel_size + 1,
                     device='cpu' if x.get_device() < 0 else x.get_device()
                 )
+        elif self.attn_masking == 'backward':
+            if self.l1.gcn1.agcn.PA.requires_grad:
+                self.attn_mask = generate_square_subsequent_mask(
+                    T*M//self.kernel_size + 1,
+                    device='cpu' if x.get_device() < 0 else x.get_device()
+                ).transpose(0, 1)
         return super().forward_preprocess(x, size)
 
     def forward_postprocess(self, x: torch.Tensor, size: torch.Size):
@@ -403,7 +409,7 @@ if __name__ == '__main__':
                   kernel_size=3,
                   pad=False,
                   pos_enc='cossin',
-                  attn_masking='forward',
+                  attn_masking='backward',
                   data_norm='ln'
                   )
     # print(model)
