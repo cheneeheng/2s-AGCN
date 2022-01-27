@@ -318,9 +318,12 @@ class Model(BaseModel):
 
         # 4. transformer (spatial)
         s_trans_dim = s_trans_cfg['model_dim']
-        A = np.ones((50, 50))
-        A[:25, :25] = self.graph.A[0, :, :]
-        A[25:, 25:] = self.graph.A[0, :, :]
+        A = np.ones((3, 50, 50))
+        A[:, :25, :25] = self.graph.A
+        A[:, 25:, 25:] = self.graph.A
+        # A = np.ones((50, 50))
+        # A[:25, :25] = self.graph.A[0, :, :]
+        # A[25:, 25:] = self.graph.A[0, :, :]
         s_trans_enc_layer = TransformerEncoderLayerExtV2(
             cfg=s_trans_cfg,
             A=A if add_A else None
@@ -372,7 +375,9 @@ class Model(BaseModel):
             if s_layer.PA is None:
                 s_x, a = s_layer(s_x)
             else:
-                s_x, a = s_layer(s_x, s_layer.PA * self.alpha)
+                # s_x, a = s_layer(s_x, s_layer.PA * self.alpha)
+                s_x, a = s_layer(s_x, s_layer.PA.repeat(
+                    N*T, 1, 1) * self.alpha)
             if self.need_attn:
                 attn.append(a)
 
@@ -401,9 +406,9 @@ if __name__ == '__main__':
     model = Model(graph=graph,
                   model_layers=101,
                   s_trans_cfg={
-                      'num_heads': 2,
-                      'model_dim': 16,
-                      'ffn_dim': 64,
+                      'num_heads': 3,
+                      'model_dim': 24,
+                      'ffn_dim': 96,
                       'dropout': 0,
                       'activation': 'gelu',
                       'prenorm': False,
