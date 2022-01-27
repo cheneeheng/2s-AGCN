@@ -383,7 +383,7 @@ class Model(BaseModel):
             if s_layer.PA is None:
                 s_x, a = s_layer(s_x)
             else:
-                if s_layer.PA.dim == 2:
+                if s_layer.PA.dim() == 2:
                     s_x, a = s_layer(s_x, s_layer.PA * self.alpha)
                 else:
                     s_x, a = s_layer(s_x, s_layer.PA.repeat(
@@ -428,7 +428,7 @@ if __name__ == '__main__':
                   pad=False,
                   pos_enc='cossin',
                   classifier_type='CLS_MASK',
-                  add_A=True
+                  add_A='single'
                   )
     # print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
