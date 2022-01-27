@@ -407,12 +407,21 @@ aagcn_v17:
         - 220118160001_nopad_3ks_noaug_lowerlr_100div_cossin_dropout05:
                   - 89.0%
                   - almost overfit, train acc ~1
-
+        # PROJ -------------------------------------
         - 220121110001_nopad_1ks_noaug_lowerlr_100div_cossin:
                   - 90.2%
                   - almost overfit, train acc ~1
         - 220121110001_nopad_2ks_noaug_lowerlr_100div_cossin:
                   - 90.6%
+                  - almost overfit, train acc ~1
+
+        - 220127170001_nopad_3ks_noaug_lowerlr_100div_cossin_backward:
+                  - backward masking
+                  - 90.5%
+                  - almost overfit, train acc ~1
+
+        - 220127170001_nopad_3ks_noaug_lowerlr_100div_cossin_4gpu:
+                  - 90.2%
                   - almost overfit, train acc ~1
 
 aagcn_v18:
@@ -577,11 +586,24 @@ aagcn_v24:
                   - almost overfit
 
         - 220125170001_nopad_3ks_noaug_lowerlr_cossin_16d:
+                  - FAULTY, NO CLS TOKEN
                   - cls masking
                   - 60.9%
         - 220125170001_nopad_3ks_noaug_lowerlr_cossin_128d:
+                  - FAULTY, NO CLS TOKEN
                   - cls masking
                   - 71.7%
+
+        - 220126100001_nopad_3ks_noaug_lowerlr_cossin_PAa:
+                  - FAULTY, NO CLS TOKEN
+                  - 59.9%
+                  - added PAa as attn mask.
+                  - with CLS_MASK
+        - 220126100001_nopad_3ks_noaug_lowerlr_cossin_3PAa:
+                  - FAULTY, NO CLS TOKEN
+                  - 66.9%
+                  - added 3 diff PAa as attn mask.
+                  - with CLS_MASK
 
 aagcn_v25:
         - only temporal transformer with tcn proj

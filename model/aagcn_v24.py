@@ -276,7 +276,7 @@ class Model(BaseModel):
                  pad: bool = True,
                  need_attn: bool = False,
                  s_trans_cfg: Optional[dict] = None,
-                 add_A: bool = False,
+                 add_A: str = 'False',
                  pos_enc: str = 'True',
                  classifier_type: str = 'CLS',
                  model_layers: int = 10
@@ -317,16 +317,22 @@ class Model(BaseModel):
                                  output_channel=s_trans_cfg['model_dim'])
 
         # 4. transformer (spatial)
+        add_A = str(add_A)
+        if add_A == 'triple':
+            A = np.ones((3, 51, 51))
+            A[:, 1:26, 1:26] = self.graph.A
+            A[:, 26:, 26:] = self.graph.A
+        elif add_A == 'single':
+            A = np.ones((51, 51))
+            A[:26, :26] = self.graph.A[0, :, :]
+            A[26:, 26:] = self.graph.A[0, :, :]
+        else:
+            A = None
+
         s_trans_dim = s_trans_cfg['model_dim']
-        A = np.ones((3, 50, 50))
-        A[:, :25, :25] = self.graph.A
-        A[:, 25:, 25:] = self.graph.A
-        # A = np.ones((50, 50))
-        # A[:25, :25] = self.graph.A[0, :, :]
-        # A[25:, 25:] = self.graph.A[0, :, :]
         s_trans_enc_layer = TransformerEncoderLayerExtV2(
             cfg=s_trans_cfg,
-            A=A if add_A else None
+            A=A
         )
         self.s_trans_enc_layers = torch.nn.ModuleList(
             [copy.deepcopy(s_trans_enc_layer)
@@ -345,6 +351,8 @@ class Model(BaseModel):
         # 5. classifier
         self.classifier_type = classifier_type
         if classifier_type == 'CLS':
+            self.s_cls_token = nn.Parameter(torch.randn(1, 1, s_trans_dim))
+        elif classifier_type == 'CLS_MASK':
             self.s_cls_token = nn.Parameter(torch.randn(1, 1, s_trans_dim))
         else:
             self.s_cls_token = None
@@ -375,9 +383,11 @@ class Model(BaseModel):
             if s_layer.PA is None:
                 s_x, a = s_layer(s_x)
             else:
-                # s_x, a = s_layer(s_x, s_layer.PA * self.alpha)
-                s_x, a = s_layer(s_x, s_layer.PA.repeat(
-                    N*T, 1, 1) * self.alpha)
+                if s_layer.PA.dim == 2:
+                    s_x, a = s_layer(s_x, s_layer.PA * self.alpha)
+                else:
+                    s_x, a = s_layer(s_x, s_layer.PA.repeat(
+                        N*T, 1, 1) * self.alpha)
             if self.need_attn:
                 attn.append(a)
 
