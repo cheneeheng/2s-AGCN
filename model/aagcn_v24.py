@@ -324,7 +324,7 @@ class Model(BaseModel):
             A[:, 26:, 26:] = self.graph.A
         elif add_A == 'single':
             A = np.ones((51, 51))
-            A[:26, :26] = self.graph.A[0, :, :]
+            A[1:26, 1:26] = self.graph.A[0, :, :]
             A[26:, 26:] = self.graph.A[0, :, :]
         else:
             A = None
