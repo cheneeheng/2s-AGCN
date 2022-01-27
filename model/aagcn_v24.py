@@ -292,6 +292,8 @@ class Model(BaseModel):
         self.need_attn = need_attn
         self.kernel_size = kernel_size
 
+        self.alpha = nn.Parameter(torch.zeros(1))
+
         # 1. joint graph
         self.init_graph(graph, graph_args)
 
@@ -316,9 +318,12 @@ class Model(BaseModel):
 
         # 4. transformer (spatial)
         s_trans_dim = s_trans_cfg['model_dim']
+        A = np.ones((50, 50))
+        A[:25, :25] = self.graph.A[0, :, :]
+        A[25:, 25:] = self.graph.A[0, :, :]
         s_trans_enc_layer = TransformerEncoderLayerExtV2(
             cfg=s_trans_cfg,
-            A=self.graph.A if add_A else None
+            A=A if add_A else None
         )
         self.s_trans_enc_layers = torch.nn.ModuleList(
             [copy.deepcopy(s_trans_enc_layer)
@@ -364,7 +369,10 @@ class Model(BaseModel):
 
         attn = []
         for s_layer in self.s_trans_enc_layers:
-            s_x, a = s_layer(s_x)
+            if s_layer.PA is None:
+                s_x, a = s_layer(s_x)
+            else:
+                s_x, a = s_layer(s_x, s_layer.PA * self.alpha)
             if self.need_attn:
                 attn.append(a)
 
@@ -404,7 +412,8 @@ if __name__ == '__main__':
                   kernel_size=3,
                   pad=False,
                   pos_enc='cossin',
-                  classifier_type='CLS_MASK'
+                  classifier_type='CLS_MASK',
+                  add_A=True
                   )
     # print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')

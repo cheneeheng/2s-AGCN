@@ -7,10 +7,15 @@ import numpy as np
 from tqdm import tqdm
 
 LABEL = './data/data/ntu/xview/val_label.pkl'
+LABEL = './data/data/ntu_nopad/xview/val_label.pkl'
 
 BASE = f'data/data/ntu_result/xview'
 FOLDER = f'211228140001_nopad_3ks'
 SCORE = f'{BASE}/aagcn_v17_joint/{FOLDER}/epoch50_test_score.pkl'
+
+BASE = f'data/data/ntu_result/xview'
+FOLDER = f'220126153001_nopad_3ks_noaug_lowerlr_emd_128d'
+SCORE = f'{BASE}/aagcn_v28_joint/{FOLDER}/epoch50_test_score.pkl'
 
 label = open(LABEL, 'rb')
 label = np.array(pickle.load(label))
