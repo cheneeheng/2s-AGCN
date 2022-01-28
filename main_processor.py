@@ -388,8 +388,9 @@ class Processor():
             accuracy = self.data_loader[ln].dataset.top_k(score, 1)
             if accuracy > self.best_acc:
                 self.best_acc = accuracy
-            self.print_log(f'Accuracy: {accuracy}')
+            self.print_log(f'Accuracy: {accuracy:.4f}')
             self.print_log(f'Model: {self.arg.model_saved_name}')
+            self.print_log('-'*51)
 
             if self.arg.phase == 'train':
                 self.val_writer.add_scalar('loss', loss, self.global_step)
