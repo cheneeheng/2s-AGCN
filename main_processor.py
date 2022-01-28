@@ -151,8 +151,19 @@ class Processor():
         if self.arg.scheduler == 'cycliclr':
             self.scheduler = optim.lr_scheduler.CyclicLR(
                 self.optimizer,
-                base_lr=self.arg.base_lr*1e-3,
-                max_lr=self.arg.base_lr
+                base_lr=self.arg.base_lr*1e-2,
+                max_lr=self.arg.base_lr,
+                step_size_up=len(self.data_loader)*2,
+                step_size_down=len(self.data_loader)*3
+            )
+        elif self.arg.scheduler == 'cycliclrtri2':
+            self.scheduler = optim.lr_scheduler.CyclicLR(
+                self.optimizer,
+                base_lr=self.arg.base_lr*1e-2,
+                max_lr=self.arg.base_lr,
+                step_size_up=len(self.data_loader)*2,
+                step_size_down=len(self.data_loader)*3,
+                mode="triangular2"
             )
         elif self.arg.scheduler == 'onecyclelr':
             self.scheduler = optim.lr_scheduler.OneCycleLR(
