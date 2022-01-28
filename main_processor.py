@@ -390,7 +390,6 @@ class Processor():
                 self.best_acc = accuracy
             self.print_log(f'Accuracy: {accuracy:.4f}')
             self.print_log(f'Model: {self.arg.model_saved_name}')
-            self.print_log('-'*51)
 
             if self.arg.phase == 'train':
                 self.val_writer.add_scalar('loss', loss, self.global_step)
@@ -410,6 +409,8 @@ class Processor():
                 s_path = f'{self.arg.work_dir}/epoch{epoch + 1}_{ln}_score.pkl'
                 with open(s_path, 'wb') as f:
                     pickle.dump(score_dict, f)
+
+            self.print_log('-'*51)
 
     def start(self):
         if self.arg.phase == 'train':
