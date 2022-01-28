@@ -160,6 +160,8 @@ def get_parser():
 
     # optim
     parser.add_argument(
+        '--scheduler', default='cycliclr', help='pytorch lr scheduler')
+    parser.add_argument(
         '--base-lr', type=float, default=0.01, help='initial learning rate')
     parser.add_argument(
         '--step',

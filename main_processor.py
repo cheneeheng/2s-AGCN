@@ -14,6 +14,7 @@ import yaml
 
 from collections import OrderedDict
 from torch.utils.tensorboard import SummaryWriter
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from sam.sam.sam import SAM
@@ -55,10 +56,9 @@ class Processor():
                 self.train_writer = self.val_writer = SummaryWriter(
                     os.path.join(arg.model_saved_name, 'test'), 'test')
         self.global_step = 0
+        self.load_data()
         self.load_model()
         self.load_optimizer()
-        self.load_data()
-        self.lr = self.arg.base_lr
         self.best_acc = 0
 
     def save_arg(self):
@@ -148,6 +148,22 @@ class Processor():
         else:
             raise ValueError()
 
+        if self.arg.scheduler == 'cycliclr':
+            self.scheduler = optim.lr_scheduler.CyclicLR(
+                self.optimizer,
+                base_lr=self.arg.base_lr*1e-3,
+                max_lr=self.arg.base_lr
+            )
+        elif self.arg.scheduler == 'onecyclelr':
+            self.scheduler = optim.lr_scheduler.OneCycleLR(
+                self.optimizer,
+                max_lr=self.arg.base_lr,
+                steps_per_epoch=len(self.data_loader),
+                epochs=self.arg.num_epoch
+            )
+        else:
+            self.scheduler = None
+
         # lr_scheduler_post = optim.lr_scheduler.MultiStepLR(
         #     self.optimizer, milestones=self.arg.step, gamma=0.1)
         # self.lr_scheduler = GradualWarmupScheduler(
@@ -163,14 +179,14 @@ class Processor():
         if self.arg.phase == 'train':
             assert os.path.exists(self.arg.train_feeder_args['data_path'])
             assert os.path.exists(self.arg.train_feeder_args['label_path'])
-            self.data_loader['train'] = torch.utils.data.DataLoader(
+            self.data_loader['train'] = DataLoader(
                 dataset=Feeder(**self.arg.train_feeder_args),
                 batch_size=self.arg.batch_size,
                 shuffle=True,
                 num_workers=self.arg.num_worker,
                 drop_last=True,
                 worker_init_fn=init_seed)
-        self.data_loader['test'] = torch.utils.data.DataLoader(
+        self.data_loader['test'] = DataLoader(
             dataset=Feeder(**self.arg.test_feeder_args),
             batch_size=self.arg.test_batch_size,
             shuffle=False,
@@ -300,8 +316,8 @@ class Processor():
             # self.train_writer.add_scalar('batch_time', process.iterable.last_duration, self.global_step)  # noqa
 
             # statistics
-            self.lr = self.optimizer.param_groups[0]['lr']
-            self.train_writer.add_scalar('lr', self.lr, self.global_step)
+            _lr = self.optimizer.param_groups[0]['lr']
+            self.train_writer.add_scalar('lr', _lr, self.global_step)
             # if self.global_step % self.arg.log_interval == 0:
             #     self.print_log(
             #         '\tBatch({}/{}) done. Loss: {:.4f}  lr:{:.6f}'.format(
@@ -403,8 +419,11 @@ class Processor():
                 save_model = \
                     ((epoch + 1) % self.arg.save_interval == 0) or \
                     ((epoch + 1) == self.arg.num_epoch)
-                self.adjust_learning_rate(epoch)
+                if self.scheduler is None:
+                    self.adjust_learning_rate(epoch)
                 self.train(epoch, save_model=save_model)
+                if self.scheduler is not None:
+                    self.scheduler.step()
                 self.eval(epoch, save_score=self.arg.save_score,
                           loader_name=['test'])
             self.print_log(f'Best Accuracy: {self.best_acc}\n')

@@ -474,8 +474,8 @@ if __name__ == '__main__':
                   model_layers=101,
                   t_trans_cfg={
                       'num_heads': 2,
-                      'model_dim': 16,
-                      'ffn_dim': 64,
+                      'model_dim': 64,
+                      'ffn_dim': 256,
                       'dropout': 0,
                       'activation': 'gelu',
                       'prenorm': False,
@@ -483,8 +483,8 @@ if __name__ == '__main__':
                   },
                   s_trans_cfg={
                       'num_heads': 2,
-                      'model_dim': 16,
-                      'ffn_dim': 64,
+                      'model_dim': 64,
+                      'ffn_dim': 256,
                       'dropout': 0,
                       'activation': 'gelu',
                       'prenorm': False,
