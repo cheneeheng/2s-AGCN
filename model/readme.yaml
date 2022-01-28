@@ -414,12 +414,12 @@ aagcn_v17:
         - 220121110001_nopad_2ks_noaug_lowerlr_100div_cossin:
                   - 90.6%
                   - almost overfit, train acc ~1
-
+        # backward masking -----------------------------
         - 220127170001_nopad_3ks_noaug_lowerlr_100div_cossin_backward:
                   - backward masking
                   - 90.5%
                   - almost overfit, train acc ~1
-
+        # more gpu to reduce the batch size per gpu -----------------------
         - 220127170001_nopad_3ks_noaug_lowerlr_100div_cossin_4gpu:
                   - 90.2%
                   - almost overfit, train acc ~1
@@ -585,25 +585,47 @@ aagcn_v24:
                   - 80.3%
                   - almost overfit
 
-        - 220125170001_nopad_3ks_noaug_lowerlr_cossin_16d:
-                  - FAULTY, NO CLS TOKEN
-                  - cls masking
-                  - 60.9%
-        - 220125170001_nopad_3ks_noaug_lowerlr_cossin_128d:
-                  - FAULTY, NO CLS TOKEN
-                  - cls masking
-                  - 71.7%
+        # - 220125170001_nopad_3ks_noaug_lowerlr_cossin_16d:
+        #           - FAULTY, NO CLS TOKEN
+        #           - cls masking
+        #           - 60.9%
+        # - 220125170001_nopad_3ks_noaug_lowerlr_cossin_128d:
+        #           - FAULTY, NO CLS TOKEN
+        #           - cls masking
+        #           - 71.7%
 
-        - 220126100001_nopad_3ks_noaug_lowerlr_cossin_PAa:
-                  - FAULTY, NO CLS TOKEN
-                  - 59.9%
-                  - added PAa as attn mask.
+        # - 220126100001_nopad_3ks_noaug_lowerlr_cossin_PAa:
+        #           - FAULTY, NO CLS TOKEN
+        #           - 59.9%
+        #           - added PAa as attn mask.
+        #           - with CLS_MASK
+        # - 220126100001_nopad_3ks_noaug_lowerlr_cossin_3PAa:
+        #           - FAULTY, NO CLS TOKEN
+        #           - 66.9%
+        #           - added 3 diff PAa as attn mask.
+        #           - with CLS_MASK
+
+        - 220127220001_nopad_3ks_noaug_lowerlr_cossin_CLS_MASK:
                   - with CLS_MASK
-        - 220126100001_nopad_3ks_noaug_lowerlr_cossin_3PAa:
-                  - FAULTY, NO CLS TOKEN
-                  - 66.9%
+                  - 19.2%
+
+        - 220127220001_nopad_3ks_noaug_lowerlr_cossin_PAa_144d:
+                  - added 3 diff PAa as attn mask.
+                  - 82.3%
+                  - almost overfit
+        - 220127220001_nopad_3ks_noaug_lowerlr_cossin_PAa_144d_CLS_MASK:
                   - added 3 diff PAa as attn mask.
                   - with CLS_MASK
+                  - 72.8%
+
+        - 220127220001_nopad_3ks_noaug_lowerlr_cossin_3PAa_144d_CLS_MASK:
+                  - added 3 diff PAa as attn mask.
+                  - with CLS_MASK
+                  - 73.3%
+        - 220127220001_nopad_3ks_noaug_lowerlr_cossin_3PAa_144d:
+                  - added 3 diff PAa as attn mask.
+                  - 82.3%
+                  - almost overfit
 
 aagcn_v25:
         - only temporal transformer with tcn proj

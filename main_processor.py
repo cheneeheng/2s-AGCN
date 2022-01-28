@@ -218,7 +218,6 @@ class Processor():
         self.model.train()
         self.print_log(f'Training epoch: {epoch + 1}')
         loader = self.data_loader['train']
-        self.adjust_learning_rate(epoch)
         # for name, param in self.model.named_parameters():
         #     self.train_writer.add_histogram(name, param.clone().cpu().data.numpy(), epoch)  # noqa
         loss_value = []
@@ -404,6 +403,7 @@ class Processor():
                 save_model = \
                     ((epoch + 1) % self.arg.save_interval == 0) or \
                     ((epoch + 1) == self.arg.num_epoch)
+                self.adjust_learning_rate(epoch)
                 self.train(epoch, save_model=save_model)
                 self.eval(epoch, save_score=self.arg.save_score,
                           loader_name=['test'])
