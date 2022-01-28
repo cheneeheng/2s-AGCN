@@ -424,6 +424,10 @@ aagcn_v17:
                   - 90.2%
                   - almost overfit, train acc ~1
 
+        - 220127170001_nopad_3ks_noaug_lowerlr_100div_cossin_32d_2h:
+                  - 90.4%
+                  - almost overfit, train acc ~1
+
 aagcn_v18:
         - added shift operation after the gcn. This forward concats the features.
         - 220103110001_nopad:
@@ -696,3 +700,8 @@ aagcn_v29:
                   - PA for spatial trans wit gate variable.
                   - 88.0%
                   - almost overfit
+
+aagcn_v30:
+        - uses trans for tcn and gcn for spatial.
+        - 220128110001_nopad_3ks_lowerlr_noaug_cossin:
+                  - 87.3%

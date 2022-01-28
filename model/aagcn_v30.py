@@ -19,7 +19,45 @@ from model.aagcn import BaseModel
 # ------------------------------------------------------------------------------
 # AAGCN Modules
 # ------------------------------------------------------------------------------
-class AdaptiveGCNLocal(nn.Module):
+class AdaptiveGCNV2(nn.Module):
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 A: np.ndarray,
+                 conv_d: nn.Conv2d,
+                 num_subset: int = 3):
+        super().__init__()
+        self.num_subset = num_subset
+        self.PA = nn.Parameter(torch.from_numpy(A.astype(np.float32)))  # Bk
+        self.alpha = nn.Parameter(torch.zeros(1))  # G
+        self.conv_a = nn.ModuleList()
+        self.conv_b = nn.ModuleList()
+        for _ in range(self.num_subset):
+            self.conv_a.append(nn.Conv2d(in_channels, out_channels, 1))
+            self.conv_b.append(nn.Conv2d(in_channels, out_channels, 1))
+        self.soft = nn.Softmax(-2)
+        self.conv_d = conv_d
+
+    def forward(self, x, return_attn=False):
+        y = None
+        N, C, T, V = x.size()
+        A = self.PA  # Bk
+        A3_list = []
+        for i in range(self.num_subset):
+            A1 = self.conv_a[i](x).permute(0, 3, 1, 2).contiguous()
+            A1 = A1.view(N, V, -1)  # N V CT (theta)
+            A2 = self.conv_b[i](x).view(N, -1, V)  # N CT V (phi)
+            A1 = self.soft(torch.matmul(A1, A2) / A1.size(-1))  # N V V
+            A1 = A[i] + A1 * self.alpha
+            A3 = x.view(N, -1, V)
+            if return_attn:
+                A3_list.append(A3)
+            z = self.conv_d[i](torch.matmul(A3, A1).view(N, C, -1, V))
+            y = z + y if y is not None else z
+        return y, A3_list
+
+
+class AdaptiveGCNV3(nn.Module):
     def __init__(self,
                  in_channels: int,
                  out_channels: int,
@@ -345,6 +383,8 @@ class Model(BaseModel):
                  t_trans_cfg: Optional[dict] = None,
                  s_trans_cfg: Optional[dict] = None,
 
+                 gcn_trans_unit: str = '',
+
                  pos_enc: str = 'True',
                  classifier_type: str = 'CLS',
                  model_layers: int = 10):
@@ -404,12 +444,19 @@ class Model(BaseModel):
             self.cls_token = None
 
         # 4. transformer (spatial)
+        if gcn_trans_unit == 'v2':
+            _adaptive = AdaptiveGCNV2
+        elif gcn_trans_unit == 'v3':
+            _adaptive = AdaptiveGCNV3
+        else:
+            _adaptive = AdaptiveGCNV3
+
         s_trans_dim = s_trans_cfg['model_dim']
         gcn = GCNUnitLocal(s_trans_dim,
                            s_trans_dim,
                            self.graph.A,
                            num_subset=num_subset,
-                           adaptive=AdaptiveGCNLocal,
+                           adaptive=_adaptive,
                            attention=False,
                            gbn_split=gbn_split)
         self.s_trans_enc_layers = torch.nn.ModuleList(
