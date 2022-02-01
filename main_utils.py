@@ -15,7 +15,8 @@ __all__ = [
     'init_seed',
     'str2bool',
     'import_class',
-    'get_parser'
+    'get_parser',
+    'print_arg'
 ]
 
 
@@ -201,3 +202,18 @@ def get_parser():
     parser.add_argument('--only_train_epoch', default=0)
     parser.add_argument('--warm_up_epoch', default=0)
     return parser
+
+
+def print_arg(arg):
+    def _dict_check(_k, _v, _i):
+        if isinstance(_v, dict):
+            print(f"AAA{_k} :".replace("AAA", " "*_i*4))
+            for __k, __v in _v.items():
+                _dict_check(__k, __v, _i+1)
+        else:
+            print(f"AAA{_k} : {_v}".replace("AAA", " "*_i*4))
+
+    for k, v in list(vars(arg).items()):
+        i = 0
+        _dict_check(k, v, i)
+    print()

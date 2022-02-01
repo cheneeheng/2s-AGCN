@@ -112,7 +112,7 @@ def default_transformer_config():
     config.intermediate_size = 512
     config.max_position_embeddings = 201
     config.layer_norm_eps = 1e-7
-    config.num_attention_heads = 2
+    config.num_attention_heads = 8
     config.num_hidden_layers = 3
     config.type_vocab_size = 0
     config.vocab_size = 300  # used if emd is True
@@ -120,7 +120,7 @@ def default_transformer_config():
     config.relative_attention = True
     config.position_buckets = 25  # the relative attn map span
     config.norm_rel_ebd = "layer_norm"  # relative embedding norm
-    config.share_att_key = True  # whether to share the proj mat for pos and context attention caöculation.  # noqa
+    config.share_att_key = True  # whether to share the proj mat for pos and context attention calculation.  # noqa
     config.pos_att_type = "p2c | c2p"  # p2p possible also
 
     config.conv_kernel_size = 3  # whether to use conv in the first layer
@@ -128,9 +128,9 @@ def default_transformer_config():
 
     config.max_relative_positions = -1  # if -1, uses max_position_embeddings
     config.position_biased_input = False  # whether to add PE to input
-    config.attention_head_size = 200
+    config.attention_head_size = 400
 
-    config.emd = False
+    config.emd = True
 
     return config
 

@@ -25,6 +25,7 @@ if __name__ == '__main__':
         parser.set_defaults(**default_arg)
 
     arg = parser.parse_args()
+    print_arg(arg)
     init_seed(arg.seed)
     processor = Processor(arg)
     processor.start()

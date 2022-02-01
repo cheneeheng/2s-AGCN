@@ -357,27 +357,27 @@ aagcn_v17:
                   - 89.0%
                   - almost overfit, train acc ~1
         - 220112190001_nopad_3ks_noaug_lowerlowerlr_attnmask_forward:
-                  - BUGGY REDO, masking may not be applied
+                #   - BUGGY REDO, masking may not be applied
                   - uses forward masking.
                   - masking starts after warmup epochs.
                   - goes up during warmup epochs and decreases afterwards.
                   - 24.4%
         - 220125120001_nopad_3ks_noaug_lowerlr_100div_cossin_forward:
-                  - BUGGY REDO, masking may not be applied
+                #   - BUGGY REDO, masking may not be applied
                   - uses forward masking in last layer.
                   - 89.1%
                   - almost overfit, train acc ~1
         - 220127170001_nopad_3ks_noaug_lowerlr_100div_cossin_backward:
-                  - BUGGY REDO, masking may not be applied
+                #   - BUGGY REDO, masking may not be applied
                   - backward masking
                   - 90.5%
                   - almost overfit, train acc ~1
         - 220127170001_nopad_3ks_noaug_lowerlr_100div_cossin_backward_128d_8h:
-                  - BUGGY REDO, masking may not be applied
+                #   - BUGGY REDO, masking may not be applied
                   - no backward
                   - 91.3%
         - 220127170001_nopad_3ks_noaug_lowerlr_100div_cossin_128d_8h_backward:
-                  - BUGGY REDO, masking may not be applied
+                #   - BUGGY REDO, masking may not be applied
                   - 91.3%
 
         # NO RELU IN TCNGCN UNIT -----------------------------------------
