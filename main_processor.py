@@ -425,9 +425,15 @@ class Processor():
 
     def start(self):
         if self.arg.phase == 'train':
-            self.print_log(f'Parameters:')
+            self.print_log(f'Parameters:\n')
             for k, v in list(vars(self.arg).items()):
-                print(f"\t\t\t\t\t\t\t\t{k} : {v}")
+                if isinstance(v, dict):
+                    print(f"{k} :")
+                    for kk, vv in v.items():
+                        print(f"\t{kk} : {vv}")
+                else:
+                    print(f"{k} : {v}")
+            print()
             self.global_step = self.arg.start_epoch * \
                 len(self.data_loader['train']) / self.arg.batch_size
             for epoch in range(self.arg.start_epoch, self.arg.num_epoch):
