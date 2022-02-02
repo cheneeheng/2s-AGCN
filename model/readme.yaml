@@ -325,6 +325,8 @@ aagcn_v17:
         - 220121120001_nopad_3ks_noaug_lowerlr_100div_cossin_128d:
                   - 89.7%
                   - almost overfit, train acc ~1
+        - 220201210001_nopad_3ks_noaug_lowerlr_100div_cossin_128d_8h:
+                  - 91.31%
         - 220118230001_nopad_3ks_noaug_lowerlr_100div_cossin_32d: (0.5dropout)
                   - 88.9%
                   - almost overfit, train acc ~1
@@ -356,29 +358,32 @@ aagcn_v17:
                   - uses attention masking => doest seem to have a diff
                   - 89.0%
                   - almost overfit, train acc ~1
-        - 220112190001_nopad_3ks_noaug_lowerlowerlr_attnmask_forward:
-                #   - BUGGY REDO, masking may not be applied
-                  - uses forward masking.
-                  - masking starts after warmup epochs.
-                  - goes up during warmup epochs and decreases afterwards.
-                  - 24.4%
-        - 220125120001_nopad_3ks_noaug_lowerlr_100div_cossin_forward:
-                #   - BUGGY REDO, masking may not be applied
-                  - uses forward masking in last layer.
-                  - 89.1%
-                  - almost overfit, train acc ~1
-        - 220127170001_nopad_3ks_noaug_lowerlr_100div_cossin_backward:
-                #   - BUGGY REDO, masking may not be applied
-                  - backward masking
-                  - 90.5%
-                  - almost overfit, train acc ~1
-        - 220127170001_nopad_3ks_noaug_lowerlr_100div_cossin_backward_128d_8h:
-                #   - BUGGY REDO, masking may not be applied
-                  - no backward
-                  - 91.3%
-        - 220127170001_nopad_3ks_noaug_lowerlr_100div_cossin_128d_8h_backward:
-                #   - BUGGY REDO, masking may not be applied
-                  - 91.3%
+        # - 220112190001_nopad_3ks_noaug_lowerlowerlr_attnmask_forward:
+        #           - BUGGY MASKING NOT APPLIED AT EVAL
+        #           - uses forward masking.
+        #           - masking starts after warmup epochs.
+        #           - goes up during warmup epochs and decreases afterwards.
+        #           - 24.4%
+        # - 220125120001_nopad_3ks_noaug_lowerlr_100div_cossin_forward:
+        #           - BUGGY MASKING NOT APPLIED AT EVAL
+        #           - uses forward masking in last layer.
+        #           - 89.1%
+        #           - almost overfit, train acc ~1
+        # - 220127170001_nopad_3ks_noaug_lowerlr_100div_cossin_backward:
+        #           - BUGGY MASKING NOT APPLIED AT EVAL
+        #           - backward masking
+        #           - 90.5%
+        #           - almost overfit, train acc ~1
+        # - 220127170001_nopad_3ks_noaug_lowerlr_100div_cossin_backward_128d_8h:
+        #           - BUGGY MASKING NOT APPLIED AT EVAL
+        #           - no backward
+        #           - 91.3%
+        # - 220127170001_nopad_3ks_noaug_lowerlr_100div_cossin_128d_8h_backward:
+        #           - BUGGY MASKING NOT APPLIED AT EVAL
+        #           - 91.3%
+        # - 220201210001_..._128d_8h_backward_rerun:
+        #           - - BUGGY MASKING NOT APPLIED AT EVAL
+        #           - 91.3%
 
         # NO RELU IN TCNGCN UNIT -----------------------------------------
         - 220117110001_nopad_3ks_noaug_lowerlr_notcngcnrelu:
@@ -451,6 +456,7 @@ aagcn_v17:
                   - 89.2%
 
         - 220128130001_nopad_3ks_noaug_lowerlr_100div_cossin_nodecay:
+                  - decay = 5e4 *******
                   - 88.9%
 
 aagcn_v18:
@@ -700,6 +706,10 @@ aagcn_v28:
         - 220126153001_nopad_3ks_noaug_lowerlr_emd_128d:
                   - 90.0%
                   - almost overfit
+        - 220201213001_nopad_3ks_noaug_lowerlr_emd_span3:
+                  - 88.8%
+        - 220201213001_nopad_3ks_noaug_lowerlr_emd_span10:
+                  - 89.2%
 
 aagcn_v29:
         - from 20, merge FM after S and T transformer in each layer.

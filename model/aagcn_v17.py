@@ -357,17 +357,17 @@ class Model(BaseModel):
                 T*M//self.kernel_size + 1
             ).detach()
         elif self.attn_masking == 'forward':
-            if self.l1.gcn1.agcn.PA.requires_grad:
+            if self.l1.gcn1.agcn.PA.requires_grad or self.training:
                 self.attn_mask = generate_square_subsequent_mask(
                     T*M//self.kernel_size + 1,
                     device='cpu' if x.get_device() < 0 else x.get_device()
-                )
+                ).detach()
         elif self.attn_masking == 'backward':
-            if self.l1.gcn1.agcn.PA.requires_grad:
+            if self.l1.gcn1.agcn.PA.requires_grad or self.training:
                 self.attn_mask = generate_square_subsequent_mask(
                     T*M//self.kernel_size + 1,
                     device='cpu' if x.get_device() < 0 else x.get_device()
-                ).transpose(0, 1)
+                ).transpose(0, 1).detach()
         return super().forward_preprocess(x, size)
 
     def forward_postprocess(self, x: torch.Tensor, size: torch.Size):
@@ -412,9 +412,11 @@ if __name__ == '__main__':
                   attn_masking='backward',
                   data_norm='ln'
                   )
-    # print(model)
+    print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))
     x = torch.ones((5, 3, 300, 25, 2))
     x[:, :, 200:, :, :] = 0.0
     model(x)
+    # for name, param in model.state_dict().items():
+    #     print(name, param.size())
