@@ -357,13 +357,13 @@ class Model(BaseModel):
                 T*M//self.kernel_size + 1
             ).detach()
         elif self.attn_masking == 'forward':
-            if self.l1.gcn1.agcn.PA.requires_grad or self.training:
+            if self.l1.gcn1.agcn.PA.requires_grad or not self.training:
                 self.attn_mask = generate_square_subsequent_mask(
                     T*M//self.kernel_size + 1,
                     device='cpu' if x.get_device() < 0 else x.get_device()
                 ).detach()
         elif self.attn_masking == 'backward':
-            if self.l1.gcn1.agcn.PA.requires_grad or self.training:
+            if self.l1.gcn1.agcn.PA.requires_grad or not self.training:
                 self.attn_mask = generate_square_subsequent_mask(
                     T*M//self.kernel_size + 1,
                     device='cpu' if x.get_device() < 0 else x.get_device()
