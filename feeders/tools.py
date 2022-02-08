@@ -1,6 +1,8 @@
 import random
+from this import d
 
 import numpy as np
+from scipy import interpolate
 
 
 def downsample(data_numpy, step, random_sample=True):
@@ -154,6 +156,19 @@ def random_shift(data_numpy):
     data_shift[:, bias:bias + size, :, :] = data_numpy[:, begin:end, :, :]
 
     return data_shift
+
+
+def stretch_to_maximum_length(data_numpy):
+    C, T, V, M = data_numpy.shape
+    t_last = T - np.where(np.flip(data_numpy.sum((0, 2, 3))) != 0.0)[0][0]
+    unpadded_data = data_numpy[:, :t_last, :, :]  # c,t,v,m
+    unpadded_data = np.transpose(unpadded_data, (0, 2, 3, 1))  # c,v,m,t
+    unpadded_data = unpadded_data.reshape(C*V*M, -1)
+    f = interpolate.interp1d(np.arange(0, t_last), unpadded_data)
+    stretched_data = f(np.linspace(0, t_last-1, T))
+    stretched_data = stretched_data.reshape(C, V, M, T)
+    stretched_data = np.transpose(stretched_data, (0, 3, 1, 2))
+    return stretched_data
 
 
 def openpose_match(data_numpy):

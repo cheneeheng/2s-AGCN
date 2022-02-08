@@ -17,6 +17,7 @@ class Feeder(Dataset):
                  random_zaxis_flip=False,
                  random_xaxis_shift=False,
                  random_yaxis_shift=False,
+                 stretch=False,
                  debug=False,
                  use_mmap=True):
         """
@@ -43,6 +44,7 @@ class Feeder(Dataset):
         self.random_zaxis_flip = random_zaxis_flip
         self.random_xaxis_shift = random_xaxis_shift
         self.random_yaxis_shift = random_yaxis_shift
+        self.stretch = stretch
         self.use_mmap = use_mmap
         self.load_data()
         if normalization:
@@ -88,6 +90,8 @@ class Feeder(Dataset):
         label = self.label[index]
         data_numpy = np.array(data_numpy)
 
+        if self.stretch:
+            data_numpy = tools.stretch_to_maximum_length(data_numpy)
         if self.normalization:
             data_numpy = (data_numpy - self.mean_map) / self.std_map
         if self.random_shift:
