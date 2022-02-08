@@ -312,23 +312,31 @@ aagcn_v17:
         - ...: # 220125120001_nopad_3ks_lowerlr_100div_cossin_rerun_randommoveshift_drop_out:
                   - 89.5%
                   - almost overfit, train acc ~1
+        - 220207140001_nopad_3ks_noaug_lowerlr_100div_cossin_8d_25h:
+                  - 90.0%
         - 220111210001_nopad_3ks_cossin_100div_noaug_lowerlr: #####
                   - 90.5%
                   - overfit, train acc ~1
                   - converged really fast at the beginning (val acc was higher)
+        - 220207140001_nopad_3ks_noaug_lowerlr_100div_cossin_25h:
+                  - 91.2%
         - 220121120001_nopad_3ks_noaug_lowerlr_100div_cossin_32d:
                   - 90.4%
                   - almost overfit, train acc ~1
         - 220121120001_nopad_3ks_noaug_lowerlr_100div_cossin_64d:
                   - 90.5%
                   - almost overfit, train acc ~1
+        - 220207140001_nopad_3ks_noaug_lowerlr_100div_cossin_64d_25h:
+                  - 91.2%
         - 220121120001_nopad_3ks_noaug_lowerlr_100div_cossin_128d:
                   - 89.7%
                   - almost overfit, train acc ~1
         - 220202230001_nopad_3ks_noaug_lowerlr_100div_cossin_128d_4h:
-                  - 
+                  - did not converge.
         - 220201210001_nopad_3ks_noaug_lowerlr_100div_cossin_128d_8h:
-                  - 91.31%
+                  - 91.3%
+        - 220207140001_nopad_3ks_noaug_lowerlr_100div_cossin_128d_16h:
+                  - 91.5%
         - 220118230001_nopad_3ks_noaug_lowerlr_100div_cossin_32d: (0.5dropout)
                   - 88.9%
                   - almost overfit, train acc ~1
@@ -360,7 +368,13 @@ aagcn_v17:
                   - uses attention masking => doest seem to have a diff
                   - 89.0%
                   - almost overfit, train acc ~1
-        
+        - 220207140001_nopad_3ks_noaug_lowerlr_100div_cossin_forward:
+                  - only have access to past info.
+                  - 89.2%
+        - 220207140001_nopad_3ks_noaug_lowerlr_100div_cossin_backward:
+                  - only have access to future info.
+                  - 90.5%
+
         # - 220202230001_nopad_3ks_noaug_lowerlr_100div_cossin_forward:
         #           - buggy, wrong logic
         #           - 89.3%
@@ -467,6 +481,12 @@ aagcn_v17:
         - 220128130001_nopad_3ks_noaug_lowerlr_100div_cossin_nodecay:
                   - decay = 5e4 *******
                   - 88.9%
+        - 220207140001_nopad_3ks_noaug_lowerlr_100div_cossin_higherwd:
+                  - 1e-3 decay
+                  - 88.9%
+
+        - 220207140001_nopad_3ks_noaug_lowerlr_100div_cossin_16dffn:
+                  - 89.6%
 
 aagcn_v18:
         - added shift operation after the gcn. This forward concats the features.
@@ -715,6 +735,8 @@ aagcn_v28:
         - 220126153001_nopad_3ks_noaug_lowerlr_emd_128d:
                   - 90.0%
                   - almost overfit
+        - 220207153001_nopad_3ks_noaug_lowerlr_emd_128d_8h:
+                  - 91.1%
         - 220201213001_nopad_3ks_noaug_lowerlr_emd_span3:
                   - 88.8%
         - 220201213001_nopad_3ks_noaug_lowerlr_emd_span10:

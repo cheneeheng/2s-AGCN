@@ -28,3 +28,4 @@ from . import aagcn_v27
 from . import aagcn_v28
 from . import aagcn_v29
 from . import aagcn_v30
+from . import aagcn_v31
