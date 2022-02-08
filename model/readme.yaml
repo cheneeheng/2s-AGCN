@@ -775,3 +775,8 @@ aagcn_v30:
                   - 85.3%
         - 220128110001_nopad_3ks_lowerlr_noaug_cossin_64d:
                   - 89.4%
+
+aagcn_v31:
+        - based on aagcn_v19.
+        - uses 1 PE.
+        - sequential and alternates between temporal and spatial.

@@ -170,22 +170,21 @@ class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
                 ) -> torch.Tensor:
         if self.pre_norm:
             src = self.norm1(src)
-            src2, attn = self.self_attn(src, src, src, attn_mask=src_mask,
+            src1, attn = self.self_attn(src, src, src, attn_mask=src_mask,
                                         key_padding_mask=src_key_padding_mask)
-            src = src + self.dropout1(src2)
+            src = src + self.dropout1(src1)
             src = self.norm2(src)
-            src1 = self.dropout(self.activation(self.linear1(src)))
-            src2 = self.dropout2(self.linear2(src1))
-            src = src + src2
+            src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))  # noqa
+            src = src + self.dropout2(src2)
             return src, attn
+
         else:
-            src2, attn = self.self_attn(src, src, src, attn_mask=src_mask,
+            src1, attn = self.self_attn(src, src, src, attn_mask=src_mask,
                                         key_padding_mask=src_key_padding_mask)
-            src = src + self.dropout1(src2)
+            src = src + self.dropout1(src1)
             src = self.norm1(src)
-            src1 = self.dropout(self.activation(self.linear1(src)))
-            src2 = self.dropout2(self.linear2(src1))
-            src = src + src2
+            src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))  # noqa
+            src = src + self.dropout2(src2)
             src = self.norm2(src)
             return src, attn
 
