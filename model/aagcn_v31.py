@@ -282,6 +282,8 @@ class Model(BaseModel):
 
                  add_A: bool = False,
 
+                 trans_seq: str = 's-t',
+
                  pos_enc: str = 'True',
                  classifier_type: str = 'CLS',
                  model_layers: int = 10
@@ -297,6 +299,8 @@ class Model(BaseModel):
         transformer_config_checker(t_trans_cfg)
         transformer_config_checker(s_trans_cfg)
 
+        self.trans_seq = trans_seq
+        self.num_subset = num_subset
         self.need_attn = need_attn
 
         # 1. joint graph
@@ -337,15 +341,36 @@ class Model(BaseModel):
             self.t_pos_encoder = lambda x: x
 
         # 4. transformer (spatial)
-        s_trans_dim = s_trans_cfg['model_dim'] * 100
-        s_trans_cfg['model_dim'] = s_trans_dim
-        s_trans_enc_layer = TransformerEncoderLayerExtV2(
-            cfg=s_trans_cfg,
-            A=self.graph.A if add_A else None
-        )
-        self.s_trans_enc_layers = torch.nn.ModuleList(
-            [copy.deepcopy(s_trans_enc_layer)
-             for _ in range(s_trans_cfg['num_layers'])])
+        if add_A:
+            s_trans_dim = s_trans_cfg['model_dim'] * 100
+            s_trans_cfg['model_dim'] = s_trans_dim
+            s_trans_enc_layers = torch.nn.ModuleDict(
+                {
+                    f'subset{a_i}':
+                    copy.deepcopy(
+                        TransformerEncoderLayerExtV2(
+                            cfg=s_trans_cfg,
+                            A=self.graph.A[a_i]
+                        )
+                    )
+                    for a_i in range(self.num_subset)
+                }
+            )
+            self.s_trans_enc_layers = torch.nn.ModuleList(
+                [copy.deepcopy(s_trans_enc_layers)
+                 for _ in range(s_trans_cfg['num_layers'])]
+            )
+        else:
+            s_trans_dim = s_trans_cfg['model_dim'] * 100
+            s_trans_cfg['model_dim'] = s_trans_dim
+            s_trans_enc_layer = TransformerEncoderLayerExtV2(
+                cfg=s_trans_cfg,
+                A=None
+            )
+            self.s_trans_enc_layers = torch.nn.ModuleList(
+                [copy.deepcopy(s_trans_enc_layer)
+                 for _ in range(s_trans_cfg['num_layers'])]
+            )
 
         # 5. classifier
         self.classifier_type = classifier_type
@@ -368,33 +393,79 @@ class Model(BaseModel):
         x = self.t_pos_encoder(x)
 
         attn = [[], []]
-        for s_layer, t_layer in zip(self.s_trans_enc_layers,
-                                    self.t_trans_enc_layers):
 
-            x = x.reshape(N, -1, V*C)  # n,mt,vc
-            x, a = t_layer(x)
-            if self.need_attn:
-                attn[0].append(a)
+        for i in range(len(self.t_trans_enc_layers)):
 
-            # x = x.reshape(-1, V, C)  # nmt,v,c
-            # A = s_layer.PA  # 3,v,v
-            # mask = None if A is None else A.repeat(N*(M*T+1), 1, 1)
-            # x, a = s_layer(x, mask)
-            # if self.need_attn:
-            #     attn[1].append(a)
+            if self.trans_seq == 's-t':
+                # Spatial
+                x0 = x[:, 0:1, :]  # n,1,vc
+                x = x[:, 1:, :]  # n,mt,vc
+                x = x.view(N, M, T, V, C).permute(0, 1, 3, 2, 4).contiguous()
+                x = x.reshape(N, M*V, T*C)  # n,mv,tc
+                x, a = self.s_trans_enc_layers[i](x)
+                if self.need_attn:
+                    attn[1].append(a)
+                x = x.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
+                x = x.reshape(N, M*T, V*C)  # n,mv,tc
+                x = torch.cat([x0, x], dim=1)
 
-            x0 = x[:, 0:1, :]  # n,1,vc
-            x = x[:, 1:, :]  # n,mt,vc
-            x = x.view(N, M, T, V, C).permute(0, 1, 3, 2, 4).contiguous()
-            x = x.reshape(N, M*V, T*C)  # n,mv,tc
-            A = s_layer.PA  # 3,v,v
-            mask = None if A is None else A.repeat(N*(M*T+1), 1, 1)
-            x, a = s_layer(x, mask)
-            if self.need_attn:
-                attn[1].append(a)
-            x = x.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
-            x = x.reshape(N, M*T, V*C)  # n,mv,tc
-            x = torch.cat([x0, x], dim=1)
+                # Temporal
+                x = x.reshape(N, -1, V*C)  # n,mt,vc
+                x, a = self.t_trans_enc_layers[i](x)
+                if self.need_attn:
+                    attn[0].append(a)
+
+                # x = x.reshape(-1, V, C)  # nmt,v,c
+                # A = s_layer.PA  # 3,v,v
+                # mask = None if A is None else A.repeat(N*(M*T+1), 1, 1)
+                # x, a = s_layer(x, mask)
+                # if self.need_attn:
+                #     attn[1].append(a)
+
+            elif self.trans_seq == 'sa-t':
+                # Spatial
+                x0 = x[:, 0:1, :]  # n,1,vc
+                x = x[:, 1:, :]  # n,mt,vc
+                x = x.view(N, M, T, V, C).permute(0, 1, 3, 2, 4).contiguous()
+                x = x.reshape(N*M, V, T*C)  # nm,v,tc
+
+                x_l = []
+                for _, s_layer in self.s_trans_enc_layers[i].items():
+                    # v,v
+                    x_i, a = s_layer(x, s_layer.PA)
+                    x_l.append(x_i)
+                    if self.need_attn:
+                        attn[1].append(a)
+                x_l = torch.stack(x_l, dim=0).sum(dim=0)
+
+                x = x_l.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
+                x = x.reshape(N, M*T, V*C)  # n,mv,tc
+                x = torch.cat([x0, x], dim=1)
+
+                # Temporal
+                x = x.reshape(N, -1, V*C)  # n,mt,vc
+                x, a = self.t_trans_enc_layers[i](x)
+                if self.need_attn:
+                    attn[0].append(a)
+
+            elif self.trans_seq == 't-s':
+                # Temporal
+                x = x.reshape(N, -1, V*C)  # n,mt,vc
+                x, a = self.t_trans_enc_layers[i](x)
+                if self.need_attn:
+                    attn[0].append(a)
+
+                # Spatial
+                x0 = x[:, 0: 1, :]  # n,1,vc
+                x = x[:, 1:, :]  # n,mt,vc
+                x = x.view(N, M, T, V, C).permute(0, 1, 3, 2, 4).contiguous()
+                x = x.reshape(N, M*V, T*C)  # n,mv,tc
+                x, a = self.s_trans_enc_layers[i](x)
+                if self.need_attn:
+                    attn[1].append(a)
+                x = x.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
+                x = x.reshape(N, M*T, V*C)  # n,mv,tc
+                x = torch.cat([x0, x], dim=1)
 
         x = x.reshape(N, -1, V*C)  # n,mt,vc
         if self.classifier_type == 'CLS':
@@ -429,7 +500,8 @@ if __name__ == '__main__':
                       'prenorm': False,
                       'num_layers': 3
                   },
-                  add_A=False,
+                  trans_seq='sa-t',
+                  add_A=True,
                   kernel_size=3,
                   pad=False,
                   pos_enc='cossin'
