@@ -439,8 +439,8 @@ class Model(BaseModel):
                     x_l.append(x_i)
                     if self.need_attn:
                         attn[1].append(a)
-                x_l = torch.stack(x_l, dim=0).sum(dim=0)
-                x = self.sa_norm(x_l)
+                x = x + torch.stack(x_l, dim=0).sum(dim=0)
+                x = self.sa_norm(x)
 
                 x = x.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
                 x = x.reshape(N, M*T, V*C)  # n,mv,tc
