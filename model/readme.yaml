@@ -794,3 +794,5 @@ aagcn_v31:
                   - 89.1%
         - 220209120001_nopad_3ks_lowerlr_noaug_cossin_clstokensplit_newspatial:
                   - 89.8%
+        - 220209120001_nopad_..._10sh:
+                  - 90.1%

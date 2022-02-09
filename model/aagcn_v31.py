@@ -328,6 +328,7 @@ class Model(BaseModel):
         # 3. transformer (temporal)
         t_trans_dim = t_trans_cfg['model_dim'] * num_point
         t_trans_cfg['model_dim'] = t_trans_dim
+        t_trans_cfg['ffn_dim'] *= num_point
         t_trans_enc_layer = TransformerEncoderLayerExtV2(cfg=t_trans_cfg)
         self.t_trans_enc_layers = torch.nn.ModuleList(
             [copy.deepcopy(t_trans_enc_layer)
@@ -345,6 +346,7 @@ class Model(BaseModel):
         if add_A:
             s_trans_dim = s_trans_cfg['model_dim'] * 100
             s_trans_cfg['model_dim'] = s_trans_dim
+            s_trans_cfg['ffn_dim'] *= 100
             s_trans_enc_layers = torch.nn.ModuleDict(
                 {
                     f'subset{a_i}':
@@ -366,6 +368,7 @@ class Model(BaseModel):
         else:
             s_trans_dim = s_trans_cfg['model_dim'] * 100
             s_trans_cfg['model_dim'] = s_trans_dim
+            s_trans_cfg['ffn_dim'] *= 100
             s_trans_enc_layer = TransformerEncoderLayerExtV2(
                 cfg=s_trans_cfg,
                 A=None
