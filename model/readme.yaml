@@ -320,6 +320,8 @@ aagcn_v17:
                   - converged really fast at the beginning (val acc was higher)
         - 220207140001_nopad_3ks_noaug_lowerlr_100div_cossin_25h:
                   - 91.2%
+        - 220209100001_nopad_3ks_noaug_lowerlr_100div_cossin_25h_6l:
+                  - 91.0%
         - 220121120001_nopad_3ks_noaug_lowerlr_100div_cossin_32d:
                   - 90.4%
                   - almost overfit, train acc ~1
@@ -491,7 +493,7 @@ aagcn_v17:
                   - 89.6%
         - 220207140001_nopad_3ks_noaug_lowerlr_100div_cossin_256dffn:
                   - 91.0%
-        
+
         - 220207140001_nopad_3ks_noaug_lowerlr_100div_cossin_stretch:
                   - remove zero padding and stretch the original values.
                   - 31.1%
