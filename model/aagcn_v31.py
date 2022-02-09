@@ -300,6 +300,7 @@ class Model(BaseModel):
         transformer_config_checker(s_trans_cfg)
 
         self.trans_seq = trans_seq
+
         self.num_subset = num_subset
         self.need_attn = need_attn
 
@@ -360,6 +361,8 @@ class Model(BaseModel):
                 [copy.deepcopy(s_trans_enc_layers)
                  for _ in range(s_trans_cfg['num_layers'])]
             )
+            self.sa_norm = nn.LayerNorm(s_trans_dim,
+                                        eps=s_trans_cfg['layer_norm_eps'])
         else:
             s_trans_dim = s_trans_cfg['model_dim'] * 100
             s_trans_cfg['model_dim'] = s_trans_dim
@@ -437,8 +440,9 @@ class Model(BaseModel):
                     if self.need_attn:
                         attn[1].append(a)
                 x_l = torch.stack(x_l, dim=0).sum(dim=0)
+                x = self.sa_norm(x_l)
 
-                x = x_l.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
+                x = x.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
                 x = x.reshape(N, M*T, V*C)  # n,mv,tc
                 x = torch.cat([x0, x], dim=1)
 
