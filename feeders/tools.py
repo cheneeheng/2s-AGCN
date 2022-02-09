@@ -1,5 +1,4 @@
 import random
-from this import d
 
 import numpy as np
 from scipy import interpolate
@@ -213,3 +212,15 @@ def openpose_match(data_numpy):
     data_numpy = data_numpy[:, :, :, rank]
 
     return data_numpy
+
+
+# Tests
+dummy = np.array([
+    [[[1, 2], [2, 3]], [[2, 3], [3, 4]]],
+    [[[2, 3], [3, 4]], [[3, 4], [4, 5]]],
+    [[[3, 4], [4, 5]], [[4, 5], [5, 6]]]
+])  # c,t,v,m
+dummy = np.concatenate([dummy, dummy*0, dummy*0], axis=1)
+dummy1 = stretch_to_maximum_length(dummy)
+print(np.array_str(dummy, precision=1, suppress_small=True))
+print(np.array_str(dummy1, precision=1, suppress_small=True))

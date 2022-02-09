@@ -331,6 +331,8 @@ aagcn_v17:
         - 220121120001_nopad_3ks_noaug_lowerlr_100div_cossin_128d:
                   - 89.7%
                   - almost overfit, train acc ~1
+        - 220207140001_nopad_3ks_noaug_lowerlr_100div_cossin_128d:
+                  - 89.7%
         - 220202230001_nopad_3ks_noaug_lowerlr_100div_cossin_128d_4h:
                   - did not converge.
         - 220201210001_nopad_3ks_noaug_lowerlr_100div_cossin_128d_8h:
@@ -487,6 +489,12 @@ aagcn_v17:
 
         - 220207140001_nopad_3ks_noaug_lowerlr_100div_cossin_16dffn:
                   - 89.6%
+        - 220207140001_nopad_3ks_noaug_lowerlr_100div_cossin_256dffn:
+                  - 91.0%
+        
+        - 220207140001_nopad_3ks_noaug_lowerlr_100div_cossin_stretch:
+                  - remove zero padding and stretch the original values.
+                  - 31.1%
 
 aagcn_v18:
         - added shift operation after the gcn. This forward concats the features.
@@ -780,3 +788,5 @@ aagcn_v31:
         - based on aagcn_v19.
         - uses 1 PE.
         - sequential and alternates between temporal and spatial.
+        - 220208220001_nopad_3ks_lowerlr_noaug_cossin:
+                  - 89.1%

@@ -337,6 +337,8 @@ class Model(BaseModel):
             self.t_pos_encoder = lambda x: x
 
         # 4. transformer (spatial)
+        s_trans_dim = s_trans_cfg['model_dim'] * 100
+        s_trans_cfg['model_dim'] = s_trans_dim
         s_trans_enc_layer = TransformerEncoderLayerExtV2(
             cfg=s_trans_cfg,
             A=self.graph.A if add_A else None
@@ -374,12 +376,25 @@ class Model(BaseModel):
             if self.need_attn:
                 attn[0].append(a)
 
-            x = x.reshape(-1, V, C)  # nmt,v,c
+            # x = x.reshape(-1, V, C)  # nmt,v,c
+            # A = s_layer.PA  # 3,v,v
+            # mask = None if A is None else A.repeat(N*(M*T+1), 1, 1)
+            # x, a = s_layer(x, mask)
+            # if self.need_attn:
+            #     attn[1].append(a)
+
+            x0 = x[:, 0:1, :]  # n,1,vc
+            x = x[:, 1:, :]  # n,mt,vc
+            x = x.view(N, M, T, V, C).permute(0, 1, 3, 2, 4).contiguous()
+            x = x.reshape(N, M*V, T*C)  # n,mv,tc
             A = s_layer.PA  # 3,v,v
             mask = None if A is None else A.repeat(N*(M*T+1), 1, 1)
             x, a = s_layer(x, mask)
             if self.need_attn:
                 attn[1].append(a)
+            x = x.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
+            x = x.reshape(N, M*T, V*C)  # n,mv,tc
+            x = torch.cat([x0, x], dim=1)
 
         x = x.reshape(N, -1, V*C)  # n,mt,vc
         if self.classifier_type == 'CLS':
