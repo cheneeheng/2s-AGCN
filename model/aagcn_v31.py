@@ -281,8 +281,12 @@ class Model(BaseModel):
                  s_trans_cfg: Optional[dict] = None,
 
                  add_A: bool = False,
+                 add_Aa: bool = False,
 
                  trans_seq: str = 's-t',
+
+                 multi_trans_dropout: float = 0.0,
+                 res_dropout: float = 0.2,
 
                  pos_enc: str = 'True',
                  classifier_type: str = 'CLS',
@@ -342,7 +346,15 @@ class Model(BaseModel):
         else:
             self.t_pos_encoder = lambda x: x
 
+        if 'res' in trans_seq:
+            self.res_dropout = nn.Dropout(p=res_dropout)
+            self.res_norm = nn.LayerNorm(t_trans_dim,
+                                         eps=t_trans_cfg['layer_norm_eps'])
+
         # 4. transformer (spatial)
+        self.alpha = 1
+        self.sa_norm = lambda x: x
+        self.multi_trans_dropout = nn.Dropout(p=multi_trans_dropout)
         if add_A:
             s_trans_dim = s_trans_cfg['model_dim'] * 100
             s_trans_cfg['model_dim'] = s_trans_dim
@@ -365,6 +377,8 @@ class Model(BaseModel):
             )
             self.sa_norm = nn.LayerNorm(s_trans_dim,
                                         eps=s_trans_cfg['layer_norm_eps'])
+            if add_Aa:
+                self.alpha = nn.Parameter(torch.zeros(1))
         else:
             s_trans_dim = s_trans_cfg['model_dim'] * 100
             s_trans_cfg['model_dim'] = s_trans_dim
@@ -438,7 +452,7 @@ class Model(BaseModel):
                 x_l = []
                 for _, s_layer in self.s_trans_enc_layers[i].items():
                     # v,v
-                    x_i, a = s_layer(x, s_layer.PA)
+                    x_i, a = s_layer(x, s_layer.PA * self.alpha)
                     x_l.append(x_i)
                     if self.need_attn:
                         attn[1].append(a)
@@ -454,6 +468,38 @@ class Model(BaseModel):
                 x, a = self.t_trans_enc_layers[i](x)
                 if self.need_attn:
                     attn[0].append(a)
+
+            elif self.trans_seq == 'sa-t-res':
+                # Spatial
+                x0 = x[:, 0:1, :]  # n,1,vc
+                x1 = x[:, 1:, :]  # n,mt,vc
+                x1 = x1.view(N, M, T, V, C).permute(0, 1, 3, 2, 4).contiguous()
+                x1 = x1.reshape(N*M, V, T*C)  # nm,v,tc
+
+                x_l = []
+                for _, s_layer in self.s_trans_enc_layers[i].items():
+                    # v,v
+                    x_i, a = s_layer(x1, s_layer.PA * self.alpha)
+                    x_l.append(x_i)
+                    if self.need_attn:
+                        attn[1].append(a)
+                x_l = torch.stack(x_l, dim=0).sum(dim=0)
+                x1 = x1 + self.multi_trans_dropout(x_l)
+                x1 = self.sa_norm(x1)
+
+                x1 = x1.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
+                x1 = x1.reshape(N, M*T, V*C)  # n,mv,tc
+                x2 = torch.cat([x0, x1], dim=1)
+
+                # Temporal
+                x2 = x2.reshape(N, -1, V*C)  # n,mt,vc
+                x2, a = self.t_trans_enc_layers[i](x2)
+                if self.need_attn:
+                    attn[0].append(a)
+
+                # Residual
+                x = x + self.res_dropout(x2)
+                x = self.res_norm(x)
 
             elif self.trans_seq == 't-s':
                 # Temporal
@@ -507,7 +553,7 @@ if __name__ == '__main__':
                       'prenorm': False,
                       'num_layers': 3
                   },
-                  trans_seq='sa-t',
+                  trans_seq='sa-t-res',
                   add_A=True,
                   kernel_size=3,
                   pad=False,
