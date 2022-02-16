@@ -194,8 +194,8 @@ def multi_head_attention_forward(
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
     tens_ops = (query, key, value, in_proj_weight, in_proj_bias,
                 bias_k, bias_v, out_proj_weight, out_proj_bias)
-    if torch.has_torch_function(tens_ops):
-        return torch.handle_torch_function(
+    if torch.overrides.has_torch_function(tens_ops):
+        return torch.overrides.handle_torch_function(
             multi_head_attention_forward,
             tens_ops,
             query,
@@ -459,16 +459,22 @@ class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
                  activation: str = "relu",
                  layer_norm_eps: float = 1e-5,
                  batch_first: bool = False,
+                 device=None,
+                 dtype=None,
                  pre_norm: bool = False,
                  A: np.ndarray = None) -> None:
+        factory_kwargs = {'device': device, 'dtype': dtype}
         super().__init__(d_model, nhead, dim_feedforward, dropout, activation,
-                         layer_norm_eps, batch_first)
+                         layer_norm_eps, batch_first, device, dtype)
         self.pre_norm = pre_norm
         if A is None:
             self.PA = None
         else:
             self.PA = nn.Parameter(
                 torch.from_numpy(A.astype(np.float32)))  # Bk
+        self.self_attn = MultiheadAttentionExt(
+            d_model, nhead, dropout=dropout, batch_first=batch_first,
+            **factory_kwargs)
 
     def forward(self,
                 src: torch.Tensor,
