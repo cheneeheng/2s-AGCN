@@ -150,6 +150,7 @@ def scaled_dot_product_attention(
     v: torch.Tensor,
     attn_mask: Optional[torch.Tensor] = None,
     dropout_p: float = 0.0,
+    alpha: Optional[torch.Tensor] = None,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     B, Nt, E = q.shape
     q = q / math.sqrt(E)
@@ -158,8 +159,10 @@ def scaled_dot_product_attention(
     # if attn_mask is not None:
     #     attn += attn_mask
     attn = softmax(attn, dim=-1)
+    if alpha is not None:
+        attn = attn * alpha
     if attn_mask is not None:
-        attn = attn_mask + attn
+        attn = attn + attn_mask
     if dropout_p > 0.0:
         attn = dropout(attn, p=dropout_p)
     # (B, Nt, Ns) x (B, Ns, E) -> (B, Nt, E)
@@ -191,6 +194,7 @@ def multi_head_attention_forward(
     v_proj_weight: Optional[torch.Tensor] = None,
     static_k: Optional[torch.Tensor] = None,
     static_v: Optional[torch.Tensor] = None,
+    alpha: Optional[torch.Tensor] = None,
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
     tens_ops = (query, key, value, in_proj_weight, in_proj_bias,
                 bias_k, bias_v, out_proj_weight, out_proj_bias)
@@ -370,7 +374,7 @@ def multi_head_attention_forward(
     # (deep breath) calculate attention and out projection
     #
     attn_output, attn_output_weights = scaled_dot_product_attention(
-        q, k, v, attn_mask, dropout_p)
+        q, k, v, attn_mask, dropout_p, alpha=alpha)
     attn_output = attn_output.transpose(
         0, 1).contiguous().view(tgt_len, bsz, embed_dim)
     attn_output = linear(attn_output, out_proj_weight, out_proj_bias)
@@ -412,7 +416,8 @@ class MultiheadAttentionExt(nn.MultiheadAttention):
                 value: torch.Tensor,
                 key_padding_mask: Optional[torch.Tensor] = None,
                 need_weights: bool = True,
-                attn_mask: Optional[torch.Tensor] = None
+                attn_mask: Optional[torch.Tensor] = None,
+                alpha: Optional[torch.Tensor] = None
                 ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         if self.batch_first:
             query, key, value = [x.transpose(1, 0)
@@ -431,7 +436,8 @@ class MultiheadAttentionExt(nn.MultiheadAttention):
                 use_separate_proj_weight=True,
                 q_proj_weight=self.q_proj_weight,
                 k_proj_weight=self.k_proj_weight,
-                v_proj_weight=self.v_proj_weight)
+                v_proj_weight=self.v_proj_weight,
+                alpha=alpha)
         else:
             attn_output, attn_output_weights = multi_head_attention_forward(
                 query, key, value, self.embed_dim, self.num_heads,
@@ -441,7 +447,8 @@ class MultiheadAttentionExt(nn.MultiheadAttention):
                 training=self.training,
                 key_padding_mask=key_padding_mask,
                 need_weights=need_weights,
-                attn_mask=attn_mask)
+                attn_mask=attn_mask,
+                alpha=alpha)
         if self.batch_first:
             return attn_output.transpose(1, 0), attn_output_weights
         else:
@@ -462,7 +469,8 @@ class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
                  device=None,
                  dtype=None,
                  pre_norm: bool = False,
-                 A: np.ndarray = None) -> None:
+                 A: np.ndarray = None,
+                 Aa: bool = False) -> None:
         factory_kwargs = {'device': device, 'dtype': dtype}
         super().__init__(d_model, nhead, dim_feedforward, dropout, activation,
                          layer_norm_eps, batch_first, device, dtype)
@@ -472,6 +480,10 @@ class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
         else:
             self.PA = nn.Parameter(
                 torch.from_numpy(A.astype(np.float32)))  # Bk
+        if Aa is None:
+            self.alpha = None
+        else:
+            self.alpha = nn.Parameter(torch.zeros(1))
         self.self_attn = MultiheadAttentionExt(
             d_model, nhead, dropout=dropout, batch_first=batch_first,
             **factory_kwargs)
@@ -479,12 +491,14 @@ class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
     def forward(self,
                 src: torch.Tensor,
                 src_mask: Optional[torch.Tensor] = None,
-                src_key_padding_mask: Optional[torch.Tensor] = None
+                src_key_padding_mask: Optional[torch.Tensor] = None,
+                alpha: Optional[torch.Tensor] = None
                 ) -> torch.Tensor:
         if self.pre_norm:
             src = self.norm1(src)
             src1, attn = self.self_attn(src, src, src, attn_mask=src_mask,
-                                        key_padding_mask=src_key_padding_mask)
+                                        key_padding_mask=src_key_padding_mask,
+                                        alpha=alpha)
             src = src + self.dropout1(src1)
             src = self.norm2(src)
             src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))  # noqa
@@ -493,7 +507,8 @@ class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
 
         else:
             src1, attn = self.self_attn(src, src, src, attn_mask=src_mask,
-                                        key_padding_mask=src_key_padding_mask)
+                                        key_padding_mask=src_key_padding_mask,
+                                        alpha=alpha)
             src = src + self.dropout1(src1)
             src = self.norm1(src)
             src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))  # noqa
@@ -507,7 +522,8 @@ class TransformerEncoderLayerExtV2(TransformerEncoderLayerExt):
 
     def __init__(self,
                  cfg: dict,
-                 A: np.ndarray = None) -> None:
+                 A: np.ndarray = None,
+                 Aa: bool = False) -> None:
         super().__init__(
             d_model=cfg['model_dim'],
             nhead=cfg['num_heads'],
@@ -518,6 +534,7 @@ class TransformerEncoderLayerExtV2(TransformerEncoderLayerExt):
             batch_first=cfg['batch_first'],
             pre_norm=cfg['prenorm'],
             A=A,
+            Aa=Aa,
         )
 
 
@@ -665,7 +682,6 @@ class Model(BaseModel):
                                          eps=t_trans_cfg['layer_norm_eps'])
 
         # 4. transformer (spatial)
-        self.alpha = 1
         self.sa_norm = lambda x: x
         self.multi_trans_dropout = nn.Dropout(p=multi_trans_dropout)
         if add_A:
@@ -678,7 +694,8 @@ class Model(BaseModel):
                     copy.deepcopy(
                         TransformerEncoderLayerExtV2(
                             cfg=s_trans_cfg,
-                            A=self.graph.A[a_i]
+                            A=self.graph.A[a_i],
+                            Aa=add_Aa
                         )
                     )
                     for a_i in range(self.num_subset)
@@ -690,8 +707,6 @@ class Model(BaseModel):
             )
             self.sa_norm = nn.LayerNorm(s_trans_dim,
                                         eps=s_trans_cfg['layer_norm_eps'])
-            if add_Aa:
-                self.alpha = nn.Parameter(torch.zeros(1))
         else:
             s_trans_dim = s_trans_cfg['model_dim'] * 100
             s_trans_cfg['model_dim'] = s_trans_dim
@@ -773,7 +788,7 @@ class Model(BaseModel):
                     if s_layer.PA is None:
                         mask = None
                     else:
-                        mask = s_layer.PA * self.alpha
+                        mask = s_layer.PA * s_layer.alpha
                     x_i, a = s_layer(x, mask)
                     x_l.append(x_i)
                     if self.need_attn:
@@ -804,8 +819,41 @@ class Model(BaseModel):
                     if s_layer.PA is None:
                         mask = None
                     else:
-                        mask = s_layer.PA * self.alpha
+                        mask = s_layer.PA * s_layer.alpha
                     x_i, a = s_layer(x1, mask)
+                    x_l.append(x_i)
+                    if self.need_attn:
+                        attn[1].append(a)
+                x_l = torch.stack(x_l, dim=0).sum(dim=0)
+                x1 = x1 + self.multi_trans_dropout(x_l)
+                x1 = self.sa_norm(x1)
+
+                x1 = x1.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
+                x1 = x1.reshape(N, M*T, V*C)  # n,mv,tc
+                x2 = torch.cat([x0, x1], dim=1)
+
+                # Temporal
+                x2 = x2.reshape(N, -1, V*C)  # n,mt,vc
+                x2, a = self.t_trans_enc_layers[i](x2)
+                if self.need_attn:
+                    attn[0].append(a)
+
+                # Residual
+                x = x + self.res_dropout(x2)
+                x = self.res_norm(x)
+
+            elif self.trans_seq == 'sa-t-res-attn-a':
+                # Spatial
+                x0 = x[:, 0:1, :]  # n,1,vc
+                x1 = x[:, 1:, :]  # n,mt,vc
+                x1 = x1.view(N, M, T, V, C).permute(0, 1, 3, 2, 4).contiguous()
+                x1 = x1.reshape(N*M, V, T*C)  # nm,v,tc
+
+                x_l = []
+                for _, s_layer in s_trans_enc_layers:
+                    # v,v
+                    mask = s_layer.PA
+                    x_i, a = s_layer(x1, mask, alpha=s_layer.alpha)
                     x_l.append(x_i)
                     if self.need_attn:
                         attn[1].append(a)
