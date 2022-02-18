@@ -10,7 +10,6 @@ import numpy as np
 import math
 from typing import Optional, Tuple
 
-from model.aagcn import import_class
 from model.aagcn import conv_init
 from model.aagcn import bn_init
 from model.aagcn import batch_norm_2d
@@ -806,6 +805,34 @@ class Model(BaseModel):
                 if self.need_attn:
                     attn[0].append(a)
 
+            elif self.trans_seq == 'sa-t-attn-a':
+                # Spatial
+                x0 = x[:, 0:1, :]  # n,1,vc
+                x = x[:, 1:, :]  # n,mt,vc
+                x = x.view(N, M, T, V, C).permute(0, 1, 3, 2, 4).contiguous()
+                x = x.reshape(N*M, V, T*C)  # nm,v,tc
+
+                x_l = []
+                for _, s_layer in s_trans_enc_layers:
+                    # v,v
+                    mask = s_layer.PA
+                    x_i, a = s_layer(x, mask, alpha=s_layer.alpha)
+                    x_l.append(x_i)
+                    if self.need_attn:
+                        attn[1].append(a)
+                x = x + torch.stack(x_l, dim=0).sum(dim=0)
+                x = self.sa_norm(x)
+
+                x = x.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
+                x = x.reshape(N, M*T, V*C)  # n,mv,tc
+                x = torch.cat([x0, x], dim=1)
+
+                # Temporal
+                x = x.reshape(N, -1, V*C)  # n,mt,vc
+                x, a = self.t_trans_enc_layers[i](x)
+                if self.need_attn:
+                    attn[0].append(a)
+
             elif self.trans_seq == 'sa-t-res':
                 # Spatial
                 x0 = x[:, 0:1, :]  # n,1,vc
@@ -927,7 +954,7 @@ if __name__ == '__main__':
                       'prenorm': False,
                       'num_layers': 2
                   },
-                  trans_seq='sa-t-res',
+                  trans_seq='sa-t-attn-a',
                   #   add_A=True,
                   #   add_Aa=True,
                   kernel_size=3,

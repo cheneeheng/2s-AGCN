@@ -823,3 +823,10 @@ aagcn_v32:
                   - 91.1%
         - 220216190001_nopad_3ks_lowerlr_noaug_cossin:
                   - 90.9%
+        - adding alpha to attention and not the global mask.
+        - 220217140001_nopad_3ks_lowerlr_noaug_cossin_1l_8sh:
+                  - 90.5%
+        - 220217140001_nopad_3ks_lowerlr_noaug_cossin_1l:
+                  - 90.4%
+        - 220217140001_nopad_3ks_lowerlr_noaug_cossin:
+                  - 90.7%
