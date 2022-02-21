@@ -287,7 +287,9 @@ class MultiheadAttention(nn.MultiheadAttention):
             kdim=kdim, vdim=vdim, batch_first=batch_first, device=device,
             dtype=dtype
         )
-        if 'rel' in pos_emb['name']:
+        if pos_emb is None:
+            self.pos_emb = None
+        elif 'rel' in pos_emb['name']:
             self.pos_emb = RelPosEmb1D(
                 tokens=pos_emb['tokens'],
                 dim_head=pos_emb['dim_head'],
