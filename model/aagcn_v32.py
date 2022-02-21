@@ -407,10 +407,14 @@ class Model(BaseModel):
 
         # 5. classifier
         self.classifier_type = classifier_type
-        if classifier_type == 'CLS':
+        if 'CLS' in classifier_type:
             self.cls_token = nn.Parameter(torch.randn(1, 1, t_trans_dim))
         else:
             self.cls_token = None
+
+        if 'POOL' in classifier_type:
+            self.cls_pool_fc = nn.Linear(t_trans_dim, t_trans_dim)
+            self.cls_pool_act = nn.Tanh()
 
         self.init_fc(t_trans_dim, num_class)
 
@@ -610,6 +614,10 @@ class Model(BaseModel):
         x = x.reshape(N, -1, V*C)  # n,mt,vc
         if self.classifier_type == 'CLS':
             x = x[:, 0, :]  # n,vc
+        elif self.classifier_type == 'CLS-POOL':
+            x = x[:, 0, :]  # n,vc
+            x = self.cls_pool_fc(x)
+            x = self.cls_pool_act(x)
         elif self.classifier_type == 'GAP':
             x = x.mean(1)  # n,vc
         else:
@@ -645,7 +653,8 @@ if __name__ == '__main__':
                   #   add_Aa=True,
                   kernel_size=3,
                   pad=False,
-                  pos_enc='cossin'
+                  pos_enc='cossin',
+                  classifier_type='CLS-POOL'
                   )
     # print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
