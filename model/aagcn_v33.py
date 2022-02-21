@@ -145,6 +145,7 @@ class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
     """Option for pre of postnorm"""
 
     def __init__(self,
+                 mha: nn.Module,
                  d_model: int,
                  nhead: int,
                  dim_feedforward: int = 2048,
@@ -155,6 +156,7 @@ class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
                  device=None,
                  dtype=None,
                  pre_norm: bool = False,
+                 pos_emb: dict = None,
                  A: np.ndarray = None,
                  Aa: bool = False) -> None:
         factory_kwargs = {'device': device, 'dtype': dtype}
@@ -170,9 +172,15 @@ class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
             self.alpha = None
         else:
             self.alpha = nn.Parameter(torch.zeros(1))
-        self.self_attn = MultiheadAttention(
-            d_model, nhead, dropout=dropout, batch_first=batch_first,
-            **factory_kwargs)
+        kwargs = {
+            'embed_dim': d_model,
+            'num_heads': nhead,
+            'dropout': dropout,
+            'batch_first': batch_first,
+        }
+        kwargs.update(factory_kwargs)
+        if isinstance(mha, MultiheadAttention):
+            kwargs['pos_emb'] = pos_emb
 
     def forward(self,
                 src: torch.Tensor,
@@ -180,11 +188,15 @@ class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
                 src_key_padding_mask: Optional[torch.Tensor] = None,
                 alpha: Optional[torch.Tensor] = None
                 ) -> torch.Tensor:
+        kwargs = {
+            'attn_mask': src_mask,
+            'key_padding_mask': src_key_padding_mask,
+        }
+        if isinstance(self.self_attn, MultiheadAttention):
+            kwargs['alpha'] = alpha
         if self.pre_norm:
             src = self.norm1(src)
-            src1, attn = self.self_attn(src, src, src, attn_mask=src_mask,
-                                        key_padding_mask=src_key_padding_mask,
-                                        alpha=alpha)
+            src1, attn = self.self_attn(src, src, src, **kwargs)
             src = src + self.dropout1(src1)
             src = self.norm2(src)
             src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))  # noqa
@@ -192,9 +204,7 @@ class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
             return src, attn
 
         else:
-            src1, attn = self.self_attn(src, src, src, attn_mask=src_mask,
-                                        key_padding_mask=src_key_padding_mask,
-                                        alpha=alpha)
+            src1, attn = self.self_attn(src, src, src, **kwargs)
             src = src + self.dropout1(src1)
             src = self.norm1(src)
             src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))  # noqa
@@ -208,9 +218,17 @@ class TransformerEncoderLayerExtV2(TransformerEncoderLayerExt):
 
     def __init__(self,
                  cfg: dict,
+                 mha: nn.Module,
                  A: np.ndarray = None,
                  Aa: bool = False) -> None:
+        pos_emb = {
+            'name': cfg['pos_emb'],
+            'tokens': cfg['length'],
+            'dim_head': cfg['model_dim']//cfg['num_heads'],
+            'heads': True if 'share' in cfg['pos_emb'] else False,
+        }
         super().__init__(
+            mha=mha,
             d_model=cfg['model_dim'],
             nhead=cfg['num_heads'],
             dim_feedforward=cfg['ffn_dim'],
@@ -219,6 +237,7 @@ class TransformerEncoderLayerExtV2(TransformerEncoderLayerExt):
             layer_norm_eps=cfg['layer_norm_eps'],
             batch_first=cfg['batch_first'],
             pre_norm=cfg['prenorm'],
+            pos_emb=pos_emb,
             A=A,
             Aa=Aa,
         )
@@ -258,7 +277,9 @@ def transformer_config_checker(cfg: dict):
         'prenorm',
         'batch_first',
         'layer_norm_eps',
-        'num_layers'
+        'num_layers',
+        'length',
+        'pos_emb'
     ]
     for x in cfg:
         assert f'{x}' in trans_cfg_names, f'{x} not in transformer config'
@@ -314,14 +335,20 @@ class Model(BaseModel):
         super().__init__(num_class, num_point, num_person,
                          in_channels, drop_out, adaptive, gbn_split)
 
-        t_trans_cfg['layer_norm_eps'] = 1e-5
-        s_trans_cfg['layer_norm_eps'] = 1e-5
-        t_trans_cfg['batch_first'] = True
-        s_trans_cfg['batch_first'] = True
-        transformer_config_checker(t_trans_cfg)
-        transformer_config_checker(s_trans_cfg)
+        if t_trans_cfg is not None:
+            t_trans_cfg['layer_norm_eps'] = 1e-5
+            t_trans_cfg['batch_first'] = True
+            transformer_config_checker(t_trans_cfg)
+        if s_trans_cfg is not None:
+            s_trans_cfg['layer_norm_eps'] = 1e-5
+            s_trans_cfg['batch_first'] = True
+            transformer_config_checker(s_trans_cfg)
 
         self.trans_seq = trans_seq
+        if 'v2' in self.trans_seq:
+            mha = MultiheadAttention
+        else:
+            mha = nn.MultiheadAttention
 
         self.num_subset = num_subset
         self.need_attn = need_attn
@@ -348,62 +375,69 @@ class Model(BaseModel):
                                  output_channel=backbone_dim)
 
         # 3. transformer (temporal)
-        t_trans_dim = t_trans_cfg['model_dim'] * num_point
-        t_trans_cfg['model_dim'] = t_trans_dim
-        t_trans_cfg['ffn_dim'] *= num_point
-        t_trans_enc_layer = TransformerEncoderLayerExtV2(cfg=t_trans_cfg)
-        self.t_trans_enc_layers = torch.nn.ModuleList(
-            [copy.deepcopy(t_trans_enc_layer)
-             for _ in range(t_trans_cfg['num_layers'])])
+        if t_trans_cfg is not None:
+            t_trans_dim = t_trans_cfg['model_dim'] * num_point
+            t_trans_cfg['model_dim'] = t_trans_dim
+            t_trans_cfg['ffn_dim'] *= num_point
+            t_trans_enc_layer = TransformerEncoderLayerExtV2(
+                cfg=t_trans_cfg,
+                mha=mha
+            )
+            self.t_trans_enc_layers = torch.nn.ModuleList(
+                [copy.deepcopy(t_trans_enc_layer)
+                 for _ in range(t_trans_cfg['num_layers'])])
 
-        pos_enc = str(pos_enc)
-        if pos_enc == 'True' or pos_enc == 'original':
-            self.t_pos_encoder = PositionalEncoding(t_trans_dim)
-        elif pos_enc == 'cossin':
-            self.t_pos_encoder = CosSinPositionalEncoding(t_trans_dim)
-        else:
-            self.t_pos_encoder = lambda x: x
+            pos_enc = str(pos_enc)
+            if pos_enc == 'True' or pos_enc == 'original':
+                self.t_pos_encoder = PositionalEncoding(t_trans_dim)
+            elif pos_enc == 'cossin':
+                self.t_pos_encoder = CosSinPositionalEncoding(t_trans_dim)
+            else:
+                self.t_pos_encoder = lambda x: x
 
-        if 'res' in trans_seq:
-            self.res_dropout = nn.Dropout(p=res_dropout)
-            self.res_norm = nn.LayerNorm(t_trans_dim,
-                                         eps=t_trans_cfg['layer_norm_eps'])
+            if 'res' in trans_seq:
+                self.res_dropout = nn.Dropout(p=res_dropout)
+                self.res_norm = nn.LayerNorm(t_trans_dim,
+                                             eps=t_trans_cfg['layer_norm_eps'])
 
         # 4. transformer (spatial)
-        self.sa_norm = lambda x: x
-        self.multi_trans_dropout = nn.Dropout(p=multi_trans_dropout)
-        s_trans_dim = s_trans_cfg['model_dim'] * trans_len
-        s_trans_cfg['model_dim'] = s_trans_dim
-        s_trans_cfg['ffn_dim'] *= trans_len
-        if add_A:
-            s_trans_enc_layers = torch.nn.ModuleDict(
-                {
-                    f'subset{a_i}':
-                    copy.deepcopy(
-                        TransformerEncoderLayerExtV2(
-                            cfg=s_trans_cfg,
-                            A=self.graph.A[a_i],
-                            Aa=add_Aa
+        if s_trans_cfg is not None:
+            self.sa_norm = lambda x: x
+            self.multi_trans_dropout = nn.Dropout(p=multi_trans_dropout)
+            s_trans_dim = s_trans_cfg['model_dim'] * trans_len
+            s_trans_cfg['model_dim'] = s_trans_dim
+            s_trans_cfg['ffn_dim'] *= trans_len
+            if add_A:
+                s_trans_enc_layers = torch.nn.ModuleDict(
+                    {
+                        f'subset{a_i}':
+                        copy.deepcopy(
+                            TransformerEncoderLayerExtV2(
+                                cfg=s_trans_cfg,
+                                mha=mha,
+                                A=self.graph.A[a_i],
+                                Aa=add_Aa
+                            )
                         )
-                    )
-                    for a_i in range(self.num_subset)
-                }
-            )
-            self.s_trans_enc_layers = torch.nn.ModuleList(
-                [copy.deepcopy(s_trans_enc_layers)
-                 for _ in range(s_trans_cfg['num_layers'])]
-            )
-            self.sa_norm = nn.LayerNorm(s_trans_dim,
-                                        eps=s_trans_cfg['layer_norm_eps'])
-        else:
-            s_trans_enc_layer = TransformerEncoderLayerExtV2(
-                cfg=s_trans_cfg,
-                A=None
-            )
-            self.s_trans_enc_layers = torch.nn.ModuleList(
-                [copy.deepcopy(s_trans_enc_layer)
-                 for _ in range(s_trans_cfg['num_layers'])]
-            )
+                        for a_i in range(self.num_subset)
+                    }
+                )
+                self.s_trans_enc_layers = torch.nn.ModuleList(
+                    [copy.deepcopy(s_trans_enc_layers)
+                     for _ in range(s_trans_cfg['num_layers'])]
+                )
+                self.sa_norm = nn.LayerNorm(s_trans_dim,
+                                            eps=s_trans_cfg['layer_norm_eps'])
+            else:
+                s_trans_enc_layer = TransformerEncoderLayerExtV2(
+                    cfg=s_trans_cfg,
+                    mha=mha,
+                    A=None
+                )
+                self.s_trans_enc_layers = torch.nn.ModuleList(
+                    [copy.deepcopy(s_trans_enc_layer)
+                     for _ in range(s_trans_cfg['num_layers'])]
+                )
 
         # 5. classifier
         self.classifier_type = classifier_type
@@ -453,13 +487,6 @@ class Model(BaseModel):
                 if self.need_attn:
                     attn[0].append(a)
 
-                # x = x.reshape(-1, V, C)  # nmt,v,c
-                # A = s_layer.PA  # 3,v,v
-                # mask = None if A is None else A.repeat(N*(M*T+1), 1, 1)
-                # x, a = s_layer(x, mask)
-                # if self.need_attn:
-                #     attn[1].append(a)
-
             elif self.trans_seq == 'sa-t':
                 # Spatial
                 x0 = x[:, 0:1, :]  # n,1,vc
@@ -475,34 +502,6 @@ class Model(BaseModel):
                     else:
                         mask = s_layer.PA * s_layer.alpha
                     x_i, a = s_layer(x, mask)
-                    x_l.append(x_i)
-                    if self.need_attn:
-                        attn[1].append(a)
-                x = x + torch.stack(x_l, dim=0).sum(dim=0)
-                x = self.sa_norm(x)
-
-                x = x.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
-                x = x.reshape(N, M*T, V*C)  # n,mv,tc
-                x = torch.cat([x0, x], dim=1)
-
-                # Temporal
-                x = x.reshape(N, -1, V*C)  # n,mt,vc
-                x, a = self.t_trans_enc_layers[i](x)
-                if self.need_attn:
-                    attn[0].append(a)
-
-            elif self.trans_seq == 'sa-t-attn-a':
-                # Spatial
-                x0 = x[:, 0:1, :]  # n,1,vc
-                x = x[:, 1:, :]  # n,mt,vc
-                x = x.view(N, M, T, V, C).permute(0, 1, 3, 2, 4).contiguous()
-                x = x.reshape(N*M, V, T*C)  # nm,v,tc
-
-                x_l = []
-                for _, s_layer in s_trans_enc_layers:
-                    # v,v
-                    mask = s_layer.PA
-                    x_i, a = s_layer(x, mask, alpha=s_layer.alpha)
                     x_l.append(x_i)
                     if self.need_attn:
                         attn[1].append(a)
@@ -555,7 +554,54 @@ class Model(BaseModel):
                 x = x + self.res_dropout(x2)
                 x = self.res_norm(x)
 
-            elif self.trans_seq == 'sa-t-res-attn-a':
+            elif self.trans_seq == 't-s':
+                # Temporal
+                x = x.reshape(N, -1, V*C)  # n,mt,vc
+                x, a = self.t_trans_enc_layers[i](x)
+                if self.need_attn:
+                    attn[0].append(a)
+
+                # Spatial
+                x0 = x[:, 0: 1, :]  # n,1,vc
+                x = x[:, 1:, :]  # n,mt,vc
+                x = x.view(N, M, T, V, C).permute(0, 1, 3, 2, 4).contiguous()
+                x = x.reshape(N, M*V, T*C)  # n,mv,tc
+                x, a = self.s_trans_enc_layers[i](x)
+                if self.need_attn:
+                    attn[1].append(a)
+                x = x.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
+                x = x.reshape(N, M*T, V*C)  # n,mv,tc
+                x = torch.cat([x0, x], dim=1)
+
+            elif self.trans_seq == 's-t-v2' or \
+                    self.trans_seq == 's-t-res-v2':
+                # Spatial
+                x0 = x[:, 0:1, :]  # n,1,vc
+                x1 = x[:, 1:, :]  # n,mt,vc
+                x1 = x1.view(N, M, T, V, C).permute(0, 1, 3, 2, 4).contiguous()
+                x1 = x1.reshape(N, M*V, T*C)  # n,mv,tc
+                x1, a = self.s_trans_enc_layers[i](x1)
+                if self.need_attn:
+                    attn[1].append(a)
+                x1 = x1.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
+                x1 = x1.reshape(N, M*T, V*C)  # n,mv,tc
+                x2 = torch.cat([x0, x1], dim=1)
+
+                # Temporal
+                x2 = x2.reshape(N, -1, V*C)  # n,mt,vc
+                x2, a = self.t_trans_enc_layers[i](x2)
+                if self.need_attn:
+                    attn[0].append(a)
+
+                if 'res' in self.trans_seq:
+                    # Residual
+                    x = x + self.res_dropout(x2)
+                    x = self.res_norm(x)
+                else:
+                    x = x2
+
+            elif self.trans_seq == 'sa-t-v2' or \
+                    self.trans_seq == 'sa-t-res-v2':
                 # Spatial
                 x0 = x[:, 0:1, :]  # n,1,vc
                 x1 = x[:, 1:, :]  # n,mt,vc
@@ -584,28 +630,12 @@ class Model(BaseModel):
                 if self.need_attn:
                     attn[0].append(a)
 
-                # Residual
-                x = x + self.res_dropout(x2)
-                x = self.res_norm(x)
-
-            elif self.trans_seq == 't-s':
-                # Temporal
-                x = x.reshape(N, -1, V*C)  # n,mt,vc
-                x, a = self.t_trans_enc_layers[i](x)
-                if self.need_attn:
-                    attn[0].append(a)
-
-                # Spatial
-                x0 = x[:, 0: 1, :]  # n,1,vc
-                x = x[:, 1:, :]  # n,mt,vc
-                x = x.view(N, M, T, V, C).permute(0, 1, 3, 2, 4).contiguous()
-                x = x.reshape(N, M*V, T*C)  # n,mv,tc
-                x, a = self.s_trans_enc_layers[i](x)
-                if self.need_attn:
-                    attn[1].append(a)
-                x = x.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
-                x = x.reshape(N, M*T, V*C)  # n,mv,tc
-                x = torch.cat([x0, x], dim=1)
+                if 'res' in self.trans_seq:
+                    # Residual
+                    x = x + self.res_dropout(x2)
+                    x = self.res_norm(x)
+                else:
+                    x = x2
 
         x = x.reshape(N, -1, V*C)  # n,mt,vc
         if self.classifier_type == 'CLS':
@@ -629,7 +659,9 @@ if __name__ == '__main__':
                       'dropout': 0,
                       'activation': 'gelu',
                       'prenorm': False,
-                      'num_layers': 2
+                      'num_layers': 2,
+                      'pos_emb': 'rel-shared',
+                      'length': 201,
                   },
                   s_trans_cfg={
                       'num_heads': 2,
@@ -638,14 +670,16 @@ if __name__ == '__main__':
                       'dropout': 0,
                       'activation': 'gelu',
                       'prenorm': False,
-                      'num_layers': 2
+                      'num_layers': 2,
+                      'pos_emb': 'rel-shared',
+                      'length': 25,
                   },
-                  trans_seq='sa-t-attn-a',
+                  trans_seq='s-t-v2',
                   #   add_A=True,
                   #   add_Aa=True,
                   kernel_size=3,
                   pad=False,
-                  pos_enc='cossin'
+                  pos_enc=None
                   )
     # print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')

@@ -34,3 +34,5 @@ ipywidgets
 torchinfo
 
 deberta
+
+einops

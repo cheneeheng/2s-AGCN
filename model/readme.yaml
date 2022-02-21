@@ -830,3 +830,7 @@ aagcn_v32:
                   - 90.4%
         - 220217140001_nopad_3ks_lowerlr_noaug_cossin:
                   - 90.7%
+        - 220218140001_nopad_3ks_lowerlr_noaug_cossin_nores_8d:
+                  - 90.0%
+        - 220218140001_nopad_3ks_lowerlr_noaug_cossin_nores:
+                  - 91.1%
