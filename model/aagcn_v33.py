@@ -198,21 +198,23 @@ class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
 
         if self.pre_norm:
             src = self.norm1(src)
-            src1, attn = self.self_attn(src, src, src, **kwargs)
+            output = self.self_attn(src, src, src, **kwargs)
+            src1 = output[0]
             src = src + self.dropout1(src1)
             src = self.norm2(src)
             src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))  # noqa
             src = src + self.dropout2(src2)
-            return src, attn
+            return src, *output[1:]
 
         else:
-            src1, attn = self.self_attn(src, src, src, **kwargs)
+            output = self.self_attn(src, src, src, **kwargs)
+            src1 = output[0]
             src = src + self.dropout1(src1)
             src = self.norm1(src)
             src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))  # noqa
             src = src + self.dropout2(src2)
             src = self.norm2(src)
-            return src, attn
+            return src, *output[1:]
 
 
 class TransformerEncoderLayerExtV2(TransformerEncoderLayerExt):
@@ -585,18 +587,18 @@ class Model(BaseModel):
                 x1 = x[:, 1:, :]  # n,mt,vc
                 x1 = x1.view(N, M, T, V, C).permute(0, 1, 3, 2, 4).contiguous()
                 x1 = x1.reshape(N, M*V, T*C)  # n,mv,tc
-                x1, a = self.s_trans_enc_layers[i](x1)
+                x1, a, pe = self.s_trans_enc_layers[i](x1)
                 if self.need_attn:
-                    attn[1].append(a)
+                    attn[1].append((a, pe))
                 x1 = x1.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
                 x1 = x1.reshape(N, M*T, V*C)  # n,mv,tc
                 x2 = torch.cat([x0, x1], dim=1)
 
                 # Temporal
                 x2 = x2.reshape(N, -1, V*C)  # n,mt,vc
-                x2, a = self.t_trans_enc_layers[i](x2)
+                x2, a, pe = self.t_trans_enc_layers[i](x2)
                 if self.need_attn:
-                    attn[0].append(a)
+                    attn[0].append((a, pe))
 
                 if 'res' in self.trans_seq:
                     # Residual
@@ -618,10 +620,10 @@ class Model(BaseModel):
                     # v,v
                     mask = s_layer.PA
                     alpha = s_layer.alpha
-                    x_i, a = s_layer(x1, mask, alpha=alpha)
+                    x_i, a, pe = s_layer(x1, mask, alpha=alpha)
                     x_l.append(x_i)
                     if self.need_attn:
-                        attn[1].append(a)
+                        attn[1].append((a, pe))
                 x_l = torch.stack(x_l, dim=0).sum(dim=0)
                 x1 = x1 + self.multi_trans_dropout(x_l)
                 x1 = self.sa_norm(x1)
@@ -632,9 +634,9 @@ class Model(BaseModel):
 
                 # Temporal
                 x2 = x2.reshape(N, -1, V*C)  # n,mt,vc
-                x2, a = self.t_trans_enc_layers[i](x2)
+                x2, a, pe = self.t_trans_enc_layers[i](x2)
                 if self.need_attn:
-                    attn[0].append(a)
+                    attn[0].append((a, pe))
 
                 if 'res' in self.trans_seq:
                     # Residual

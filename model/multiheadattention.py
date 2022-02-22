@@ -31,7 +31,10 @@ def scaled_dot_product_attention(
     #     attn += attn_mask
     if pos_emb is not None:
         _, t, d = q.shape
-        attn = attn + pos_emb(q.reshape(-1, num_heads, t, d)).reshape(-1, t, t)
+        pe = pos_emb(q.reshape(-1, num_heads, t, d)).reshape(-1, t, t)
+        attn = attn + pe
+    else:
+        pe = None
     attn = softmax(attn, dim=-1)
     if alpha is not None:
         attn = attn * alpha
@@ -41,7 +44,7 @@ def scaled_dot_product_attention(
         attn = dropout(attn, p=dropout_p)
     # (B, Nt, Ns) x (B, Ns, E) -> (B, Nt, E)
     output = torch.bmm(attn, v)
-    return output, attn
+    return output, attn, pe
 
 
 def multi_head_attention_forward(
@@ -248,7 +251,7 @@ def multi_head_attention_forward(
     #
     # (deep breath) calculate attention and out projection
     #
-    attn_output, attn_output_weights = scaled_dot_product_attention(
+    attn_output, attn_output_weights, pe = scaled_dot_product_attention(
         q, k, v, attn_mask, dropout_p,
         num_heads=num_heads, pos_emb=pos_emb, alpha=alpha
     )
@@ -260,9 +263,9 @@ def multi_head_attention_forward(
         # average attention weights over heads
         attn_output_weights = attn_output_weights.view(
             bsz, num_heads, tgt_len, src_len)
-        return attn_output, attn_output_weights.sum(dim=1) / num_heads
+        return attn_output, attn_output_weights.sum(dim=1) / num_heads, pe
     else:
-        return attn_output, None
+        return attn_output, None, pe
 
 
 class MultiheadAttention(nn.MultiheadAttention):
@@ -314,7 +317,7 @@ class MultiheadAttention(nn.MultiheadAttention):
                                  for x in (query, key, value)]
 
         if not self._qkv_same_embed_dim:
-            attn_output, attn_output_weights = multi_head_attention_forward(
+            attn_output, attn_output_weights, pe = multi_head_attention_forward(
                 query, key, value, self.embed_dim, self.num_heads,
                 self.in_proj_weight, self.in_proj_bias,
                 self.bias_k, self.bias_v, self.add_zero_attn,
@@ -330,7 +333,7 @@ class MultiheadAttention(nn.MultiheadAttention):
                 pos_emb=self.pos_emb,
                 alpha=alpha)
         else:
-            attn_output, attn_output_weights = multi_head_attention_forward(
+            attn_output, attn_output_weights, pe = multi_head_attention_forward(
                 query, key, value, self.embed_dim, self.num_heads,
                 self.in_proj_weight, self.in_proj_bias,
                 self.bias_k, self.bias_v, self.add_zero_attn,
@@ -342,6 +345,6 @@ class MultiheadAttention(nn.MultiheadAttention):
                 pos_emb=self.pos_emb,
                 alpha=alpha)
         if self.batch_first:
-            return attn_output.transpose(1, 0), attn_output_weights
+            return attn_output.transpose(1, 0), attn_output_weights, pe
         else:
-            return attn_output, attn_output_weights
+            return attn_output, attn_output_weights, pe

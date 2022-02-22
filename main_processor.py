@@ -138,6 +138,10 @@ class Processor():
             self.optimizer = optim.Adam(self.model.parameters(),
                                         lr=self.arg.base_lr,
                                         weight_decay=self.arg.weight_decay)
+        elif self.arg.optimizer == 'AdamW':
+            self.optimizer = optim.AdamW(self.model.parameters(),
+                                         lr=self.arg.base_lr,
+                                         weight_decay=self.arg.weight_decay)
         elif self.arg.optimizer == 'SAM_SGD':
             self.optimizer = SAM(params=self.model.parameters(),
                                  base_optimizer=optim.SGD,
@@ -206,7 +210,7 @@ class Processor():
             worker_init_fn=init_seed)
 
     def adjust_learning_rate(self, epoch):
-        opts = ['SGD', 'SAM_SGD', 'Adam']
+        opts = ['SGD', 'SAM_SGD', 'Adam', 'AdamW']
         if self.arg.optimizer in opts:
             if epoch < self.arg.warm_up_epoch:
                 lr = self.arg.base_lr * (epoch + 1) / self.arg.warm_up_epoch
