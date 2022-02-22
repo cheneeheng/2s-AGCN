@@ -414,7 +414,7 @@ class Model(BaseModel):
         if 'POOL' in classifier_type:
             self.cls_pool_fc = nn.Linear(t_trans_dim, t_trans_dim)
             self.cls_pool_act = nn.Tanh()
-            
+
         self.init_fc(t_trans_dim, num_class)
 
     def forward_postprocess(self, x: torch.Tensor, size: torch.Size):

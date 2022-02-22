@@ -834,3 +834,10 @@ aagcn_v32:
                   - 90.0%
         - 220218140001_nopad_3ks_lowerlr_noaug_cossin_nores:
                   - 91.1%
+        - 220218140001_nopad_3ks_lowerlr_noaug_cossin_nores_pool:
+                  - 91.1%
+
+aagcn_v33:
+        - added relative position encoding
+        - 220221150001_nopad_3ks_lowerlr_noaug_rel_pool:
+                  - 91.1%

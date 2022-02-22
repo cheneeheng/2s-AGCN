@@ -172,15 +172,16 @@ class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
             self.alpha = None
         else:
             self.alpha = nn.Parameter(torch.zeros(1))
-        kwargs = {
-            'embed_dim': d_model,
-            'num_heads': nhead,
-            'dropout': dropout,
-            'batch_first': batch_first,
-        }
-        kwargs.update(factory_kwargs)
-        if isinstance(mha, MultiheadAttention):
+        if mha == MultiheadAttention:
+            kwargs = {
+                'embed_dim': d_model,
+                'num_heads': nhead,
+                'dropout': dropout,
+                'batch_first': batch_first,
+            }
+            kwargs.update(factory_kwargs)
             kwargs['pos_emb'] = pos_emb
+            self.self_attn = MultiheadAttention(**kwargs)
 
     def forward(self,
                 src: torch.Tensor,
@@ -192,8 +193,9 @@ class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
             'attn_mask': src_mask,
             'key_padding_mask': src_key_padding_mask,
         }
-        if isinstance(self.self_attn, MultiheadAttention):
+        if self.self_attn == MultiheadAttention:
             kwargs['alpha'] = alpha
+
         if self.pre_norm:
             src = self.norm1(src)
             src1, attn = self.self_attn(src, src, src, **kwargs)
@@ -681,9 +683,9 @@ if __name__ == '__main__':
                       'pos_emb': 'rel-shared',
                       'length': 25,
                   },
-                  trans_seq='s-t-v2',
-                  #   add_A=True,
-                  #   add_Aa=True,
+                  trans_seq='sa-t-v2',
+                  add_A=True,
+                  add_Aa=True,
                   kernel_size=3,
                   pad=False,
                   pos_enc=None,
