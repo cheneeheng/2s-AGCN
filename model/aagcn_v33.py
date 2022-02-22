@@ -622,7 +622,6 @@ class Model(BaseModel):
                     x_l.append(x_i)
                     if self.need_attn:
                         attn[1].append(a)
-                    print(s_layer.alpha)
                 x_l = torch.stack(x_l, dim=0).sum(dim=0)
                 x1 = x1 + self.multi_trans_dropout(x_l)
                 x1 = self.sa_norm(x1)
