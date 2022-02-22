@@ -3,10 +3,13 @@ import numpy as np
 import os
 import pickle
 import random
+from scipy import interpolate
 
 from tqdm import tqdm
 
 from data_gen.preprocess import pre_normalization
+
+from utils.multiprocessing import parallel_processing
 
 training_subjects = [
     1, 2, 4, 5, 8, 9, 13, 14, 15, 16, 17, 18, 19, 25, 27, 28, 31, 34, 35, 38
@@ -16,6 +19,18 @@ max_body_true = 2
 max_body_kinect = 4
 num_joint = 25
 max_frame = 300
+
+
+def stretch_to_maximum_length(data_numpy):
+    C, T, V, M = data_numpy.shape
+    unpadded_data = data_numpy  # c,t,v,m
+    unpadded_data = np.transpose(unpadded_data, (0, 2, 3, 1))  # c,v,m,t
+    unpadded_data = unpadded_data.reshape(C*V*M, -1)
+    f = interpolate.interp1d(np.arange(0, T), unpadded_data)
+    stretched_data = f(np.linspace(0, T-1, max_frame))
+    stretched_data = stretched_data.reshape(C, V, M, max_frame)
+    stretched_data = np.transpose(stretched_data, (0, 3, 1, 2))
+    return stretched_data
 
 
 def randomize(data, seed=None):
@@ -97,7 +112,7 @@ def read_xyz(file, max_body=4, num_joint=25):  # 取了前两个body
 
 
 def gendata(data_path, out_path, ignored_sample_path=None,
-            benchmark='xview', part='eval', seed=None):
+            benchmark='xview', part='eval', stretch=False, seed=None):
 
     if ignored_sample_path is not None:
         with open(ignored_sample_path, 'r') as f:
@@ -109,8 +124,9 @@ def gendata(data_path, out_path, ignored_sample_path=None,
 
     sample_name = []
     sample_label = []
-    filenames = randomize(os.listdir(data_path), seed)
-    for filename in filenames:
+    filenames = os.listdir(data_path)
+    randomize(filenames, seed)
+    for filename in tqdm(filenames):
         if filename in ignored_samples:
             continue
         action_class = int(
@@ -147,10 +163,21 @@ def gendata(data_path, out_path, ignored_sample_path=None,
     for i, s in enumerate(tqdm(sample_name)):
         data = read_xyz(os.path.join(data_path, s),
                         max_body=max_body_kinect, num_joint=num_joint)
-        fp[i, :, 0:data.shape[1], :, :] = data
+        if stretch:
+            fp[i, :, :, :, :] = stretch_to_maximum_length(data)
+        else:
+            fp[i, :, 0:data.shape[1], :, :] = data
 
     fp = pre_normalization(fp, pad=False)
     np.save('{}/{}_data_joint.npy'.format(out_path, part), fp)
+
+
+def tmp_fn(data_path, seeds, pid=0):
+    for i in tqdm(seeds):
+        filenames = os.listdir(data_path)
+        randomize(filenames, i)
+        if filenames[0] == 'S001C003P004R002A038.skeleton':
+            print(i)
 
 
 if __name__ == '__main__':
@@ -163,7 +190,7 @@ if __name__ == '__main__':
         default='./data/data/nturgbd_raw/samples_with_missing_skeletons.txt')
     parser.add_argument(
         '--out-folder',
-        default='./data/data/ntu_nopad/')
+        default='./data/data/ntu_stretched/')
     parser.add_argument(
         '--benchmark',
         default=['xsub', 'xview'],
@@ -174,6 +201,10 @@ if __name__ == '__main__':
         default=['train', 'val'],
         nargs='+',
         help='which Top K accuracy will be shown')
+
+    parser.add_argument(
+        '--stretch',
+        default=True)
 
     parser.add_argument(
         '--seed',
@@ -192,10 +223,16 @@ if __name__ == '__main__':
             if not os.path.exists(out_path):
                 os.makedirs(out_path)
             print(b, p)
+
+            # parallel_processing(
+            # tmp_fn, 6, [i for i in range(10000)], arg.data_path)
+            # exit()
+
             gendata(
                 arg.data_path,
                 out_path,
                 arg.ignored_sample_path,
                 benchmark=b,
                 part=p,
+                stretch=arg.stretch,
                 seed=arg.seed,)
