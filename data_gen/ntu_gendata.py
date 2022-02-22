@@ -125,7 +125,7 @@ def gendata(data_path, out_path, ignored_sample_path=None,
 
     sample_name = []
     sample_label = []
-    filenames = os.listdir(data_path)
+    filenames = sorted(os.listdir(data_path))
     randomize(filenames, seed)
     for filename in tqdm(filenames):
         if filename in ignored_samples:
@@ -173,12 +173,12 @@ def gendata(data_path, out_path, ignored_sample_path=None,
     np.save('{}/{}_data_joint.npy'.format(out_path, part), fp)
 
 
-def tmp_fn(filenames_tuple, seeds, pid=0):
+def tmp_fn(filenames_tuple, filenames_ori_tuple, seeds, pid=0):
     for i in tqdm(seeds):
         filenames = deepcopy(filenames_tuple)
         randomize(filenames, i)
-        if filenames[0] == 'S001C003P004R002A038.skeleton':
-            print(i)
+        if filenames == filenames_ori_tuple:
+            print('HERE >>>>>>>>>>', i)
 
 
 if __name__ == '__main__':
@@ -224,9 +224,14 @@ if __name__ == '__main__':
             os.makedirs(out_path, exist_ok=True)
             print(b, p)
 
-            # filenames = os.listdir(arg.data_path)
+            # filenames = sorted(os.listdir(arg.data_path))
+            # filenames_ori = pickle.load(
+            #     open('/code/2s-AGCN/data/data/ntu_nopad/xsub/train_label.pkl',
+            #          'rb')
+            # )
             # parallel_processing(
-            #     tmp_fn, 6, [i for i in range(10000)], tuple(filenames))
+            #     tmp_fn, 64, [i for i in range(1000000)],
+            #     tuple(filenames), tuple(filenames_ori))
             # exit()
 
             gendata(
