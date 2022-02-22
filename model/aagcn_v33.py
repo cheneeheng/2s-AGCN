@@ -193,7 +193,7 @@ class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
             'attn_mask': src_mask,
             'key_padding_mask': src_key_padding_mask,
         }
-        if self.self_attn == MultiheadAttention:
+        if isinstance(self.self_attn, MultiheadAttention):
             kwargs['alpha'] = alpha
 
         if self.pre_norm:
@@ -617,10 +617,12 @@ class Model(BaseModel):
                 for _, s_layer in s_trans_enc_layers:
                     # v,v
                     mask = s_layer.PA
-                    x_i, a = s_layer(x1, mask, alpha=s_layer.alpha)
+                    alpha = s_layer.alpha
+                    x_i, a = s_layer(x1, mask, alpha=alpha)
                     x_l.append(x_i)
                     if self.need_attn:
                         attn[1].append(a)
+                    print(s_layer.alpha)
                 x_l = torch.stack(x_l, dim=0).sum(dim=0)
                 x1 = x1 + self.multi_trans_dropout(x_l)
                 x1 = self.sa_norm(x1)
