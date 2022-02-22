@@ -1,4 +1,5 @@
 import argparse
+from copy import deepcopy
 import numpy as np
 import os
 import pickle
@@ -172,9 +173,9 @@ def gendata(data_path, out_path, ignored_sample_path=None,
     np.save('{}/{}_data_joint.npy'.format(out_path, part), fp)
 
 
-def tmp_fn(data_path, seeds, pid=0):
+def tmp_fn(filenames_tuple, seeds, pid=0):
     for i in tqdm(seeds):
-        filenames = os.listdir(data_path)
+        filenames = deepcopy(filenames_tuple)
         randomize(filenames, i)
         if filenames[0] == 'S001C003P004R002A038.skeleton':
             print(i)
@@ -220,12 +221,12 @@ if __name__ == '__main__':
     for b in benchmark:
         for p in part:
             out_path = os.path.join(arg.out_folder, b)
-            if not os.path.exists(out_path):
-                os.makedirs(out_path)
+            os.makedirs(out_path, exist_ok=True)
             print(b, p)
 
+            # filenames = os.listdir(arg.data_path)
             # parallel_processing(
-            # tmp_fn, 6, [i for i in range(10000)], arg.data_path)
+            #     tmp_fn, 6, [i for i in range(10000)], tuple(filenames))
             # exit()
 
             gendata(

@@ -22,9 +22,9 @@ def parallel_processing(func, num_of_processes: int, *args):
         if isinstance(arg, list):
             c = check_arr_arg_length(arg, c)
             arrays.append(arg)
-        elif isinstance(arg, tuple):
-            c = check_arr_arg_length(arg, c)
-            arrays.append(arg)
+        # elif isinstance(arg, tuple):
+        #     c = check_arr_arg_length(arg, c)
+        #     arrays.append(arg)
         elif isinstance(arg, np.ndarray):
             c = check_arr_arg_length(arg, c)
             arrays.append(arg)
