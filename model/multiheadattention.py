@@ -35,6 +35,7 @@ def scaled_dot_product_attention(
         attn = attn + pe
     else:
         pe = None
+    attn_i = softmax(attn, dim=-1)
     attn = softmax(attn, dim=-1)
     if alpha is not None:
         attn = attn * alpha
@@ -44,7 +45,7 @@ def scaled_dot_product_attention(
         attn = dropout(attn, p=dropout_p)
     # (B, Nt, Ns) x (B, Ns, E) -> (B, Nt, E)
     output = torch.bmm(attn, v)
-    return output, attn, pe
+    return output, attn_i, pe
 
 
 def multi_head_attention_forward(
