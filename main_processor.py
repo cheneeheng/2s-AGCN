@@ -128,8 +128,32 @@ class Processor():
                     output_device=output_device)
 
     def load_optimizer(self):
+        if 'LLRD' in self.arg.optimizer:
+            params_dict = {}
+            for (k, v) in self.model.named_parameters():
+                if 'trans' not in k:
+                    params_dict['-1'] = params_dict.get('-1', []) + [v]
+                else:
+                    _k = k.split('.')[1]
+                    params_dict[_k] = params_dict.get(_k, []) + [v]
+            params_dict = dict(sorted(params_dict.items(), reverse=True))
+            params_list = []
+            for idx, (k, v) in enumerate(params_dict.items()):
+                if k == '-1':
+                    params_list.append({'params': v})
+                else:
+                    params_list.append(
+                        {'params': v,
+                         'lr': self.arg.base_lr * self.arg.llrd_factor**idx})
+
         if self.arg.optimizer == 'SGD':
             self.optimizer = optim.SGD(self.model.parameters(),
+                                       lr=self.arg.base_lr,
+                                       momentum=0.9,
+                                       nesterov=self.arg.nesterov,
+                                       weight_decay=self.arg.weight_decay)
+        elif self.arg.optimizer == 'SGD-LLRD':
+            self.optimizer = optim.SGD(params_list,
                                        lr=self.arg.base_lr,
                                        momentum=0.9,
                                        nesterov=self.arg.nesterov,
@@ -142,8 +166,12 @@ class Processor():
             self.optimizer = optim.AdamW(self.model.parameters(),
                                          lr=self.arg.base_lr,
                                          weight_decay=self.arg.weight_decay)
+        elif self.arg.optimizer == 'AdamW-LLRD':
+            self.optimizer = optim.AdamW(params_list,
+                                         lr=self.arg.base_lr,
+                                         weight_decay=self.arg.weight_decay)
         elif self.arg.optimizer == 'SAM_SGD':
-            self.optimizer = SAM(params=self.model.parameters(),
+            self.optimizer = SAM(self.model.parameters(),
                                  base_optimizer=optim.SGD,
                                  lr=self.arg.base_lr,
                                  momentum=0.9,
@@ -210,16 +238,16 @@ class Processor():
             worker_init_fn=init_seed)
 
     def adjust_learning_rate(self, epoch):
-        opts = ['SGD', 'SAM_SGD', 'Adam', 'AdamW']
+        opts = ['SGD', 'SGD-LLRD', 'SAM_SGD', 'Adam', 'AdamW', 'AdamW-LLRD']
         if self.arg.optimizer in opts:
-            if epoch < self.arg.warm_up_epoch:
-                lr = self.arg.base_lr * (epoch + 1) / self.arg.warm_up_epoch
-            else:
-                lr = self.arg.base_lr * (
-                    0.1 ** np.sum(epoch >= np.array(self.arg.step)))
             for param_group in self.optimizer.param_groups:
+                if epoch < self.arg.warm_up_epoch:
+                    lr = param_group['lr'] * \
+                        (epoch + 1) / self.arg.warm_up_epoch
+                else:
+                    lr = param_group['lr'] * (
+                        0.1 ** np.sum(epoch >= np.array(self.arg.step)))
                 param_group['lr'] = lr
-            return lr
         else:
             raise ValueError()
 
