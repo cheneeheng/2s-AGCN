@@ -31,7 +31,7 @@ test_feeder_args:
   label_path: ./data/data/ntu_nopad/xview/val_label.pkl
 
 # model
-model: model.aagcn_v33.Model
+model: model.aagcn_v34.Model
 model_args:
   num_class: 60
   num_point: 25
