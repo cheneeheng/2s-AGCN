@@ -13,7 +13,7 @@ from model.aagcn import GCNUnit
 from model.aagcn import AdaptiveGCN
 from model.aagcn import BaseModel
 
-from model.multiheadattention import MultiheadAttention
+from model.module.multiheadattention import MultiheadAttention
 
 
 # ------------------------------------------------------------------------------

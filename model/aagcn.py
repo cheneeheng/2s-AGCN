@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 from torchinfo import summary
 
-from model.ghostbatchnorm import GhostBatchNorm1d, GhostBatchNorm2d
+from model.module.ghostbatchnorm import GhostBatchNorm1d, GhostBatchNorm2d
 
 
 def import_class(name: str):

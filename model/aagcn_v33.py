@@ -13,7 +13,7 @@ from model.aagcn import GCNUnit
 from model.aagcn import AdaptiveGCN
 from model.aagcn import BaseModel
 
-from model.multiheadattention import MultiheadAttention
+from model.module.multiheadattention import MultiheadAttention
 
 
 # ------------------------------------------------------------------------------
@@ -158,7 +158,7 @@ class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
                  pre_norm: bool = False,
                  pos_emb: dict = None,
                  A: np.ndarray = None,
-                 Aa: bool = False) -> None:
+                 Aa: str = None) -> None:
         factory_kwargs = {'device': device, 'dtype': dtype}
         super().__init__(d_model, nhead, dim_feedforward, dropout, activation,
                          layer_norm_eps, batch_first, device, dtype)
@@ -168,10 +168,12 @@ class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
         else:
             self.PA = nn.Parameter(
                 torch.from_numpy(A.astype(np.float32)))  # Bk
-        if Aa is None:
+        if Aa == 'None' or Aa == 'False':
             self.alpha = None
-        else:
+        elif Aa == 'True' or Aa == 'zero':
             self.alpha = nn.Parameter(torch.zeros(1))
+        elif Aa == 'one':
+            self.alpha = nn.Parameter(torch.ones(1))
         if mha == MultiheadAttention:
             kwargs = {
                 'embed_dim': d_model,
@@ -224,7 +226,7 @@ class TransformerEncoderLayerExtV2(TransformerEncoderLayerExt):
                  cfg: dict,
                  mha: nn.Module,
                  A: np.ndarray = None,
-                 Aa: bool = False) -> None:
+                 Aa: str = None) -> None:
         pos_emb = {
             'name': cfg['pos_emb'],
             'tokens': cfg['length'],
@@ -324,7 +326,7 @@ class Model(BaseModel):
                  s_trans_cfg: Optional[dict] = None,
 
                  add_A: bool = False,
-                 add_Aa: bool = False,
+                 add_Aa: str = None,
 
                  trans_seq: str = 's-t',
 
@@ -420,7 +422,7 @@ class Model(BaseModel):
                                 cfg=s_trans_cfg,
                                 mha=mha,
                                 A=self.graph.A[a_i],
-                                Aa=add_Aa
+                                Aa=str(add_Aa)
                             )
                         )
                         for a_i in range(self.num_subset)
@@ -739,7 +741,7 @@ if __name__ == '__main__':
                   },
                   trans_seq='sa-t-v3',
                   add_A=True,
-                  add_Aa=True,
+                  add_Aa='one',
                   kernel_size=3,
                   pad=False,
                   pos_enc=None,

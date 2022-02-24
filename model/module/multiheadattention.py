@@ -7,7 +7,7 @@ import math
 import warnings
 from typing import Optional, Tuple
 
-from model.rel_embedding import RelPosEmb1D
+from model.module.rel_embedding import RelPosEmb1D
 
 
 # ------------------------------------------------------------------------------
