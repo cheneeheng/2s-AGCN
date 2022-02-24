@@ -61,6 +61,31 @@ class Processor():
         self.load_optimizer()
         self.best_acc = 0
 
+    # **************************************************************************
+    # UTILS
+    # **************************************************************************
+    def print_time(self):
+        localtime = time.asctime(time.localtime(time.time()))
+        self.print_log("Local current time :  " + localtime)
+
+    def print_log(self, str, print_time=True):
+        if print_time:
+            localtime = time.asctime(time.localtime(time.time()))
+            str = "[ " + localtime + ' ] ' + str
+        print(str)
+        if self.arg.print_log:
+            with open(f'{self.arg.work_dir}/log.txt', 'a') as f:
+                print(str, file=f)
+
+    def record_time(self):
+        self.cur_time = time.time()
+        return self.cur_time
+
+    def split_time(self):
+        split_time = time.time() - self.cur_time
+        self.record_time()
+        return split_time
+
     def save_arg(self):
         # save arg
         arg_dict = vars(self.arg)
@@ -69,6 +94,23 @@ class Processor():
         with open(f'{self.arg.work_dir}/config.yaml', 'w') as f:
             yaml.dump(arg_dict, f)
 
+    def adjust_learning_rate(self, epoch):
+        opts = ['SGD', 'SGD-LLRD', 'SAM_SGD', 'Adam', 'AdamW', 'AdamW-LLRD']
+        if self.arg.optimizer in opts:
+            for param_group in self.optimizer.param_groups:
+                if epoch < self.arg.warm_up_epoch:
+                    lr = param_group['lr'] * \
+                        (epoch + 1) / self.arg.warm_up_epoch
+                else:
+                    lr = param_group['lr'] * (
+                        0.1 ** np.sum(epoch >= np.array(self.arg.step)))
+                param_group['lr'] = lr
+        else:
+            raise ValueError()
+
+    # **************************************************************************
+    # LOADERS
+    # **************************************************************************
     def load_model(self):
         output_device = self.arg.device[0] if type(
             self.arg.device) is list else self.arg.device
@@ -237,42 +279,9 @@ class Processor():
             drop_last=False,
             worker_init_fn=init_seed)
 
-    def adjust_learning_rate(self, epoch):
-        opts = ['SGD', 'SGD-LLRD', 'SAM_SGD', 'Adam', 'AdamW', 'AdamW-LLRD']
-        if self.arg.optimizer in opts:
-            for param_group in self.optimizer.param_groups:
-                if epoch < self.arg.warm_up_epoch:
-                    lr = param_group['lr'] * \
-                        (epoch + 1) / self.arg.warm_up_epoch
-                else:
-                    lr = param_group['lr'] * (
-                        0.1 ** np.sum(epoch >= np.array(self.arg.step)))
-                param_group['lr'] = lr
-        else:
-            raise ValueError()
-
-    def print_time(self):
-        localtime = time.asctime(time.localtime(time.time()))
-        self.print_log("Local current time :  " + localtime)
-
-    def print_log(self, str, print_time=True):
-        if print_time:
-            localtime = time.asctime(time.localtime(time.time()))
-            str = "[ " + localtime + ' ] ' + str
-        print(str)
-        if self.arg.print_log:
-            with open(f'{self.arg.work_dir}/log.txt', 'a') as f:
-                print(str, file=f)
-
-    def record_time(self):
-        self.cur_time = time.time()
-        return self.cur_time
-
-    def split_time(self):
-        split_time = time.time() - self.cur_time
-        self.record_time()
-        return split_time
-
+    # **************************************************************************
+    # TRAIN AND EVAL
+    # **************************************************************************
     def train(self, epoch, save_model=False):
         self.model.train()
         self.print_log(f'Training epoch: {epoch + 1}')
@@ -455,6 +464,9 @@ class Processor():
 
             self.print_log('-'*51)
 
+    # **************************************************************************
+    # MAIN
+    # **************************************************************************
     def start(self):
         if self.arg.phase == 'train':
             self.print_log(f'Parameters:\n')
@@ -470,6 +482,8 @@ class Processor():
                 self.train(epoch, save_model=save_model)
                 if self.scheduler is not None:
                     self.scheduler.step()
+                # if ((epoch + 1) % self.arg.eval_interval == 0) or \
+                #         ((epoch + 1) == self.arg.num_epoch):
                 self.eval(epoch, save_score=self.arg.save_score,
                           loader_name=['test'])
             self.print_log(f'Best Accuracy: {self.best_acc}\n')
