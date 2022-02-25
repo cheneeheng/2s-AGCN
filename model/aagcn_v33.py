@@ -466,7 +466,12 @@ class Model(BaseModel):
             self.m_b_mask = self.m_b_mask.permute(1, 2, 0)  # n,m,t
             self.m_b_mask = self.m_b_mask.reshape(x.size(0), -1, 1)  # n,mt, 1
             if self.cls_token is not None:
-                cls_token = torch.ones((x.size(0), 1, 1), dtype=bool)
+                device = self.m_b_mask.get_device()
+                if device == -1:
+                    device = 'cpu'
+                cls_token = torch.ones(
+                    (x.size(0), 1, 1), dtype=bool,
+                    device='cpu' if device == -1 else device)
                 self.m_b_mask = torch.cat([cls_token, self.m_b_mask], dim=1)
         return super().forward(x)
 
