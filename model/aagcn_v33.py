@@ -665,8 +665,11 @@ class Model(BaseModel):
             elif self.trans_seq == 'sa-t-v3' or \
                     self.trans_seq == 'sa-t-res-v3':
                 # Spatial
-                x0 = x[:, 0:1, :]  # n,1,vc
-                x1 = x[:, 1:, :]  # n,mt,vc
+                if self.cls_token is not None:
+                    x0 = x[:, 0:1, :]  # n,1,vc
+                    x1 = x[:, 1:, :]  # n,mt,vc
+                else:
+                    x1 = x[:, :, :]  # n,mt,vc
                 x1 = x1.view(N, M, T, V, C).permute(0, 1, 3, 2, 4).contiguous()
                 x1 = x1.reshape(N*M, V, T*C)  # nm,v,tc
 
@@ -685,7 +688,10 @@ class Model(BaseModel):
 
                 x1 = x1.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
                 x1 = x1.reshape(N, M*T, V*C)  # n,mv,tc
-                x2 = torch.cat([x0, x1], dim=1)
+                if self.cls_token is not None:
+                    x2 = torch.cat([x0, x1], dim=1)
+                else:
+                    x2 = x1
 
                 # Temporal
                 x2 = x2.reshape(N, -1, V*C)  # n,mt,vc
