@@ -701,16 +701,18 @@ class Model(BaseModel):
                     x = x2
 
         x = x.reshape(N, -1, V*C)  # n,mt,vc
-        if self.classifier_type == 'CLS':
+        if 'CLS' in self.classifier_type:
             x = x[:, 0, :]  # n,vc
         elif self.classifier_type == 'CLS-POOL':
             x = x[:, 0, :]  # n,vc
-            x = self.cls_pool_fc(x)
-            x = self.cls_pool_act(x)
-        elif self.classifier_type == 'GAP':
+        elif 'GAP' in self.classifier_type:
             x = x.mean(1)  # n,vc
         else:
             raise ValueError("Unknown classifier_type")
+
+        if 'POOL' in self.classifier_type:
+            x = self.cls_pool_fc(x)
+            x = self.cls_pool_act(x)
 
         return x, attn
 
