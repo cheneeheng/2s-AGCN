@@ -855,7 +855,13 @@ aagcn_v33:
                   - 88.3%
         - 220223110001_nopad_3ks_noaug_rel_pool_withAa_llrd_v3:
                   - 87.4%
+        - 220224140001_nopad_3ks_noaug_rel_pool_withAa_v3_noPAfreeze_a1:
+                  - 89.2%
 
 aagcn_v34:
         - from v33
         - uses different temporal transformer input format.
+        - 220224160001_nopad_3ks_lowerlr_noaug_rel_v3:
+                  - 78.6%
+        - 220224160001_nopad_3ks_noaug_rel_v3_noPAfreeze_a1:
+                  - 84.9%

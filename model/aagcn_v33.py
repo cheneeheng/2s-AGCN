@@ -168,6 +168,7 @@ class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
         else:
             self.PA = nn.Parameter(
                 torch.from_numpy(A.astype(np.float32)))  # Bk
+        Aa = str(Aa)
         if Aa == 'None' or Aa == 'False':
             self.alpha = None
         elif Aa == 'True' or Aa == 'zero':
@@ -387,7 +388,8 @@ class Model(BaseModel):
             t_trans_cfg['ffn_dim'] *= num_point
             t_trans_enc_layer = TransformerEncoderLayerExtV2(
                 cfg=t_trans_cfg,
-                mha=mha
+                mha=mha,
+                Aa=str(add_Aa)
             )
             self.t_trans_enc_layers = torch.nn.ModuleList(
                 [copy.deepcopy(t_trans_enc_layer)
