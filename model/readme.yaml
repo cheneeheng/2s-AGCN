@@ -865,3 +865,7 @@ aagcn_v34:
                   - 78.6%
         - 220224160001_nopad_3ks_noaug_rel_v3_noPAfreeze_a1:
                   - 84.9%
+
+aagcn_v35:
+        - from v33
+        - includes masking of person

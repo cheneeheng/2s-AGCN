@@ -189,7 +189,8 @@ class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
                 src: torch.Tensor,
                 src_mask: Optional[torch.Tensor] = None,
                 src_key_padding_mask: Optional[torch.Tensor] = None,
-                alpha: Optional[torch.Tensor] = None
+                alpha: Optional[torch.Tensor] = None,
+                global_attn: Optional[torch.Tensor] = None,
                 ) -> torch.Tensor:
         kwargs = {
             'attn_mask': src_mask,
@@ -197,6 +198,7 @@ class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
         }
         if isinstance(self.self_attn, MultiheadAttention):
             kwargs['alpha'] = alpha
+            kwargs['global_attn'] = global_attn
 
         if self.pre_norm:
             src = self.norm1(src)
@@ -247,30 +249,6 @@ class TransformerEncoderLayerExtV2(TransformerEncoderLayerExt):
             A=A,
             Aa=Aa,
         )
-
-
-class TransformerEncoderExt(nn.TransformerEncoder):
-
-    def __init__(self, encoder_layer, num_layers, norm=None,
-                 need_attn: bool = False):
-        super().__init__(encoder_layer, num_layers, norm)
-        self.need_attn = need_attn
-
-    def forward(self,
-                src: torch.Tensor,
-                mask: Optional[torch.Tensor] = None,
-                src_key_padding_mask: Optional[torch.Tensor] = None,
-                ) -> torch.Tensor:
-        output = src
-        attn_list = []
-        for mod in self.layers:
-            output, attn = mod(output, src_mask=mask,
-                               src_key_padding_mask=src_key_padding_mask)
-            if self.need_attn:
-                attn_list.append(attn)
-        if self.norm is not None:
-            output = self.norm(output)
-        return output, attn_list
 
 
 def transformer_config_checker(cfg: dict):
@@ -482,97 +460,72 @@ class Model(BaseModel):
             x = torch.cat((cls_tokens, x), dim=1)
         x = self.t_pos_encoder(x)
 
-        attn = [[], []]
-
         def _temporal_trans(_layer, _x, _attn, _pe=False):
-            if _pe:
-                _x, _a, pe = _layer(_x)  # nm,1+t,vc
-            else:
-                _x, _a = _layer(_x)  # nm,1+t,vc
+            out = _layer(_x)  # nm,1+t,vc
+            _x, _a = out[0], out[1]
             if self.need_attn:
-                if _pe:
-                    _attn.append((_a, pe))
-                else:
-                    _attn.append(_a)
+                _attn.append((_a, out[2]) if _pe else _a)
             return _x, _attn
 
         def _spatial_trans(_layer, _x, _attn, _pe=False):
-            _x0 = _x[:, 0:1, :]  # nm,1,vc
-            _x = _x[:, 1:, :]  # nm,t,vc
+            if self.cls_token is not None:
+                _x0 = _x[:, 0:1, :]  # nm,1,vc
+                _x = _x[:, 1:, :]  # nm,t,vc
             _x = _x.view(N, M, T, V, C).permute(0, 1, 3, 2, 4).contiguous()
             _x = _x.reshape(N*M, V, T*C)  # nm,v,tc
-            if _pe:
-                _x, _a, pe = _layer(_x)
-            else:
-                _x, _a = _layer(_x)
+            out = _layer(_x)
+            _x, _a = out[0], out[1]
             if self.need_attn:
-                if _pe:
-                    _attn.append((_a, pe))
-                else:
-                    _attn.append(_a)
+                _attn.append((_a, out[2]) if _pe else _a)
             _x = _x.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
             _x = _x.reshape(N*M, T, V*C)  # nm,t,vc
-            _x = torch.cat([_x0, _x], dim=1)  # nm,1+t,vc
+            if self.cls_token is not None:
+                _x = torch.cat([_x0, _x], dim=1)  # nm,1+t,vc
             return _x, _attn
 
-        def _spatial_Aa_trans(_layers, _x, _attn, _pe=False):
-            _x0 = _x[:, 0:1, :]  # nm,1,vc
-            _x1 = _x[:, 1:, :]  # nm,t,vc
+        def _spatial_Aa_trans(_layers, _x, _attn, _pe=False, mode=None):
+            if self.cls_token is not None:
+                _x0 = _x[:, 0:1, :]  # nm,1,vc
+                _x1 = _x[:, 1:, :]  # nm,t,vc
+            else:
+                _x1 = _x[:, :, :]  # nm,t,vc
             _x1 = _x1.view(N, M, T, V, C).permute(0, 1, 3, 2, 4).contiguous()
             _x1 = _x1.reshape(N*M, V, T*C)  # nm,v,tc
             _x_l = []
-            for _, s_layer in _layers:
-                # v,v
-                if s_layer.PA is None:
-                    mask = None
-                else:
-                    mask = s_layer.PA * s_layer.alpha
-                if _pe:
-                    x_i, _a, pe = s_layer(_x1, mask)
-                else:
-                    x_i, _a = s_layer(_x1, mask)
-                _x_l.append(x_i)
-                if self.need_attn:
-                    if _pe:
-                        _attn.append((_a, pe))
+            if mode == 'v3':
+                for _, s_layer in list(_layers)[:-1]:
+                    # v,v
+                    mask = s_layer.PA
+                    alpha = s_layer.alpha
+                    out = s_layer(_x1, global_attn=mask, alpha=alpha)
+                    _x_l.append(out[0])
+                    if self.need_attn:
+                        _attn.append((out[1], out[2]) if _pe else out[1])
+            else:
+                for _, s_layer in _layers:
+                    # v,v
+                    if s_layer.PA is None:
+                        mask = None
                     else:
-                        _attn.append(_a)
+                        mask = s_layer.PA * s_layer.alpha
+                    out = s_layer(_x1, global_attn=mask)  # x, a, pe
+                    _x_l.append(out[0])
+                    if self.need_attn:
+                        _attn.append((out[1], out[2]) if _pe else out[1])
             _x_l = torch.stack(_x_l, dim=0).sum(dim=0)
-            _x1 = _x1 + self.multi_trans_dropout(_x_l)
-            _x1 = self.sa_norm(_x1)
+            if mode == 'v3':
+                _x1 = self.multi_trans_dropout(_x_l)
+                _x1 = list(_layers)[-1][1](_x1)
+            else:
+                _x1 = _x1 + self.multi_trans_dropout(_x_l)
+                _x1 = self.sa_norm(_x1)
             _x1 = _x1.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
             _x1 = _x1.reshape(N*M, T, V*C)  # nm,t,vc
-            _x1 = torch.cat([_x0, _x1], dim=1)  # nm,1+t,vc
+            if self.cls_token is not None:
+                _x1 = torch.cat([_x0, _x1], dim=1)  # nm,1+t,vc
             return _x1, _attn
 
-        def _spatial_Aa_trans_v3(_layers, _x, _attn, _pe=False):
-            _x0 = _x[:, 0:1, :]  # nm,1,vc
-            _x1 = _x[:, 1:, :]  # nm,t,vc
-            _x1 = _x1.view(N, M, T, V, C).permute(0, 1, 3, 2, 4).contiguous()
-            _x1 = _x1.reshape(N*M, V, T*C)  # nm,v,tc
-            _x_l = []
-            for _, s_layer in list(_layers)[:-1]:
-                # v,v
-                mask = s_layer.PA
-                alpha = s_layer.alpha
-                if _pe:
-                    x_i, _a, pe = s_layer(_x1, mask, alpha=alpha)
-                else:
-                    x_i, _a = s_layer(_x1, mask, alpha=alpha)
-                _x_l.append(x_i)
-                if self.need_attn:
-                    if _pe:
-                        _attn.append((_a, pe))
-                    else:
-                        _attn.append(_a)
-            _x_l = torch.stack(_x_l, dim=0).sum(dim=0)
-            _x1 = self.multi_trans_dropout(_x_l)
-            _x1 = list(_layers)[-1][1](_x1)
-            _x1 = _x1.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
-            _x1 = _x1.reshape(N*M, T, V*C)  # nm,t,vc
-            _x1 = torch.cat([_x0, _x1], dim=1)  # nm,1+t,vc
-            return _x1, _attn
-
+        attn = [[], []]
         for i in range(len(self.t_trans_enc_layers)):
 
             if isinstance(self.s_trans_enc_layers[i], torch.nn.ModuleDict):
@@ -625,8 +578,8 @@ class Model(BaseModel):
             elif self.trans_seq == 'sa-t-v3' or \
                     self.trans_seq == 'sa-t-res-v3':
                 # Spatial
-                x1, attn[0] = _spatial_Aa_trans_v3(
-                    s_trans_enc_layers, x, attn[0], _pe=True)
+                x1, attn[0] = _spatial_Aa_trans(
+                    s_trans_enc_layers, x, attn[0], _pe=True, mode='v3')
                 # Temporal
                 x2, attn[1] = _temporal_trans(
                     self.t_trans_enc_layers[i], x1, attn[1], _pe=True)

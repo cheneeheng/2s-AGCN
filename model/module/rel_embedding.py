@@ -73,6 +73,7 @@ class RelPosEmb1D(nn.Module):
         """
         super().__init__()
         scale = dim_head ** -0.5
+        self.tokens = tokens
         self.shared_heads = heads if heads is not None else True
         if self.shared_heads:
             self.rel_pos_emb = nn.Parameter(

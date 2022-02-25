@@ -347,6 +347,8 @@ class BaseModel(nn.Module):
         super().__init__()
 
         self.num_class = num_class
+        self.num_person = num_person
+        self.num_point = num_point
 
         self.graph = None
 

@@ -22,13 +22,14 @@ def scaled_dot_product_attention(
     num_heads: int = 1,
     pos_emb: Optional[nn.Module] = None,
     alpha: Optional[torch.Tensor] = None,
+    global_attn: Optional[torch.Tensor] = None,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     B, Nt, E = q.shape
     q = q / math.sqrt(E)
     # (B, Nt, E) x (B, E, Ns) -> (B, Nt, Ns)
     attn = torch.bmm(q, k.transpose(-2, -1))
-    # if attn_mask is not None:
-    #     attn += attn_mask
+    if attn_mask is not None:
+        attn += attn_mask
     if pos_emb is not None:
         _, t, d = q.shape
         pe = pos_emb(q.reshape(-1, num_heads, t, d)).reshape(-1, t, t)
@@ -39,8 +40,8 @@ def scaled_dot_product_attention(
     attn = softmax(attn, dim=-1)
     if alpha is not None:
         attn = attn * alpha
-    if attn_mask is not None:
-        attn = attn + attn_mask
+    if global_attn is not None:
+        attn = attn + global_attn
     if dropout_p > 0.0:
         attn = dropout(attn, p=dropout_p)
     # (B, Nt, Ns) x (B, Ns, E) -> (B, Nt, E)
@@ -74,6 +75,7 @@ def multi_head_attention_forward(
     static_v: Optional[torch.Tensor] = None,
     pos_emb: Optional[nn.Module] = None,
     alpha: Optional[torch.Tensor] = None,
+    global_attn: Optional[torch.Tensor] = None,
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
     tens_ops = (query, key, value, in_proj_weight, in_proj_bias,
                 bias_k, bias_v, out_proj_weight, out_proj_bias)
@@ -104,6 +106,9 @@ def multi_head_attention_forward(
             v_proj_weight=v_proj_weight,
             static_k=static_k,
             static_v=static_v,
+            pos_emb=pos_emb,
+            alpha=alpha,
+            global_attn=global_attn,
         )
 
     # set up shape vars
@@ -254,7 +259,8 @@ def multi_head_attention_forward(
     #
     attn_output, attn_output_weights, pe = scaled_dot_product_attention(
         q, k, v, attn_mask, dropout_p,
-        num_heads=num_heads, pos_emb=pos_emb, alpha=alpha
+        num_heads=num_heads, pos_emb=pos_emb,
+        alpha=alpha, global_attn=global_attn
     )
     attn_output = attn_output.transpose(
         0, 1).contiguous().view(tgt_len, bsz, embed_dim)
@@ -311,7 +317,8 @@ class MultiheadAttention(nn.MultiheadAttention):
                 key_padding_mask: Optional[torch.Tensor] = None,
                 need_weights: bool = True,
                 attn_mask: Optional[torch.Tensor] = None,
-                alpha: Optional[torch.Tensor] = None
+                alpha: Optional[torch.Tensor] = None,
+                global_attn: Optional[torch.Tensor] = None,
                 ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         if self.batch_first:
             query, key, value = [x.transpose(1, 0)
@@ -332,7 +339,8 @@ class MultiheadAttention(nn.MultiheadAttention):
                 k_proj_weight=self.k_proj_weight,
                 v_proj_weight=self.v_proj_weight,
                 pos_emb=self.pos_emb,
-                alpha=alpha)
+                alpha=alpha,
+                global_attn=global_attn)
         else:
             attn_output, attn_output_weights, pe = multi_head_attention_forward(
                 query, key, value, self.embed_dim, self.num_heads,
@@ -344,7 +352,8 @@ class MultiheadAttention(nn.MultiheadAttention):
                 need_weights=need_weights,
                 attn_mask=attn_mask,
                 pos_emb=self.pos_emb,
-                alpha=alpha)
+                alpha=alpha,
+                global_attn=global_attn)
         if self.batch_first:
             return attn_output.transpose(1, 0), attn_output_weights, pe
         else:

@@ -178,13 +178,20 @@ class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
                 src: torch.Tensor,
                 src_mask: Optional[torch.Tensor] = None,
                 src_key_padding_mask: Optional[torch.Tensor] = None,
-                alpha: Optional[torch.Tensor] = None
+                alpha: Optional[torch.Tensor] = None,
+                global_attn: Optional[torch.Tensor] = None,
                 ) -> torch.Tensor:
+        kwargs = {
+            'attn_mask': src_mask,
+            'key_padding_mask': src_key_padding_mask,
+        }
+        if isinstance(self.self_attn, MultiheadAttention):
+            kwargs['alpha'] = alpha
+            kwargs['global_attn'] = global_attn
+
         if self.pre_norm:
             src = self.norm1(src)
-            src1, attn, _ = self.self_attn(src, src, src, attn_mask=src_mask,
-                                           key_padding_mask=src_key_padding_mask,
-                                           alpha=alpha)
+            src1, attn, _ = self.self_attn(src, src, src, **kwargs)
             src = src + self.dropout1(src1)
             src = self.norm2(src)
             src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))  # noqa
@@ -192,9 +199,7 @@ class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
             return src, attn
 
         else:
-            src1, attn, _ = self.self_attn(src, src, src, attn_mask=src_mask,
-                                           key_padding_mask=src_key_padding_mask,
-                                           alpha=alpha)
+            src1, attn, _ = self.self_attn(src, src, src, **kwargs)
             src = src + self.dropout1(src1)
             src = self.norm1(src)
             src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))  # noqa
@@ -222,30 +227,6 @@ class TransformerEncoderLayerExtV2(TransformerEncoderLayerExt):
             A=A,
             Aa=Aa,
         )
-
-
-class TransformerEncoderExt(nn.TransformerEncoder):
-
-    def __init__(self, encoder_layer, num_layers, norm=None,
-                 need_attn: bool = False):
-        super().__init__(encoder_layer, num_layers, norm)
-        self.need_attn = need_attn
-
-    def forward(self,
-                src: torch.Tensor,
-                mask: Optional[torch.Tensor] = None,
-                src_key_padding_mask: Optional[torch.Tensor] = None,
-                ) -> torch.Tensor:
-        output = src
-        attn_list = []
-        for mod in self.layers:
-            output, attn = mod(output, src_mask=mask,
-                               src_key_padding_mask=src_key_padding_mask)
-            if self.need_attn:
-                attn_list.append(attn)
-        if self.norm is not None:
-            output = self.norm(output)
-        return output, attn_list
 
 
 def transformer_config_checker(cfg: dict):
@@ -505,7 +486,7 @@ class Model(BaseModel):
                 for _, s_layer in s_trans_enc_layers:
                     # v,v
                     mask = s_layer.PA
-                    x_i, a = s_layer(x, mask, alpha=s_layer.alpha)
+                    x_i, a = s_layer(x, global_attn=mask, alpha=s_layer.alpha)
                     x_l.append(x_i)
                     if self.need_attn:
                         attn[1].append(a)
@@ -536,7 +517,7 @@ class Model(BaseModel):
                         mask = None
                     else:
                         mask = s_layer.PA * s_layer.alpha
-                    x_i, a = s_layer(x1, mask)
+                    x_i, a = s_layer(x1, global_attn=mask)
                     x_l.append(x_i)
                     if self.need_attn:
                         attn[1].append(a)
@@ -569,7 +550,7 @@ class Model(BaseModel):
                 for _, s_layer in s_trans_enc_layers:
                     # v,v
                     mask = s_layer.PA
-                    x_i, a = s_layer(x1, mask, alpha=s_layer.alpha)
+                    x_i, a = s_layer(x1, global_attn=mask, alpha=s_layer.alpha)
                     x_l.append(x_i)
                     if self.need_attn:
                         attn[1].append(a)
