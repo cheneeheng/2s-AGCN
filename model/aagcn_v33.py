@@ -521,7 +521,7 @@ class Model(BaseModel):
             _x1 = _x1.view(N, M, T, V, C).permute(0, 1, 3, 2, 4).contiguous()
             _x1 = _x1.reshape(N*M, V, T*C)  # nm,v,tc
             _x_l = []
-            if mode == 'v3':
+            if mode == 'v2' or mode == 'v3':
                 for _, s_layer in list(_layers)[:-1]:
                     # v,v
                     mask = s_layer.PA
