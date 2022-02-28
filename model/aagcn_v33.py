@@ -584,7 +584,7 @@ class Model(BaseModel):
                     s_trans_enc_layers, x, attn[0])
                 # Temporal
                 x2, attn[1] = _temporal_trans(
-                    self.t_trans_enc_layers[i], x2, attn[1])
+                    self.t_trans_enc_layers[i], x1, attn[1])
 
             elif self.trans_seq == 's-t-v2' or \
                     self.trans_seq == 's-t-res-v2':
@@ -593,7 +593,7 @@ class Model(BaseModel):
                     self.s_trans_enc_layers[i], x, attn[0], _pe=True)
                 # Temporal
                 x2, attn[1] = _temporal_trans(
-                    self.t_trans_enc_layers[i], x2, attn[1], _pe=True)
+                    self.t_trans_enc_layers[i], x1, attn[1], _pe=True)
 
             elif self.trans_seq == 'sa-t-v2' or \
                     self.trans_seq == 'sa-t-res-v2':
@@ -602,10 +602,11 @@ class Model(BaseModel):
                     s_trans_enc_layers, x, attn[0], _pe=True)
                 # Temporal
                 x2, attn[1] = _temporal_trans(
-                    self.t_trans_enc_layers[i], x2, attn[1], _pe=True)
+                    self.t_trans_enc_layers[i], x1, attn[1], _pe=True)
 
             elif self.trans_seq == 'sa-t-v3' or \
                     self.trans_seq == 'sa-t-res-v3':
+                # no spatial residual
                 # Spatial
                 x1, attn[0] = _spatial_Aa_trans(
                     s_trans_enc_layers, x, attn[0], _pe=True, mode='v3')

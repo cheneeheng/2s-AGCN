@@ -857,6 +857,15 @@ aagcn_v33:
                   - 87.4%
         - 220224140001_nopad_3ks_noaug_rel_pool_withAa_v3_noPAfreeze_a1:
                   - 89.2%
+        - 220221150001_nopad_3ks_lowerlr_noaug_rel_pool_withAa_1h_v3:
+                  - 80.5%
+        - 220221150001_nopad_3ks_lowerlr_noaug_rel_pool_withAa_a1_GAPPOOL:
+                  - v3
+                  - 82.2%
+        - with m_mask. Binary masking to mask to temopral trans.
+        - 220225150001_nopad_3ks_lowerlr_noaug_rel_pool_withAa_mmask:
+                  - v3
+                  - 20.8%
 
 aagcn_v34:
         - from v33
