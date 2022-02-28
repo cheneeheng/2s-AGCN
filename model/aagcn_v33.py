@@ -521,7 +521,16 @@ class Model(BaseModel):
             _x1 = _x1.view(N, M, T, V, C).permute(0, 1, 3, 2, 4).contiguous()
             _x1 = _x1.reshape(N*M, V, T*C)  # nm,v,tc
             _x_l = []
-            if mode == 'v2' or mode == 'v3':
+            if mode == 'v2':
+                for _, s_layer in _layers:
+                    # v,v
+                    mask = s_layer.PA
+                    alpha = s_layer.alpha
+                    out = s_layer(_x1, global_attn=mask, alpha=alpha)
+                    _x_l.append(out[0])
+                    if self.need_attn:
+                        _attn.append((out[1], out[2]) if _pe else out[1])
+            elif mode == 'v3':
                 for _, s_layer in list(_layers)[:-1]:
                     # v,v
                     mask = s_layer.PA
