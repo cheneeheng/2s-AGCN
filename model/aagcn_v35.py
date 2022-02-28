@@ -375,6 +375,18 @@ class Model(BaseModel):
                 [copy.deepcopy(t_trans_enc_layer)
                  for _ in range(t_trans_cfg['num_layers'])])
 
+            if 'res' in trans_seq:
+                res_trans_enc_layers = torch.nn.ModuleDict(
+                    {
+                        'res_norm': nn.LayerNorm(
+                            t_trans_dim, eps=t_trans_cfg['layer_norm_eps']),
+                        'res_dropout': nn.Dropout(p=res_dropout),
+                    }
+                )
+                self.res_trans_enc_layers = torch.nn.ModuleList(
+                    [copy.deepcopy(res_trans_enc_layers)
+                     for _ in range(t_trans_cfg['num_layers'])])
+
             pos_enc = str(pos_enc)
             if pos_enc == 'True' or pos_enc == 'original':
                 self.t_pos_encoder = PositionalEncoding(t_trans_dim)
@@ -382,11 +394,6 @@ class Model(BaseModel):
                 self.t_pos_encoder = CosSinPositionalEncoding(t_trans_dim)
             else:
                 self.t_pos_encoder = lambda x: x
-
-            if 'res' in trans_seq:
-                self.res_dropout = nn.Dropout(p=res_dropout)
-                self.res_norm = nn.LayerNorm(t_trans_dim,
-                                             eps=t_trans_cfg['layer_norm_eps'])
 
         # 4. transformer (spatial)
         if s_trans_cfg is not None:
@@ -479,26 +486,25 @@ class Model(BaseModel):
             if self.m_mask:
                 _x = _x * self.m_b_mask
             out = _layer(_x)  # x, attn, pe
-            _x, _a = out[0], out[1]
             if self.need_attn:
-                _attn.append((_a, out[2]) if _pe else _a)
-            return _x, _attn
+                _attn.append((out[1], out[2]) if _pe else out[1])
+            return out[0], _attn
 
-        def _spatial_trans(_layer, _x, _attn, _pe=False):
-            if self.cls_token is not None:
-                _x0 = _x[:, 0:1, :]  # nm,1,vc
-                _x = _x[:, 1:, :]  # nm,t,vc
-            _x = _x.view(N, M, T, V, C).permute(0, 1, 3, 2, 4).contiguous()
-            _x = _x.reshape(N*M, V, T*C)  # nm,v,tc
-            out = _layer(_x)
-            _x, _a = out[0], out[1]
-            if self.need_attn:
-                _attn.append((_a, out[2]) if _pe else _a)
-            _x = _x.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
-            _x = _x.reshape(N*M, T, V*C)  # nm,t,vc
-            if self.cls_token is not None:
-                _x = torch.cat([_x0, _x], dim=1)  # nm,1+t,vc
-            return _x, _attn
+        # def _spatial_trans(_layer, _x, _attn, _pe=False):
+        #     if self.cls_token is not None:
+        #         _x0 = _x[:, 0:1, :]  # nm,1,vc
+        #         _x = _x[:, 1:, :]  # nm,t,vc
+        #     _x = _x.view(N, M, T, V, C).permute(0, 1, 3, 2, 4).contiguous()
+        #     _x = _x.reshape(N*M, V, T*C)  # nm,v,tc
+        #     out = _layer(_x)
+        #     _x, _a = out[0], out[1]
+        #     if self.need_attn:
+        #         _attn.append((_a, out[2]) if _pe else _a)
+        #     _x = _x.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
+        #     _x = _x.reshape(N*M, T, V*C)  # nm,t,vc
+        #     if self.cls_token is not None:
+        #         _x = torch.cat([_x0, _x], dim=1)  # nm,1+t,vc
+        #     return _x, _attn
 
         def _spatial_Aa_trans(_layers, _x, _attn, _pe=False, mode=None):
             if self.cls_token is not None:
@@ -510,21 +516,22 @@ class Model(BaseModel):
             _x1 = _x1.reshape(N*M, V, T*C)  # nm,v,tc
             _x_l = []
             if mode == 'v1' or mode == 'v2':
-                for _, s_layer in list(_layers)[:-2]:
+                for s_name, s_layer in _layers.items():
+                    if 'subset' not in s_name:
+                        continue
                     # v,v
-                    mask = s_layer.PA
-                    alpha = s_layer.alpha
-                    out = s_layer(_x1, global_attn=mask, alpha=alpha)
+                    out = s_layer(_x1, global_attn=s_layer.PA,
+                                  alpha=s_layer.alpha)
                     _x_l.append(out[0])
                     if self.need_attn:
                         _attn.append((out[1], out[2]) if _pe else out[1])
             _x_l = torch.stack(_x_l, dim=0).sum(dim=0)
             if mode == 'v1':
-                _x1 = list(_layers)[-1][1](_x_l)  # dropout
-                _x1 = list(_layers)[-2][1](_x1)  # norm
+                _x1 = _layers['sa_dropout'](_x_l)  # dropout
+                _x1 = _layers['sa_norm'](_x1)  # norm
             elif mode == 'v2':
-                _x1 = _x1 + list(_layers)[-1][1](_x_l)  # dropout
-                _x1 = list(_layers)[-2][1](_x1)  # norm
+                _x1 = _x1 + _layers['sa_dropout'](_x_l)  # dropout
+                _x1 = _layers['sa_norm'](_x1)  # norm
             _x1 = _x1.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
             _x1 = _x1.reshape(N, M*T, V*C)  # nm,t,vc
             if self.cls_token is not None:
@@ -535,7 +542,7 @@ class Model(BaseModel):
         for i in range(len(self.t_trans_enc_layers)):
 
             if isinstance(self.s_trans_enc_layers[i], torch.nn.ModuleDict):
-                s_trans_enc_layers = self.s_trans_enc_layers[i].items()
+                s_trans_enc_layers = self.s_trans_enc_layers[i]
             else:
                 s_trans_enc_layers = [(None, self.s_trans_enc_layers[i])]
 
@@ -550,7 +557,7 @@ class Model(BaseModel):
 
             elif self.trans_seq == 'sa-t-v2' or \
                     self.trans_seq == 'sa-t-res-v2':
-                # no spatial residual
+                # with spatial residual
                 # Spatial
                 x1, attn[0] = _spatial_Aa_trans(
                     s_trans_enc_layers, x, attn[0], _pe=True, mode='v2')
@@ -560,8 +567,8 @@ class Model(BaseModel):
 
             if 'res' in self.trans_seq:
                 # Residual
-                x = x + self.res_dropout(x2)
-                x = self.res_norm(x)
+                x = x + self.res_trans_enc_layers[i]['res_dropout'](x2)
+                x = self.res_trans_enc_layers[i]['res_norm'](x)
             else:
                 x = x2
 
@@ -608,7 +615,7 @@ if __name__ == '__main__':
                       'pos_emb': 'rel-shared',
                       'length': 25,
                   },
-                  trans_seq='sa-t-v2',
+                  trans_seq='sa-t-res-v2',
                   add_A=True,
                   add_Aa='one',
                   kernel_size=3,

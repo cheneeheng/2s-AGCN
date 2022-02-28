@@ -869,6 +869,8 @@ aagcn_v33:
                   - 83.0%
         - 220221150001_nopad_3ks_lowerlr_noaug_rel_pool_withAa_1h:
                   - 80.8%
+        - 220221150001_nopad_3ks_lowerlr_noaug_rel_pool_withAa_16sh:
+        - 220221150001_nopad_3ks_lowerlr_noaug_rel_pool_withAa_rerun:
 
 aagcn_v34:
         - from v33

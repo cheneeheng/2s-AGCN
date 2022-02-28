@@ -264,12 +264,15 @@ class Processor():
         if self.arg.phase == 'train':
             assert os.path.exists(self.arg.train_feeder_args['data_path'])
             assert os.path.exists(self.arg.train_feeder_args['label_path'])
+            g = torch.Generator()
+            g.manual_seed(self.arg.seed)
             self.data_loader['train'] = DataLoader(
                 dataset=Feeder(**self.arg.train_feeder_args),
                 batch_size=self.arg.batch_size,
                 shuffle=True,
                 num_workers=self.arg.num_worker,
                 drop_last=True,
+                generator=g,
                 worker_init_fn=init_seed)
         self.data_loader['test'] = DataLoader(
             dataset=Feeder(**self.arg.test_feeder_args),
