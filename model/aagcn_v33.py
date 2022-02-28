@@ -599,7 +599,7 @@ class Model(BaseModel):
                     self.trans_seq == 'sa-t-res-v2':
                 # Spatial
                 x1, attn[0] = _spatial_Aa_trans(
-                    s_trans_enc_layers, x, attn[0], _pe=True)
+                    s_trans_enc_layers, x, attn[0], _pe=True, mode='v2')
                 # Temporal
                 x2, attn[1] = _temporal_trans(
                     self.t_trans_enc_layers[i], x1, attn[1], _pe=True)
