@@ -864,6 +864,10 @@ aagcn_v33:
         - with m_mask. Binary masking to mask to temopral trans.
         - 220225150001_nopad_3ks_lowerlr_noaug_rel_pool_withAa_mmask_v3:
                   - 20.8%
+        - 220221150001_nopad_3ks_lowerlr_noaug_rel_pool_withAa_10h:
+                  - 83.0%
+        - 220221150001_nopad_3ks_lowerlr_noaug_rel_pool_withAa_1h:
+                  - 80.8%
 
 aagcn_v34:
         - from v33
