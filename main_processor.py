@@ -61,52 +61,6 @@ class Processor():
         self.load_optimizer()
         self.best_acc = 0
 
-    # **************************************************************************
-    # UTILS
-    # **************************************************************************
-    def print_time(self):
-        localtime = time.asctime(time.localtime(time.time()))
-        self.print_log("Local current time :  " + localtime)
-
-    def print_log(self, str, print_time=True):
-        if print_time:
-            localtime = time.asctime(time.localtime(time.time()))
-            str = "[ " + localtime + ' ] ' + str
-        print(str)
-        if self.arg.print_log:
-            with open(f'{self.arg.work_dir}/log.txt', 'a') as f:
-                print(str, file=f)
-
-    def record_time(self):
-        self.cur_time = time.time()
-        return self.cur_time
-
-    def split_time(self):
-        split_time = time.time() - self.cur_time
-        self.record_time()
-        return split_time
-
-    def save_arg(self):
-        # save arg
-        arg_dict = vars(self.arg)
-        if not os.path.exists(self.arg.work_dir):
-            os.makedirs(self.arg.work_dir)
-        with open(f'{self.arg.work_dir}/config.yaml', 'w') as f:
-            yaml.dump(arg_dict, f)
-
-    def adjust_learning_rate(self, epoch):
-        opts = ['SGD', 'SGD-LLRD', 'SAM_SGD', 'Adam', 'AdamW', 'AdamW-LLRD']
-        if self.arg.optimizer in opts:
-            for param_group in self.optimizer.param_groups:
-                if epoch < self.arg.warm_up_epoch:
-                    lr = param_group['lr'] * \
-                        (epoch + 1) / self.arg.warm_up_epoch
-                else:
-                    lr = param_group['lr'] * (
-                        0.1 ** np.sum(epoch >= np.array(self.arg.step)))
-                param_group['lr'] = lr
-        else:
-            raise ValueError()
 
     # **************************************************************************
     # LOADERS
@@ -264,15 +218,12 @@ class Processor():
         if self.arg.phase == 'train':
             assert os.path.exists(self.arg.train_feeder_args['data_path'])
             assert os.path.exists(self.arg.train_feeder_args['label_path'])
-            g = torch.Generator()
-            g.manual_seed(self.arg.seed)
             self.data_loader['train'] = DataLoader(
                 dataset=Feeder(**self.arg.train_feeder_args),
                 batch_size=self.arg.batch_size,
                 shuffle=True,
                 num_workers=self.arg.num_worker,
                 drop_last=True,
-                generator=g,
                 worker_init_fn=init_seed)
         self.data_loader['test'] = DataLoader(
             dataset=Feeder(**self.arg.test_feeder_args),
@@ -281,6 +232,57 @@ class Processor():
             num_workers=self.arg.num_worker,
             drop_last=False,
             worker_init_fn=init_seed)
+
+
+
+    # **************************************************************************
+    # UTILS
+    # **************************************************************************
+    def print_time(self):
+        localtime = time.asctime(time.localtime(time.time()))
+        self.print_log("Local current time :  " + localtime)
+
+    def print_log(self, str, print_time=True):
+        if print_time:
+            localtime = time.asctime(time.localtime(time.time()))
+            str = "[ " + localtime + ' ] ' + str
+        print(str)
+        if self.arg.print_log:
+            with open(f'{self.arg.work_dir}/log.txt', 'a') as f:
+                print(str, file=f)
+
+    def record_time(self):
+        self.cur_time = time.time()
+        return self.cur_time
+
+    def split_time(self):
+        split_time = time.time() - self.cur_time
+        self.record_time()
+        return split_time
+
+    def save_arg(self):
+        # save arg
+        arg_dict = vars(self.arg)
+        if not os.path.exists(self.arg.work_dir):
+            os.makedirs(self.arg.work_dir)
+        with open(f'{self.arg.work_dir}/config.yaml', 'w') as f:
+            yaml.dump(arg_dict, f)
+
+    def adjust_learning_rate(self, epoch):
+        opts = ['SGD', 'SGD-LLRD', 'SAM_SGD', 'Adam', 'AdamW', 'AdamW-LLRD']
+        if self.arg.optimizer in opts:
+            for param_group in self.optimizer.param_groups:
+                if epoch < self.arg.warm_up_epoch:
+                    lr = param_group['lr'] * \
+                        (epoch + 1) / self.arg.warm_up_epoch
+                else:
+                    lr = param_group['lr'] * (
+                        0.1 ** np.sum(epoch >= np.array(self.arg.step)))
+                param_group['lr'] = lr
+        else:
+            raise ValueError()
+
+
 
     # **************************************************************************
     # TRAIN AND EVAL

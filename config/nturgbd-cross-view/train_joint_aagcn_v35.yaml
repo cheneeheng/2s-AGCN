@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_v35_joint/220228200001_nopad_3ks_noaug_rel_pool_withAa_v1
-model_saved_name: ./data/data/ntu_result/xview/aagcn_v35_joint/220228200001_nopad_3ks_noaug_rel_pool_withAa_v1/ntu_cv_aagcn_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_v35_joint/220228200001_nopad_3ks_noaug_rel_pool_withAa_1l_16sh_v2_rerun
+model_saved_name: ./data/data/ntu_result/xview/aagcn_v35_joint/220228200001_nopad_3ks_noaug_rel_pool_withAa_1l_16sh_v2_rerun/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
@@ -35,7 +35,7 @@ test_feeder_args:
   label_path: ./data/data/ntu_nopad/xview/val_label.pkl
 
 # model
-model: model.aagcn_v33.Model
+model: model.aagcn_v35.Model
 model_args:
   num_class: 60
   num_point: 25
@@ -58,22 +58,22 @@ model_args:
     dropout: 0.2
     activation: gelu
     prenorm: False
-    num_layers: 3
+    num_layers: 1
     length: 201
     pos_emb: rel-shared
   s_trans_cfg:
-    num_heads: 1
+    num_heads: 16
     model_dim: 16
     ffn_dim: 64
     dropout: 0.2
     activation: gelu
     prenorm: False
-    num_layers: 3
+    num_layers: 1
     length: 25
     pos_emb: rel-shared
   add_A: True
   add_Aa: True
-  trans_seq: sa-t-v1
+  trans_seq: sa-t-v2
   sa_dropout: 0.2
   res_dropout: 0.2
   pos_enc: None

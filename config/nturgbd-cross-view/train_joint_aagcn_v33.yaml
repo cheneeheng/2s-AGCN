@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_v33_joint/220224140001_nopad_3ks_noaug_rel_pool_withAa_v3_noPAfreeze_a1
-model_saved_name: ./data/data/ntu_result/xview/aagcn_v33_joint/220224140001_nopad_3ks_noaug_rel_pool_withAa_v3_noPAfreeze_a1/ntu_cv_aagcn_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_v33_joint/220221150001_nopad_3ks_lowerlr_noaug_rel_pool_withAa_rerunori2
+model_saved_name: ./data/data/ntu_result/xview/aagcn_v33_joint/220221150001_nopad_3ks_lowerlr_noaug_rel_pool_withAa_rerunori2/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
@@ -72,8 +72,8 @@ model_args:
     length: 25
     pos_emb: rel-shared
   add_A: True
-  add_Aa: one
-  trans_seq: sa-t-v3
+  add_Aa: True
+  trans_seq: sa-t-v2
   multi_trans_dropout: 0.2
   res_dropout: 0.2
   pos_enc: None
@@ -91,7 +91,7 @@ test_batch_size: 64
 
 optimizer: SGD
 nesterov: True
-base_lr: 0.1
+base_lr: 0.01
 step: [30, 40]
 weight_decay: 0.0001
 llrd_factor: 0.5
@@ -100,6 +100,5 @@ start_epoch: 0
 num_epoch: 50
 warm_up_epoch: 5
 
-only_train_part: False
-only_train_epoch: 0
-# only_train_epoch: 5
+only_train_part: True
+only_train_epoch: 5
