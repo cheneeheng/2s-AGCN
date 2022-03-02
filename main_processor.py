@@ -61,10 +61,18 @@ class Processor():
         self.load_optimizer()
         self.best_acc = 0
 
+    def save_arg(self):
+        # save arg
+        arg_dict = vars(self.arg)
+        if not os.path.exists(self.arg.work_dir):
+            os.makedirs(self.arg.work_dir)
+        with open(f'{self.arg.work_dir}/config.yaml', 'w') as f:
+            yaml.dump(arg_dict, f)
 
     # **************************************************************************
     # LOADERS
     # **************************************************************************
+
     def load_model(self):
         output_device = self.arg.device[0] if type(
             self.arg.device) is list else self.arg.device
@@ -136,11 +144,11 @@ class Processor():
             params_list = []
             for idx, (k, v) in enumerate(params_dict.items()):
                 if k == '-1':
-                    params_list.append({'params': v})
+                    lr = self.arg.base_lr
+                    params_list.append({'params': v, 'lr': lr, 'base_lr': lr})
                 else:
-                    params_list.append(
-                        {'params': v,
-                         'lr': self.arg.base_lr * self.arg.llrd_factor**idx})
+                    lr = self.arg.base_lr * self.arg.llrd_factor**idx
+                    params_list.append({'params': v, 'lr': lr, 'base_lr': lr})
 
         if self.arg.optimizer == 'SGD':
             self.optimizer = optim.SGD(self.model.parameters(),
@@ -233,11 +241,10 @@ class Processor():
             drop_last=False,
             worker_init_fn=init_seed)
 
-
-
     # **************************************************************************
     # UTILS
     # **************************************************************************
+
     def print_time(self):
         localtime = time.asctime(time.localtime(time.time()))
         self.print_log("Local current time :  " + localtime)
@@ -260,33 +267,34 @@ class Processor():
         self.record_time()
         return split_time
 
-    def save_arg(self):
-        # save arg
-        arg_dict = vars(self.arg)
-        if not os.path.exists(self.arg.work_dir):
-            os.makedirs(self.arg.work_dir)
-        with open(f'{self.arg.work_dir}/config.yaml', 'w') as f:
-            yaml.dump(arg_dict, f)
-
     def adjust_learning_rate(self, epoch):
-        opts = ['SGD', 'SGD-LLRD', 'SAM_SGD', 'Adam', 'AdamW', 'AdamW-LLRD']
-        if self.arg.optimizer in opts:
+        opts1 = ['SGD', 'SAM_SGD', 'Adam', 'AdamW']
+        opts2 = ['SGD-LLRD', 'AdamW-LLRD']
+        if self.arg.optimizer in opts1:
+            if epoch < self.arg.warm_up_epoch:
+                lr = self.arg.base_lr * (epoch + 1) / self.arg.warm_up_epoch
+            else:
+                lr = self.arg.base_lr * (
+                    0.1 ** np.sum(epoch >= np.array(self.arg.step)))
+            for param_group in self.optimizer.param_groups:
+                param_group['lr'] = lr
+            return lr
+        elif self.arg.optimizer in opts2:
             for param_group in self.optimizer.param_groups:
                 if epoch < self.arg.warm_up_epoch:
-                    lr = param_group['lr'] * \
+                    lr = param_group['base_lr'] * \
                         (epoch + 1) / self.arg.warm_up_epoch
                 else:
-                    lr = param_group['lr'] * (
+                    lr = param_group['base_lr'] * (
                         0.1 ** np.sum(epoch >= np.array(self.arg.step)))
                 param_group['lr'] = lr
         else:
             raise ValueError()
 
-
-
     # **************************************************************************
     # TRAIN AND EVAL
     # **************************************************************************
+
     def train(self, epoch, save_model=False):
         self.model.train()
         self.print_log(f'Training epoch: {epoch + 1}')
@@ -472,6 +480,7 @@ class Processor():
     # **************************************************************************
     # MAIN
     # **************************************************************************
+
     def start(self):
         if self.arg.phase == 'train':
             self.print_log(f'Parameters:\n')

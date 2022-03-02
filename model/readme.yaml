@@ -814,6 +814,19 @@ aagcn_v31:
                   - 90.7%
         - 220216130001_nopad_3ks_noaug_cossin_1l_sa-t-res_10Aa_003lr:
                   - 90.7%
+        - 220216130001_nopad_3ks_noaug_cossin_1l_sa-t-res_Aa_003lr_rerun:
+                  - debug correct.
+        - 220216130001_nopad_3ks_noaug_cossin_1l_sa-t-res_Aa_003lr_rerun2:
+                  - either the code workflow or the LR adjust is causing it to fail.
+                  - this uses the old LR adjust code, so workflow is most probably the cause.
+        - 220216130001_nopad_3ks_noaug_cossin_1l_sa-t-res_Aa_003lr_rerun3:
+                  - debug run. training converging again.
+                  - main_processor.py uses the old version, prior to refractor.
+        - 220216130001_nopad_3ks_noaug_cossin_1l_sa-t-res_Aa_003lr_rerun4:
+                  - debug run. training converging again.
+                  - main_processor.py moved utils after loaders.
+        - 220216130001_nopad_3ks_noaug_cossin_1l_sa-t-res_Aa_003lr_rerun5:
+                  - no converge after first epoch
 
 aagcn_v32:
         - adding attention mask after softmax.
@@ -852,12 +865,15 @@ aagcn_v33:
         - 220221150001_nopad_3ks_lowerlr_noaug_rel_pool_withAa:
                   - 91.1%
         - 220223110001_nopad_3ks_noaug_rel_pool_withAa_llrd:
+                  - LR INVALID
                   - 88.3%
         - 220223110001_nopad_3ks_noaug_rel_pool_withAa_llrd_v3:
+                  - LR INVALID
                   - 87.4%
         - 220224140001_nopad_3ks_noaug_rel_pool_withAa_v3_noPAfreeze_a1:
+                  - LR INVALID
                   - 89.2%
-        - ###### TRAINING SEEMS TO NOT CONVERGE AS BEFFORE.
+        -  ########## TRAINING SEEMS TO NOT CONVERGE AS BEFFORE.
         - 220221150001_nopad_3ks_lowerlr_noaug_rel_pool_withAa_1h_v3_a1:
                   - 80.5%
         - 220221150001_nopad_3ks_lowerlr_noaug_rel_pool_withAa_a1_GAPPOOL_v3:
@@ -871,14 +887,37 @@ aagcn_v33:
                   - 80.8%
         - 220221150001_nopad_3ks_lowerlr_noaug_rel_pool_withAa_16sh:
         - 220221150001_nopad_3ks_lowerlr_noaug_rel_pool_withAa_rerun:
+        -  #  TRAINING SEEMS TO NOT CONVERGE AS BEFFORE.##########
+        - 220221150001_nopad_3ks_lowerlr_noaug_rel_pool_withAa_rerunori:
+                  - debug run. training converging again.
+                  - either the code workflow or the LR adjust is causing it to fail.
+        - 220221150001_nopad_3ks_lowerlr_noaug_rel_pool_withAa_rerunori2:
+                  - debug run. training converging again.
+                  - either the code workflow or the LR adjust is causing it to fail.
+                  - main_processor.py uses the old version, prior to refractor.
+        - 220221150001_nopad_3ks_lowerlr_noaug_rel_pool_withAa_rerunori3:
+                  - no converge
+        - 220221150001_nopad_3ks_lowerlr_noaug_rel_pool_withAa_rerunori4:
+                  - converdeg.
+                  - adjust LR logic is wrong.
 
 aagcn_v34:
         - from v33
         - uses different temporal transformer input format.
+        -  ########## TRAINING SEEMS TO NOT CONVERGE AS BEFFORE.
         - 220224160001_nopad_3ks_lowerlr_noaug_rel_v3:
                   - 78.6%
         - 220224160001_nopad_3ks_noaug_rel_v3_noPAfreeze_a1:
                   - 84.9%
+        -  #  TRAINING SEEMS TO NOT CONVERGE AS BEFFORE.##########
 
 aagcn_v35:
         - clean copy from v33
+        -  ########## TRAINING SEEMS TO NOT CONVERGE AS BEFFORE.
+        - 220228200001_nopad_3ks_noaug_rel_pool_withAa_1l_v1:
+                  - LR INVALID
+                  - 82.7%
+        - 220228200001_nopad_3ks_noaug_rel_pool_withAa_1l_16sh_v1:
+                  - LR INVALID
+                  - 83.1%
+        -  #  TRAINING SEEMS TO NOT CONVERGE AS BEFFORE.##########

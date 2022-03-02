@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_v33_joint/delme
-model_saved_name: ./data/data/ntu_result/xview/aagcn_v33_joint/delme/ntu_cv_aagcn_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_v31_joint/delme
+model_saved_name: ./data/data/ntu_result/xview/aagcn_v31_joint/delme/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
@@ -31,7 +31,7 @@ test_feeder_args:
   label_path: ./data/data/ntu_nopad/xview/val_label.pkl
 
 # model
-model: model.aagcn_v33.Model
+model: model.aagcn_v31.Model
 model_args:
   num_class: 60
   num_point: 25
@@ -46,7 +46,11 @@ model_args:
   attention: True
   kernel_size: 3
   pad: False
-  backbone_dim: 16
+  trans_seq: sa-t-res
+  add_A: True
+  add_Aa: True
+  multi_trans_dropout: 0.0
+  res_dropout: 0.0
   t_trans_cfg:
     num_heads: 25
     model_dim: 16
@@ -54,9 +58,7 @@ model_args:
     dropout: 0.2
     activation: gelu
     prenorm: False
-    num_layers: 3
-    length: 201
-    pos_emb: rel-shared
+    num_layers: 1
   s_trans_cfg:
     num_heads: 1
     model_dim: 16
@@ -64,15 +66,8 @@ model_args:
     dropout: 0.2
     activation: gelu
     prenorm: False
-    num_layers: 3
-    length: 25
-    pos_emb: rel-shared
-  add_A: True
-  add_Aa: True
-  trans_seq: sa-t-v2
-  multi_trans_dropout: 0.2
-  res_dropout: 0.2
-  pos_enc: None
+    num_layers: 1
+  pos_enc: cossin
   classifier_type: CLS
   model_layers: 101
 #  gbn_split: 2
@@ -81,19 +76,19 @@ model_args:
 #optim
 # device: [0, 1 ,2, 3]
 device: [0]
-batch_size: 2
-test_batch_size: 2
+batch_size: 4
+test_batch_size: 4
 
+llrd_factor: 0.5
 optimizer: SGD-LLRD
 nesterov: True
-base_lr: 0.01
+base_lr: 0.03
 step: [30, 40]
 weight_decay: 0.0001
-llrd_factor: 0.5
 
 start_epoch: 0
-num_epoch: 50
-warm_up_epoch: 0
+num_epoch: 5
+warm_up_epoch: 5
 
-only_train_part: False
+only_train_part: True
 only_train_epoch: 5
