@@ -922,4 +922,6 @@ aagcn_v35:
                   - 83.1%
         -  #  TRAINING SEEMS TO NOT CONVERGE AS BEFFORE.##########
         - 220228200001_nopad_3ks_noaug_rel_pool_withAa_1l_v2:
+                  - 90.3%
         - 220228200001_nopad_3ks_noaug_rel_pool_withAa_1l_16sh_v2:
+                  - 90.6%

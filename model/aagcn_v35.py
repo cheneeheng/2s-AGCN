@@ -409,7 +409,7 @@ class Model(BaseModel):
                             TransformerEncoderLayerExtV2(
                                 cfg=s_trans_cfg,
                                 mha=mha,
-                                A=self.graph.A[a_i].transpose((0, 2, 1)) if invert_A else self.graph.A[a_i],  # noqa
+                                A=self.graph.A[a_i].transpose((1, 0)) if invert_A else self.graph.A[a_i],  # noqa
                                 Aa=str(add_Aa)
                             )
                         )
