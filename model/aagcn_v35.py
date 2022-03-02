@@ -4,7 +4,7 @@ from torch import nn
 import copy
 import numpy as np
 import math
-from typing import Optional
+from typing import Optional, Union
 
 from model.aagcn import conv_init
 from model.aagcn import bn_init
@@ -306,6 +306,7 @@ class Model(BaseModel):
 
                  add_A: bool = False,
                  add_Aa: str = None,
+                 invert_A: bool = False,
 
                  trans_seq: str = 's-t',
 
@@ -408,7 +409,7 @@ class Model(BaseModel):
                             TransformerEncoderLayerExtV2(
                                 cfg=s_trans_cfg,
                                 mha=mha,
-                                A=self.graph.A[a_i],
+                                A=self.graph.A[a_i].transpose((0, 2, 1)) if invert_A else self.graph.A[a_i],  # noqa
                                 Aa=str(add_Aa)
                             )
                         )
@@ -470,6 +471,66 @@ class Model(BaseModel):
                 self.m_b_mask = torch.cat([cls_token, self.m_b_mask], dim=1)
         return super().forward(x)
 
+    def forward_temporal_transformer(self,
+                                     x: torch.Tensor,
+                                     size: list,
+                                     layer: torch.nn.Module,
+                                     attn: list,
+                                     pe: bool = False):
+        N, C, T, V, M = size
+        x = x.reshape(N, -1, V*C)  # n,1+mt,vc
+        if self.m_mask:
+            x = x * self.m_b_mask
+        out = layer(x)  # x, attn, pe
+        if self.need_attn:
+            attn.append((out[1], out[2]) if pe else out[1])
+        return out[0], attn
+
+    def forward_spatial_Aa_trans(self,
+                                 x: torch.Tensor,
+                                 size: list,
+                                 layers: Union[torch.nn.ModuleDict,
+                                               torch.nn.ModuleList],
+                                 attn: list,
+                                 pe: bool = False,
+                                 mode: str = 'v1'):
+        assert mode in ['v0', 'v1', 'v2'], f"{mode} is not supported."
+        N, C, T, V, M = size
+        if self.cls_token is not None:
+            x0 = x[:, 0:1, :]  # nm,1,vc
+            x1 = x[:, 1:, :]  # nm,t,vc
+        else:
+            x1 = x[:, :, :]  # nm,t,vc
+        x1 = x1.view(N, M, T, V, C).permute(0, 1, 3, 2, 4).contiguous()
+        x1 = x1.reshape(N*M, V, T*C)  # nm,v,tc
+        x_l = []
+        if mode == 'v0':
+            out = layers(x1)
+            x1 = out[0]
+            if self.need_attn:
+                attn.append((out[1], out[2]) if pe else out[1])
+        elif mode == 'v1' or mode == 'v2':
+            for s_name, s_layer in layers.items():
+                if 'subset' not in s_name:
+                    continue
+                # v,v
+                out = s_layer(x1, global_attn=s_layer.PA, alpha=s_layer.alpha)
+                x_l.append(out[0])
+                if self.need_attn:
+                    attn.append((out[1], out[2]) if pe else out[1])
+            x_l = torch.stack(x_l, dim=0).sum(dim=0)
+        if mode == 'v1':
+            x1 = layers['sa_dropout'](x_l)  # dropout
+            x1 = layers['sa_norm'](x1)  # norm
+        elif mode == 'v2':
+            x1 = x1 + layers['sa_dropout'](x_l)  # dropout
+            x1 = layers['sa_norm'](x1)  # norm
+        x1 = x1.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
+        x1 = x1.reshape(N, M*T, V*C)  # nm,t,vc
+        if self.cls_token is not None:
+            x1 = torch.cat([x0, x1], dim=1)  # nm,1+t,vc
+        return x1, attn
+
     def forward_postprocess(self, x: torch.Tensor, size: torch.Size):
         N, _, _, V, M = size
         _, C, T, _ = x.size()
@@ -481,63 +542,6 @@ class Model(BaseModel):
             x = torch.cat((cls_tokens, x), dim=1)
         x = self.t_pos_encoder(x)
 
-        def _temporal_trans(_layer, _x, _attn, _pe=False):
-            _x = _x.reshape(N, -1, V*C)  # n,1+mt,vc
-            if self.m_mask:
-                _x = _x * self.m_b_mask
-            out = _layer(_x)  # x, attn, pe
-            if self.need_attn:
-                _attn.append((out[1], out[2]) if _pe else out[1])
-            return out[0], _attn
-
-        # def _spatial_trans(_layer, _x, _attn, _pe=False):
-        #     if self.cls_token is not None:
-        #         _x0 = _x[:, 0:1, :]  # nm,1,vc
-        #         _x = _x[:, 1:, :]  # nm,t,vc
-        #     _x = _x.view(N, M, T, V, C).permute(0, 1, 3, 2, 4).contiguous()
-        #     _x = _x.reshape(N*M, V, T*C)  # nm,v,tc
-        #     out = _layer(_x)
-        #     _x, _a = out[0], out[1]
-        #     if self.need_attn:
-        #         _attn.append((_a, out[2]) if _pe else _a)
-        #     _x = _x.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
-        #     _x = _x.reshape(N*M, T, V*C)  # nm,t,vc
-        #     if self.cls_token is not None:
-        #         _x = torch.cat([_x0, _x], dim=1)  # nm,1+t,vc
-        #     return _x, _attn
-
-        def _spatial_Aa_trans(_layers, _x, _attn, _pe=False, mode=None):
-            if self.cls_token is not None:
-                _x0 = _x[:, 0:1, :]  # nm,1,vc
-                _x1 = _x[:, 1:, :]  # nm,t,vc
-            else:
-                _x1 = _x[:, :, :]  # nm,t,vc
-            _x1 = _x1.view(N, M, T, V, C).permute(0, 1, 3, 2, 4).contiguous()
-            _x1 = _x1.reshape(N*M, V, T*C)  # nm,v,tc
-            _x_l = []
-            if mode == 'v1' or mode == 'v2':
-                for s_name, s_layer in _layers.items():
-                    if 'subset' not in s_name:
-                        continue
-                    # v,v
-                    out = s_layer(_x1, global_attn=s_layer.PA,
-                                  alpha=s_layer.alpha)
-                    _x_l.append(out[0])
-                    if self.need_attn:
-                        _attn.append((out[1], out[2]) if _pe else out[1])
-            _x_l = torch.stack(_x_l, dim=0).sum(dim=0)
-            if mode == 'v1':
-                _x1 = _layers['sa_dropout'](_x_l)  # dropout
-                _x1 = _layers['sa_norm'](_x1)  # norm
-            elif mode == 'v2':
-                _x1 = _x1 + _layers['sa_dropout'](_x_l)  # dropout
-                _x1 = _layers['sa_norm'](_x1)  # norm
-            _x1 = _x1.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
-            _x1 = _x1.reshape(N, M*T, V*C)  # nm,t,vc
-            if self.cls_token is not None:
-                _x1 = torch.cat([_x0, _x1], dim=1)  # nm,1+t,vc
-            return _x1, _attn
-
         attn = [[], []]
         for i in range(len(self.t_trans_enc_layers)):
 
@@ -546,24 +550,63 @@ class Model(BaseModel):
             else:
                 s_trans_enc_layers = [(None, self.s_trans_enc_layers[i])]
 
-            if self.trans_seq == 'sa-t-v1' or \
-                    self.trans_seq == 'sa-t-res-v1':
+            if 'v0' in self.trans_seq:
                 # Spatial
-                x1, attn[0] = _spatial_Aa_trans(
-                    s_trans_enc_layers, x, attn[0], _pe=True, mode='v1')
+                x1, attn[0] = self.forward_spatial_Aa_trans(
+                    x=x,
+                    size=[N, C, T, V, M],
+                    layers=s_trans_enc_layers,
+                    attn=attn[0],
+                    pe=True,
+                    mode='v0'
+                )
                 # Temporal
-                x2, attn[1] = _temporal_trans(
-                    self.t_trans_enc_layers[i], x1, attn[1], _pe=True)
+                x2, attn[1] = self.forward_temporal_transformer(
+                    x=x1,
+                    size=[N, C, T, V, M],
+                    layer=self.t_trans_enc_layers[i],
+                    attn=attn[1],
+                    pe=True
+                )
 
-            elif self.trans_seq == 'sa-t-v2' or \
-                    self.trans_seq == 'sa-t-res-v2':
+            elif 'v1' in self.trans_seq:
+                # Spatial
+                x1, attn[0] = self.forward_spatial_Aa_trans(
+                    x=x,
+                    size=[N, C, T, V, M],
+                    layers=s_trans_enc_layers,
+                    attn=attn[0],
+                    pe=True,
+                    mode='v1'
+                )
+                # Temporal
+                x2, attn[1] = self.forward_temporal_transformer(
+                    x=x1,
+                    size=[N, C, T, V, M],
+                    layer=self.t_trans_enc_layers[i],
+                    attn=attn[1],
+                    pe=True
+                )
+
+            elif 'v2' in self.trans_seq:
                 # with spatial residual
                 # Spatial
-                x1, attn[0] = _spatial_Aa_trans(
-                    s_trans_enc_layers, x, attn[0], _pe=True, mode='v2')
+                x1, attn[0] = self.forward_spatial_Aa_trans(
+                    x=x,
+                    size=[N, C, T, V, M],
+                    layers=s_trans_enc_layers,
+                    attn=attn[0],
+                    pe=True,
+                    mode='v2'
+                )
                 # Temporal
-                x2, attn[1] = _temporal_trans(
-                    self.t_trans_enc_layers[i], x1, attn[1], _pe=True)
+                x2, attn[1] = self.forward_temporal_transformer(
+                    x=x1,
+                    size=[N, C, T, V, M],
+                    layer=self.t_trans_enc_layers[i],
+                    attn=attn[1],
+                    pe=True
+                )
 
             if 'res' in self.trans_seq:
                 # Residual
@@ -627,4 +670,5 @@ if __name__ == '__main__':
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
     # print(sum(p.numel() for p in model.parameters() if p.requires_grad))
     print([i[0] for i in model.named_parameters() if 'PA' in i[0]])
-    print(model(torch.ones((1, 3, 300, 25, 2))))
+    # print(model(torch.ones((1, 3, 300, 25, 2))))
+    print(model(torch.rand((1, 3, 300, 25, 2))))
