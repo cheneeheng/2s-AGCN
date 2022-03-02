@@ -341,6 +341,9 @@ class Model(BaseModel):
         self.m_mask = m_mask
         self.m_b_mask = None
 
+        self.rel_emb_s = True if 'rel' in s_trans_cfg['pos_emb'] else False
+        self.rel_emb_t = True if 'rel' in t_trans_cfg['pos_emb'] else False
+
         # 1. joint graph
         self.init_graph(graph, graph_args)
 
@@ -497,10 +500,10 @@ class Model(BaseModel):
         assert mode in ['v0', 'v1', 'v2'], f"{mode} is not supported."
         N, C, T, V, M = size
         if self.cls_token is not None:
-            x0 = x[:, 0:1, :]  # nm,1,vc
-            x1 = x[:, 1:, :]  # nm,t,vc
+            x0 = x[:, 0:1, :]  # n,1,vc
+            x1 = x[:, 1:, :]  # n,mt,vc
         else:
-            x1 = x[:, :, :]  # nm,t,vc
+            x1 = x[:, :, :]  # n,mt,vc
         x1 = x1.view(N, M, T, V, C).permute(0, 1, 3, 2, 4).contiguous()
         x1 = x1.reshape(N*M, V, T*C)  # nm,v,tc
         x_l = []
@@ -526,9 +529,9 @@ class Model(BaseModel):
             x1 = x1 + layers['sa_dropout'](x_l)  # dropout
             x1 = layers['sa_norm'](x1)  # norm
         x1 = x1.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
-        x1 = x1.reshape(N, M*T, V*C)  # nm,t,vc
+        x1 = x1.reshape(N, M*T, V*C)  # n,mt,vc
         if self.cls_token is not None:
-            x1 = torch.cat([x0, x1], dim=1)  # nm,1+t,vc
+            x1 = torch.cat([x0, x1], dim=1)  # n,1+mt,vc
         return x1, attn
 
     def forward_postprocess(self, x: torch.Tensor, size: torch.Size):
@@ -557,16 +560,16 @@ class Model(BaseModel):
                     size=[N, C, T, V, M],
                     layers=s_trans_enc_layers,
                     attn=attn[0],
-                    pe=True,
+                    pe=self.rel_emb_s,
                     mode='v0'
                 )
                 # Temporal
                 x2, attn[1] = self.forward_temporal_transformer(
-                    x=x1,
+                    x=x if 'parallel' in self.trans_seq else x1,
                     size=[N, C, T, V, M],
                     layer=self.t_trans_enc_layers[i],
                     attn=attn[1],
-                    pe=True
+                    pe=self.rel_emb_t
                 )
 
             elif 'v1' in self.trans_seq:
@@ -576,16 +579,16 @@ class Model(BaseModel):
                     size=[N, C, T, V, M],
                     layers=s_trans_enc_layers,
                     attn=attn[0],
-                    pe=True,
+                    pe=self.rel_emb_s,
                     mode='v1'
                 )
                 # Temporal
                 x2, attn[1] = self.forward_temporal_transformer(
-                    x=x1,
+                    x=x if 'parallel' in self.trans_seq else x1,
                     size=[N, C, T, V, M],
                     layer=self.t_trans_enc_layers[i],
                     attn=attn[1],
-                    pe=True
+                    pe=self.rel_emb_t
                 )
 
             elif 'v2' in self.trans_seq:
@@ -596,17 +599,23 @@ class Model(BaseModel):
                     size=[N, C, T, V, M],
                     layers=s_trans_enc_layers,
                     attn=attn[0],
-                    pe=True,
+                    pe=self.rel_emb_s,
                     mode='v2'
                 )
                 # Temporal
                 x2, attn[1] = self.forward_temporal_transformer(
-                    x=x1,
+                    x=x if 'parallel' in self.trans_seq else x1,
                     size=[N, C, T, V, M],
                     layer=self.t_trans_enc_layers[i],
                     attn=attn[1],
-                    pe=True
+                    pe=self.rel_emb_t
                 )
+
+            if 'parallel' in self.trans_seq:
+                if 'add' in self.trans_seq:
+                    x2 += x1
+                else:
+                    raise ValueError()
 
             if 'res' in self.trans_seq:
                 # Residual
@@ -658,7 +667,7 @@ if __name__ == '__main__':
                       'pos_emb': 'rel-shared',
                       'length': 25,
                   },
-                  trans_seq='sa-t-res-v2',
+                  trans_seq='sa-t-res-parallel-add-v2',
                   add_A=True,
                   add_Aa='one',
                   kernel_size=3,
