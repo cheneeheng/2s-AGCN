@@ -487,7 +487,8 @@ class Model(BaseModel):
             self.s_cls_token = nn.Parameter(torch.randn(1, 1, s_trans_dim))
             self.s_t_trans_enc_layer = torch.nn.ModuleDict(
                 {
-                    'st_linear1': nn.Linear(s_trans_dim*num_person, t_trans_dim),
+                    'st_linear1': nn.Linear(s_trans_dim*num_person,
+                                            t_trans_dim),
                     'st_linear2': nn.Linear(t_trans_dim, t_trans_dim),
                     'st_dropout1': nn.Dropout(p=0.2),
                     'st_dropout2': nn.Dropout(p=0.2),
