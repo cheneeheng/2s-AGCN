@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torch.nn.functional import gelu
 
 import copy
 import numpy as np
@@ -14,6 +15,14 @@ from model.aagcn import AdaptiveGCN
 from model.aagcn import BaseModel
 
 from model.module.multiheadattention import MultiheadAttention
+
+
+class GELU(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        return gelu(x)
 
 
 # ------------------------------------------------------------------------------
@@ -310,6 +319,8 @@ class Model(BaseModel):
 
                  trans_seq: str = 's-t',
 
+                 add_s_cls: bool = False,
+
                  m_mask: bool = False,
 
                  sa_dropout: float = 0.0,
@@ -452,6 +463,14 @@ class Model(BaseModel):
                     for _ in range(s_trans_cfg['num_layers'])]
             )
 
+            pos_enc = str(pos_enc)
+            if pos_enc == 'True' or pos_enc == 'original':
+                self.s_pos_encoder = PositionalEncoding(s_trans_dim)
+            elif pos_enc == 'cossin':
+                self.s_pos_encoder = CosSinPositionalEncoding(s_trans_dim)
+            else:
+                self.s_pos_encoder = lambda x: x
+
         # 5. classifier
         self.classifier_type = classifier_type
         if 'CLS' in classifier_type:
@@ -461,8 +480,24 @@ class Model(BaseModel):
         if 'POOL' in classifier_type:
             self.cls_pool_fc = nn.Linear(t_trans_dim, t_trans_dim)
             self.cls_pool_act = nn.Tanh()
-
         self.init_fc(t_trans_dim, num_class)
+
+        # 6. s cls token
+        if add_s_cls and self.cls_token is not None:
+            self.s_cls_token = nn.Parameter(torch.randn(1, 1, s_trans_dim))
+            self.s_t_trans_enc_layer = torch.nn.ModuleDict(
+                {
+                    'st_linear1': nn.Linear(s_trans_dim*num_person, t_trans_dim),
+                    'st_linear2': nn.Linear(t_trans_dim, t_trans_dim),
+                    'st_dropout1': nn.Dropout(p=0.2),
+                    'st_dropout2': nn.Dropout(p=0.2),
+                    'st_act': GELU(),
+                    'st_norm': nn.LayerNorm(
+                        t_trans_dim, eps=t_trans_cfg['layer_norm_eps']),
+                }
+            )
+        else:
+            self.s_cls_token = None
 
     def forward(self, x):
         if self.m_mask:
@@ -516,17 +551,21 @@ class Model(BaseModel):
             x1 = x[:, :, :]  # n,mt,vc
         x1 = x1.view(N, M, T, V, C).permute(0, 1, 3, 2, 4).contiguous()
         x1 = x1.reshape(N*M, V, T*C)  # nm,v,tc
+        if self.s_cls_token is not None:
+            s_cls_tokens = self.s_cls_token.repeat(x1.size(0), 1, 1)
+            x1 = torch.cat((s_cls_tokens, x1), dim=1)
+        x1 = self.s_pos_encoder(x1)
         x_l = []
         if mode == 'v0':
-            out = layers(x1)
-            x1 = out[0]
+            for s_name, s_layer in layers:
+                out = s_layer(x1)
+                x1 = out[0]
             if self.need_attn:
                 attn.append((out[1], out[2]) if pe else out[1])
         elif mode == 'v1' or mode == 'v2':
             for s_name, s_layer in layers.items():
                 if 'subset' not in s_name:
                     continue
-                # v,v
                 out = s_layer(x1, global_attn=s_layer.PA, alpha=s_layer.alpha)
                 x_l.append(out[0])
                 if self.need_attn:
@@ -538,6 +577,17 @@ class Model(BaseModel):
         elif mode == 'v2':
             x1 = x1 + layers['sa_dropout'](x_l)  # dropout
             x1 = layers['sa_norm'](x1)  # norm
+        if self.s_cls_token is not None:
+            xs = x1[:, 0:1, :]
+            xs = xs.view(N, M, 1, T, C).reshape(N, 1, -1)  # n,1,mtc
+            xs = self.s_t_trans_enc_layer['st_linear1'](xs)
+            xs = self.s_t_trans_enc_layer['st_act'](xs)
+            xs = self.s_t_trans_enc_layer['st_dropout1'](xs)
+            xs = self.s_t_trans_enc_layer['st_linear2'](xs)
+            xs = self.s_t_trans_enc_layer['st_dropout2'](xs)
+            xs = self.s_t_trans_enc_layer['st_norm'](xs)
+            x0 += xs
+            x1 = x1[:, 1:, :]
         x1 = x1.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
         x1 = x1.reshape(N, M*T, V*C)  # n,mt,vc
         if self.cls_token is not None:
@@ -646,17 +696,18 @@ if __name__ == '__main__':
                       'prenorm': False,
                       'num_layers': 3,
                       'pos_emb': 'rel-shared',
-                      'length': 25,
+                      'length': 26,
                   },
-                  trans_seq='sa-t-res-parallel-add-v2',
+                  trans_seq='sa-t-res-v2',
                   add_A='Empty',
-                  add_Aa='one',
+                  add_Aa='False',
+                  add_s_cls=True,
                   kernel_size=3,
                   pad=False,
                   pos_enc=None,
                   classifier_type='CLS-POOL'
                   )
-    # print(model)
+    print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
     # print(sum(p.numel() for p in model.parameters() if p.requires_grad))
     print([i[0] for i in model.named_parameters() if 'PA' in i[0]])
