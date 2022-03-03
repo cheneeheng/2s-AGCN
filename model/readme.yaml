@@ -925,3 +925,14 @@ aagcn_v35:
                   - 90.3%
         - 220228200001_nopad_3ks_noaug_rel_pool_withAa_1l_16sh_v2:
                   - 90.6%
+        - 220228200001_nopad_3ks_noaug_rel_pool_withAainv_1l_v2:
+                  - 90.5%
+        - 220228200001_nopad_3ks_noaug_rel_pool_withAainv_1l_16sh_v2:
+                  - 90.4%
+        - 220228200001_nopad_3ks_noaug_rel_pool_withAainv_v2:
+                  - 91.3%
+        - 220228200001_nopad_3ks_noaug_rel_pool_withAainv_v2_llrd:
+                  - 90.9%
+        - 220228200001_nopad_3ks_noaug_rel_pool_withAainv_1l_paralleladd_v2:
+                  - 87.9%
+        

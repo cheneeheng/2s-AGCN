@@ -304,7 +304,7 @@ class Model(BaseModel):
                  t_trans_cfg: Optional[dict] = None,
                  s_trans_cfg: Optional[dict] = None,
 
-                 add_A: bool = False,
+                 add_A: Optional[str] = None,
                  add_Aa: str = None,
                  invert_A: bool = False,
 
@@ -404,11 +404,13 @@ class Model(BaseModel):
             s_trans_dim = s_trans_cfg['model_dim'] * trans_len
             s_trans_cfg['model_dim'] = s_trans_dim
             s_trans_cfg['ffn_dim'] *= trans_len
-            if add_A:
-                s_trans_enc_layers = torch.nn.ModuleDict(
-                    {
-                        f'subset{a_i}':
-                        copy.deepcopy(
+
+            add_A = str(add_A)
+            if add_A == 'True' or add_A == 'Empty':
+                m_dict = {}
+                for a_i in range(self.num_subset):
+                    if add_A == 'True':
+                        m_dict[f'subset{a_i}'] = copy.deepcopy(
                             TransformerEncoderLayerExtV2(
                                 cfg=s_trans_cfg,
                                 mha=mha,
@@ -416,10 +418,17 @@ class Model(BaseModel):
                                 Aa=str(add_Aa)
                             )
                         )
-                        for a_i in range(self.num_subset)
-                    }
-                )
-                s_trans_enc_layers.update(
+                    elif add_A == 'Empty':
+                        m_dict[f'subset{a_i}'] = copy.deepcopy(
+                            TransformerEncoderLayerExtV2(
+                                cfg=s_trans_cfg,
+                                mha=mha,
+                                A=None,
+                                Aa=str(add_Aa)
+                            )
+                        )
+                s_trans_enc_layer = torch.nn.ModuleDict(m_dict)
+                s_trans_enc_layer.update(
                     {
                         'sa_norm': nn.LayerNorm(
                             s_trans_dim, eps=s_trans_cfg['layer_norm_eps']),
@@ -427,20 +436,21 @@ class Model(BaseModel):
                         'sa_dropout': nn.Dropout(p=sa_dropout),
                     }
                 )
-                self.s_trans_enc_layers = torch.nn.ModuleList(
-                    [copy.deepcopy(s_trans_enc_layers)
-                        for _ in range(s_trans_cfg['num_layers'])]
-                )
-            else:
+            elif add_A == 'False' or add_A == 'None':
+                assert 'v0' in self.trans_seq, 'v0 not in self.trans_seq'
                 s_trans_enc_layer = TransformerEncoderLayerExtV2(
                     cfg=s_trans_cfg,
                     mha=mha,
-                    A=None
+                    A=None,
+                    Aa=str(add_Aa)
                 )
-                self.s_trans_enc_layers = torch.nn.ModuleList(
-                    [copy.deepcopy(s_trans_enc_layer)
-                     for _ in range(s_trans_cfg['num_layers'])]
-                )
+            else:
+                raise ValueError()
+
+            self.s_trans_enc_layers = torch.nn.ModuleList(
+                [copy.deepcopy(s_trans_enc_layer)
+                    for _ in range(s_trans_cfg['num_layers'])]
+            )
 
         # 5. classifier
         self.classifier_type = classifier_type
@@ -554,62 +564,33 @@ class Model(BaseModel):
                 s_trans_enc_layers = [(None, self.s_trans_enc_layers[i])]
 
             if 'v0' in self.trans_seq:
-                # Spatial
-                x1, attn[0] = self.forward_spatial_Aa_trans(
-                    x=x,
-                    size=[N, C, T, V, M],
-                    layers=s_trans_enc_layers,
-                    attn=attn[0],
-                    pe=self.rel_emb_s,
-                    mode='v0'
-                )
-                # Temporal
-                x2, attn[1] = self.forward_temporal_transformer(
-                    x=x if 'parallel' in self.trans_seq else x1,
-                    size=[N, C, T, V, M],
-                    layer=self.t_trans_enc_layers[i],
-                    attn=attn[1],
-                    pe=self.rel_emb_t
-                )
-
+                # single s trans
+                mode = 'v0'
             elif 'v1' in self.trans_seq:
-                # Spatial
-                x1, attn[0] = self.forward_spatial_Aa_trans(
-                    x=x,
-                    size=[N, C, T, V, M],
-                    layers=s_trans_enc_layers,
-                    attn=attn[0],
-                    pe=self.rel_emb_s,
-                    mode='v1'
-                )
-                # Temporal
-                x2, attn[1] = self.forward_temporal_transformer(
-                    x=x if 'parallel' in self.trans_seq else x1,
-                    size=[N, C, T, V, M],
-                    layer=self.t_trans_enc_layers[i],
-                    attn=attn[1],
-                    pe=self.rel_emb_t
-                )
-
+                # 3 s trans -> sum -> norm -> dropout
+                mode = 'v1'
             elif 'v2' in self.trans_seq:
-                # with spatial residual
-                # Spatial
-                x1, attn[0] = self.forward_spatial_Aa_trans(
-                    x=x,
-                    size=[N, C, T, V, M],
-                    layers=s_trans_enc_layers,
-                    attn=attn[0],
-                    pe=self.rel_emb_s,
-                    mode='v2'
-                )
-                # Temporal
-                x2, attn[1] = self.forward_temporal_transformer(
-                    x=x if 'parallel' in self.trans_seq else x1,
-                    size=[N, C, T, V, M],
-                    layer=self.t_trans_enc_layers[i],
-                    attn=attn[1],
-                    pe=self.rel_emb_t
-                )
+                # 3 s trans -> sum -> res -> norm -> dropout
+                mode = 'v2'
+
+            # Spatial
+            x1, attn[0] = self.forward_spatial_Aa_trans(
+                x=x,
+                size=[N, C, T, V, M],
+                layers=s_trans_enc_layers,
+                attn=attn[0],
+                pe=self.rel_emb_s,
+                mode=mode
+            )
+
+            # Temporal
+            x2, attn[1] = self.forward_temporal_transformer(
+                x=x if 'parallel' in self.trans_seq else x1,
+                size=[N, C, T, V, M],
+                layer=self.t_trans_enc_layers[i],
+                attn=attn[1],
+                pe=self.rel_emb_t
+            )
 
             if 'parallel' in self.trans_seq:
                 if 'add' in self.trans_seq:
@@ -668,7 +649,7 @@ if __name__ == '__main__':
                       'length': 25,
                   },
                   trans_seq='sa-t-res-parallel-add-v2',
-                  add_A=True,
+                  add_A='Empty',
                   add_Aa='one',
                   kernel_size=3,
                   pad=False,
