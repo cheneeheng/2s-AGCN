@@ -15,14 +15,7 @@ from model.aagcn import AdaptiveGCN
 from model.aagcn import BaseModel
 
 from model.module.multiheadattention import MultiheadAttention
-
-
-class GELU(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-    def forward(self, x):
-        return gelu(x)
+from model.module.crossattention import ProjectInOut, Attention, PreNorm
 
 
 # ------------------------------------------------------------------------------
@@ -279,6 +272,43 @@ def transformer_config_checker(cfg: dict):
         assert f'{x}' in trans_cfg_names, f'{x} not in transformer config'
 
 
+# cross attention transformer
+class CrossTransformer(nn.Module):
+    def __init__(self, depth,
+                 sm_dim, sm_heads, sm_dim_head, sm_dropout,
+                 lg_dim, lg_heads, lg_dim_head, lg_dropout):
+        super().__init__()
+        self.layers = nn.ModuleList([])
+        for _ in range(depth):
+            self.layers.append(nn.ModuleList([
+                ProjectInOut(sm_dim, lg_dim,
+                             PreNorm(lg_dim,
+                                     Attention(lg_dim,
+                                               heads=sm_heads,
+                                               dim_head=sm_dim_head,
+                                               dropout=sm_dropout))),
+                ProjectInOut(lg_dim, sm_dim,
+                             PreNorm(sm_dim,
+                                     Attention(sm_dim,
+                                               heads=lg_heads,
+                                               dim_head=lg_dim_head,
+                                               dropout=lg_dropout)))
+            ]))
+
+    def forward(self, sm_tokens, lg_tokens):
+        (sm_cls, sm_patch_tokens), (lg_cls, lg_patch_tokens) = map(
+            lambda t: (t[:, :1], t[:, 1:]), (sm_tokens, lg_tokens))
+
+        for sm_attend_lg, lg_attend_sm in self.layers:
+            sm_cls = sm_attend_lg(
+                sm_cls, context=lg_patch_tokens, kv_include_self=True) + sm_cls
+            lg_cls = lg_attend_sm(
+                lg_cls, context=sm_patch_tokens, kv_include_self=True) + lg_cls
+
+        sm_tokens = torch.cat((sm_cls, sm_patch_tokens), dim=1)
+        lg_tokens = torch.cat((lg_cls, lg_patch_tokens), dim=1)
+        return sm_tokens, lg_tokens
+
 # ------------------------------------------------------------------------------
 # Network
 # - uses original transformer
@@ -288,6 +318,8 @@ def transformer_config_checker(cfg: dict):
 # nmt,v,c => spatial trans (individual)
 # nt,mv,c => spatial trans (joint+individual)
 # ------------------------------------------------------------------------------
+
+
 class Model(BaseModel):
     def __init__(self,
                  num_class: int = 60,
@@ -320,6 +352,7 @@ class Model(BaseModel):
                  trans_seq: str = 's-t',
 
                  add_s_cls: bool = True,
+                 cross_attn: bool = False,
 
                  m_mask: bool = False,
 
@@ -502,6 +535,27 @@ class Model(BaseModel):
         else:
             self.s_cls_token = None
 
+        # 7. cross attention
+        if cross_attn:
+            # sm = longer token length
+            cross_attn_layer = CrossTransformer(
+                # depth=t_trans_cfg['num_layers'],
+                depth=1,
+                sm_dim=t_trans_dim,
+                sm_heads=t_trans_cfg['num_heads'],
+                sm_dim_head=s_trans_dim * \
+                num_person//4//t_trans_cfg['num_heads'],
+                sm_dropout=t_trans_cfg['dropout'],
+                lg_dim=s_trans_dim*num_person,
+                lg_heads=s_trans_cfg['num_heads'],
+                lg_dim_head=t_trans_dim//4//s_trans_cfg['num_heads'],
+                lg_dropout=s_trans_cfg['dropout'])
+            self.cross_attn_enc_layers = torch.nn.ModuleList(
+                [copy.deepcopy(cross_attn_layer)
+                    for _ in range(t_trans_cfg['num_layers'])])
+        else:
+            self.cross_attn_enc_layers = None
+
     def forward(self, x):
         if self.m_mask:
             if self.cls_token is not None:
@@ -595,9 +649,9 @@ class Model(BaseModel):
 
         attn = [[], []]
 
-        # Spatial
-        for i in range(len(self.s_trans_enc_layers)):
+        for i in range(len(self.t_trans_enc_layers)):
 
+            # Spatial
             if isinstance(self.s_trans_enc_layers[i], torch.nn.ModuleDict):
                 s_trans_enc_layers = self.s_trans_enc_layers[i]
             else:
@@ -615,6 +669,7 @@ class Model(BaseModel):
             else:
                 raise ValueError
 
+            # Spatial
             x1, attn[0] = self.forward_spatial_Aa_trans(
                 x=x1,
                 size=[N, C, T, V, M],
@@ -624,8 +679,7 @@ class Model(BaseModel):
                 mode=mode
             )
 
-        # Temporal
-        for i in range(len(self.t_trans_enc_layers)):
+            # Temporal
             x2, attn[1] = self.forward_temporal_transformer(
                 x=x2,
                 size=[N, C, T, V, M],
@@ -633,6 +687,14 @@ class Model(BaseModel):
                 attn=attn[1],
                 pe=self.rel_emb_t
             )
+
+            if self.cross_attn_enc_layers is not None:
+                # cross attention
+                x1 = x1.view(N, M, -1, T*C).permute(0, 2, 1, 3).contiguous()
+                x1 = x1.reshape(N, -1, M*T*C)  # n,v,mtc
+                x2, x1 = self.cross_attn_enc_layers[i](x2, x1)
+                x1 = x1.view(N, -1, M, T*C).permute(0, 2, 1, 3).contiguous()
+                x1 = x1.reshape(N*M, -1, T*C)  # nm,v,tc
 
         # if 'parallel' in self.trans_seq:
         #     if 'add' in self.trans_seq:

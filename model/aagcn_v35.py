@@ -17,14 +17,6 @@ from model.aagcn import BaseModel
 from model.module.multiheadattention import MultiheadAttention
 
 
-class GELU(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-    def forward(self, x):
-        return gelu(x)
-
-
 # ------------------------------------------------------------------------------
 # AAGCN Modules
 # ------------------------------------------------------------------------------
@@ -492,7 +484,7 @@ class Model(BaseModel):
                     'st_linear2': nn.Linear(t_trans_dim, t_trans_dim),
                     'st_dropout1': nn.Dropout(p=0.2),
                     'st_dropout2': nn.Dropout(p=0.2),
-                    'st_act': GELU(),
+                    'st_act': nn.GELU(),
                     'st_norm': nn.LayerNorm(
                         t_trans_dim, eps=t_trans_cfg['layer_norm_eps']),
                 }
