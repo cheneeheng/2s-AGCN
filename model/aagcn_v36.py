@@ -319,7 +319,7 @@ class Model(BaseModel):
 
                  trans_seq: str = 's-t',
 
-                 add_s_cls: bool = False,
+                 add_s_cls: bool = True,
 
                  m_mask: bool = False,
 
@@ -477,26 +477,28 @@ class Model(BaseModel):
             self.cls_token = nn.Parameter(torch.randn(1, 1, t_trans_dim))
         else:
             self.cls_token = None
+        output_dim = t_trans_dim+s_trans_dim*num_person
         if 'POOL' in classifier_type:
-            self.cls_pool_fc = nn.Linear(t_trans_dim, t_trans_dim)
+            # # vc+mtc
+            self.cls_pool_fc = nn.Linear(output_dim, output_dim)
             self.cls_pool_act = nn.Tanh()
-        self.init_fc(t_trans_dim, num_class)
+        self.init_fc(output_dim, num_class)
 
         # 6. s cls token
         if add_s_cls and self.cls_token is not None:
             self.s_cls_token = nn.Parameter(torch.randn(1, 1, s_trans_dim))
-            self.s_t_trans_enc_layer = torch.nn.ModuleDict(
-                {
-                    'st_linear1': nn.Linear(s_trans_dim*num_person,
-                                            t_trans_dim),
-                    'st_linear2': nn.Linear(t_trans_dim, t_trans_dim),
-                    'st_dropout1': nn.Dropout(p=0.2),
-                    'st_dropout2': nn.Dropout(p=0.2),
-                    'st_act': GELU(),
-                    'st_norm': nn.LayerNorm(
-                        t_trans_dim, eps=t_trans_cfg['layer_norm_eps']),
-                }
-            )
+            # self.s_t_trans_enc_layer = torch.nn.ModuleDict(
+            #     {
+            #         'st_linear1': nn.Linear(s_trans_dim*num_person,
+            #                                 t_trans_dim),
+            #         'st_linear2': nn.Linear(t_trans_dim, t_trans_dim),
+            #         'st_dropout1': nn.Dropout(p=0.2),
+            #         'st_dropout2': nn.Dropout(p=0.2),
+            #         'st_act': GELU(),
+            #         'st_norm': nn.LayerNorm(
+            #             t_trans_dim, eps=t_trans_cfg['layer_norm_eps']),
+            #     }
+            # )
         else:
             self.s_cls_token = None
 
@@ -545,17 +547,11 @@ class Model(BaseModel):
                                  mode: str = 'v1'):
         assert mode in ['v0', 'v1', 'v2'], f"{mode} is not supported."
         N, C, T, V, M = size
-        if self.cls_token is not None:
-            x0 = x[:, 0:1, :]  # n,1,vc
-            x1 = x[:, 1:, :]  # n,mt,vc
-        else:
-            x1 = x[:, :, :]  # n,mt,vc
-        x1 = x1.view(N, M, T, V, C).permute(0, 1, 3, 2, 4).contiguous()
-        x1 = x1.reshape(N*M, V, T*C)  # nm,v,tc
         if self.s_cls_token is not None:
-            s_cls_tokens = self.s_cls_token.repeat(x1.size(0), 1, 1)
-            x1 = torch.cat((s_cls_tokens, x1), dim=1)
-        x1 = self.s_pos_encoder(x1)
+            x0 = x[:, 0:1, :]  # nm,1,tc
+            x1 = x[:, 1:, :]  # nm,v,tc
+        else:
+            x1 = x[:, :, :]  # nm,v,tc
         x_l = []
         if mode == 'v0':
             for s_name, s_layer in layers:
@@ -579,35 +575,31 @@ class Model(BaseModel):
             x1 = x1 + layers['sa_dropout'](x_l)  # dropout
             x1 = layers['sa_norm'](x1)  # norm
         if self.s_cls_token is not None:
-            xs = x1[:, 0:1, :]
-            xs = xs.view(N, M, 1, T, C).reshape(N, 1, -1)  # n,1,mtc
-            xs = self.s_t_trans_enc_layer['st_linear1'](xs)
-            xs = self.s_t_trans_enc_layer['st_act'](xs)
-            xs = self.s_t_trans_enc_layer['st_dropout1'](xs)
-            xs = self.s_t_trans_enc_layer['st_linear2'](xs)
-            xs = self.s_t_trans_enc_layer['st_dropout2'](xs)
-            xs = self.s_t_trans_enc_layer['st_norm'](xs)
-            x0 += xs
-            x1 = x1[:, 1:, :]
-        x1 = x1.view(N, M, V, T, C).permute(0, 1, 3, 2, 4).contiguous()
-        x1 = x1.reshape(N, M*T, V*C)  # n,mt,vc
-        if self.cls_token is not None:
-            x1 = torch.cat([x0, x1], dim=1)  # n,1+mt,vc
+            x1 = torch.cat([x0, x1], dim=1)  # nm,v+1,tc
         return x1, attn
 
     def forward_postprocess(self, x: torch.Tensor, size: torch.Size):
         N, _, _, V, M = size
         _, C, T, _ = x.size()
-        x = x.view(N, M, C, T, V).permute(0, 1, 3, 4, 2).contiguous()  # n,m,t,v,c  # noqa
 
-        x = x.reshape(N, M*T, V*C)
+        x1 = x.view(N, M, C, T, V).permute(0, 1, 4, 3, 2).contiguous()  # n,m,t,v,c  # noqa
+        x1 = x1.reshape(N*M, V, T*C)  # nm,v,tc
+        if self.s_cls_token is not None:
+            s_cls_tokens = self.s_cls_token.repeat(x1.size(0), 1, 1)
+            x1 = torch.cat((s_cls_tokens, x1), dim=1)
+        x1 = self.s_pos_encoder(x1)
+
+        x2 = x.view(N, M, C, T, V).permute(0, 1, 3, 4, 2).contiguous()  # n,m,t,v,c  # noqa
+        x2 = x2.reshape(N, M*T, V*C)
         if self.cls_token is not None:
-            cls_tokens = self.cls_token.repeat(x.size(0), 1, 1)
-            x = torch.cat((cls_tokens, x), dim=1)
-        x = self.t_pos_encoder(x)
+            cls_tokens = self.cls_token.repeat(x2.size(0), 1, 1)
+            x2 = torch.cat((cls_tokens, x2), dim=1)
+        x2 = self.t_pos_encoder(x2)
 
         attn = [[], []]
-        for i in range(len(self.t_trans_enc_layers)):
+
+        # Spatial
+        for i in range(len(self.s_trans_enc_layers)):
 
             if isinstance(self.s_trans_enc_layers[i], torch.nn.ModuleDict):
                 s_trans_enc_layers = self.s_trans_enc_layers[i]
@@ -624,9 +616,8 @@ class Model(BaseModel):
                 # 3 s trans -> sum -> res -> norm -> dropout
                 mode = 'v2'
 
-            # Spatial
             x1, attn[0] = self.forward_spatial_Aa_trans(
-                x=x,
+                x=x1,
                 size=[N, C, T, V, M],
                 layers=s_trans_enc_layers,
                 attn=attn[0],
@@ -634,37 +625,40 @@ class Model(BaseModel):
                 mode=mode
             )
 
-            # Temporal
+        # Temporal
+        for i in range(len(self.t_trans_enc_layers)):
             x2, attn[1] = self.forward_temporal_transformer(
-                x=x if 'parallel' in self.trans_seq else x1,
+                x=x2,
                 size=[N, C, T, V, M],
                 layer=self.t_trans_enc_layers[i],
                 attn=attn[1],
                 pe=self.rel_emb_t
             )
 
-            if 'parallel' in self.trans_seq:
-                if 'add' in self.trans_seq:
-                    x2 += x1
-                else:
-                    raise ValueError()
+        # if 'parallel' in self.trans_seq:
+        #     if 'add' in self.trans_seq:
+        #         x2 += x1
+        #     else:
+        #         raise ValueError()
 
-            if 'res' in self.trans_seq:
-                # Residual
-                x = x + self.res_trans_enc_layers[i]['res_dropout'](x2)
-                x = self.res_trans_enc_layers[i]['res_norm'](x)
-            else:
-                x = x2
+        # if 'res' in self.trans_seq:
+        #     # Residual
+        #     x = x + self.res_trans_enc_layers[i]['res_dropout'](x2)
+        #     x = self.res_trans_enc_layers[i]['res_norm'](x)
+        # else:
+        #     x = x2
 
-        x = x.reshape(N, -1, V*C)  # n,mt,vc
-        if 'CLS' in self.classifier_type:
-            x = x[:, 0, :]  # n,vc
-        elif self.classifier_type == 'CLS-POOL':
-            x = x[:, 0, :]  # n,vc
-        elif 'GAP' in self.classifier_type:
-            x = x.mean(1)  # n,vc
-        else:
-            raise ValueError("Unknown classifier_type")
+        x1 = x1[:, 0:1, :]  # nm,1,tc
+        x1 = x1.view(N, M, 1, T, C).reshape(N, 1, -1)  # n,1,mtc
+        x2 = x2[:, 0:1, :]  # n,1,vc
+        x = torch.cat([x1, x2], dim=-1).squeeze(1)  # n,vc+mtc
+
+        # if 'CLS' in self.classifier_type:
+        #     x = x[:, 0, :]  # n,vc
+        # elif 'GAP' in self.classifier_type:
+        #     x = x.mean(1)  # n,vc
+        # else:
+        #     raise ValueError("Unknown classifier_type")
 
         if 'POOL' in self.classifier_type:
             x = self.cls_pool_fc(x)
@@ -697,7 +691,7 @@ if __name__ == '__main__':
                       'prenorm': False,
                       'num_layers': 3,
                       'pos_emb': 'rel-shared',
-                      'length': 26,
+                      'length': 25,
                   },
                   trans_seq='sa-t-res-v2',
                   add_A='Empty',
