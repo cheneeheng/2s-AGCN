@@ -546,13 +546,14 @@ class Model(BaseModel):
                                  pe: bool = False,
                                  mode: str = 'v1'):
         assert mode in ['v0', 'v1', 'v2'], f"{mode} is not supported."
+        x1 = x
         x_l = []
         if mode == 'v0':
             for s_name, s_layer in layers:
                 out = s_layer(x1)
                 x1 = out[0]
-            if self.need_attn:
-                attn.append((out[1], out[2]) if pe else out[1])
+                if self.need_attn:
+                    attn.append((out[1], out[2]) if pe else out[1])
         elif mode == 'v1' or mode == 'v2':
             for s_name, s_layer in layers.items():
                 if 'subset' not in s_name:
@@ -562,11 +563,13 @@ class Model(BaseModel):
                 if self.need_attn:
                     attn.append((out[1], out[2]) if pe else out[1])
             x_l = torch.stack(x_l, dim=0).sum(dim=0)
+        else:
+            raise ValueError
         if mode == 'v1':
             x1 = layers['sa_dropout'](x_l)  # dropout
             x1 = layers['sa_norm'](x1)  # norm
         elif mode == 'v2':
-            x1 = x1 + layers['sa_dropout'](x_l)  # dropout
+            x1 = x + layers['sa_dropout'](x_l)  # dropout
             x1 = layers['sa_norm'](x1)  # norm
         else:
             raise ValueError
