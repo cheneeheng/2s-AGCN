@@ -546,12 +546,6 @@ class Model(BaseModel):
                                  pe: bool = False,
                                  mode: str = 'v1'):
         assert mode in ['v0', 'v1', 'v2'], f"{mode} is not supported."
-        N, C, T, V, M = size
-        if self.s_cls_token is not None:
-            x0 = x[:, 0:1, :]  # nm,1,tc
-            x1 = x[:, 1:, :]  # nm,v,tc
-        else:
-            x1 = x[:, :, :]  # nm,v,tc
         x_l = []
         if mode == 'v0':
             for s_name, s_layer in layers:
@@ -574,8 +568,8 @@ class Model(BaseModel):
         elif mode == 'v2':
             x1 = x1 + layers['sa_dropout'](x_l)  # dropout
             x1 = layers['sa_norm'](x1)  # norm
-        if self.s_cls_token is not None:
-            x1 = torch.cat([x0, x1], dim=1)  # nm,v+1,tc
+        else:
+            raise ValueError
         return x1, attn
 
     def forward_postprocess(self, x: torch.Tensor, size: torch.Size):
@@ -615,6 +609,8 @@ class Model(BaseModel):
             elif 'v2' in self.trans_seq:
                 # 3 s trans -> sum -> res -> norm -> dropout
                 mode = 'v2'
+            else:
+                raise ValueError
 
             x1, attn[0] = self.forward_spatial_Aa_trans(
                 x=x1,
@@ -691,7 +687,7 @@ if __name__ == '__main__':
                       'prenorm': False,
                       'num_layers': 3,
                       'pos_emb': 'rel-shared',
-                      'length': 25,
+                      'length': 26,
                   },
                   trans_seq='sa-t-res-v2',
                   add_A='Empty',

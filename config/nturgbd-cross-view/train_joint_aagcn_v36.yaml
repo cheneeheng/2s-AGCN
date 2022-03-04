@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_v36_joint/220304100001_nopad_3ks_noaug_rel_pool_withAa
-model_saved_name: ./data/data/ntu_result/xview/aagcn_v36_joint/220304100001_nopad_3ks_noaug_rel_pool_withAa/ntu_cv_aagcn_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_v36_joint/220304100001_nopad_3ks_noaug_rel_pool_EmptyA_v1
+model_saved_name: ./data/data/ntu_result/xview/aagcn_v36_joint/220304100001_nopad_3ks_noaug_rel_pool_EmptyA_v1/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
@@ -58,7 +58,7 @@ model_args:
     dropout: 0.2
     activation: gelu
     prenorm: False
-    num_layers: 1
+    num_layers: 3
     length: 201
     pos_emb: rel-shared
   s_trans_cfg:
@@ -68,7 +68,7 @@ model_args:
     dropout: 0.2
     activation: gelu
     prenorm: False
-    num_layers: 1
+    num_layers: 3
     length: 25
     pos_emb: rel-shared
   add_A: False
