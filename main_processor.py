@@ -213,10 +213,10 @@ class Processor():
                     max_lr=self.arg.base_lr,
                     steps_per_epoch=len(self.data_loader),
                     epochs=self.arg.num_epoch,
-                    pct_start=self.warm_up_epoch/self.num_epoch,
-                    anneal_strategy=self.anneal_strategy,
-                    div_factor=self.arg.base_lr/self.initial_lr,
-                    final_div_factor=self.arg.base_lr/self.final_lr,
+                    pct_start=self.arg.warm_up_epoch/self.arg.num_epoch,
+                    anneal_strategy=self.arg.anneal_strategy,
+                    div_factor=self.arg.base_lr/self.arg.initial_lr,
+                    final_div_factor=self.arg.base_lr/self.arg.final_lr,
                 ))
         else:
             self.scheduler = (None, None)
