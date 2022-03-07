@@ -763,6 +763,7 @@ if __name__ == '__main__':
                   pos_enc=None,
                   classifier_type='CLS-POOL'
                   )
+
     # print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
     # print(sum(p.numel() for p in model.parameters() if p.requires_grad))
