@@ -185,24 +185,28 @@ class Processor():
             raise ValueError()
 
         if self.arg.scheduler == 'cycliclr':
+            step_size_up = len(self.data_loader['train'])//2
+            step_size_down = len(self.data_loader['train']) - step_size_up
             self.scheduler = (
                 'BATCH',
                 optim.lr_scheduler.CyclicLR(
                     self.optimizer,
                     base_lr=self.arg.base_lr*1e-2,
                     max_lr=self.arg.base_lr,
-                    step_size_up=len(self.data_loader)*2,
-                    step_size_down=len(self.data_loader)*3
+                    step_size_up=step_size_up,
+                    step_size_down=step_size_down,
                 ))
         elif self.arg.scheduler == 'cycliclrtri2':
+            step_size_up = len(self.data_loader['train'])//2
+            step_size_down = len(self.data_loader['train']) - step_size_up
             self.scheduler = (
                 'BATCH',
                 optim.lr_scheduler.CyclicLR(
                     self.optimizer,
                     base_lr=self.arg.base_lr*1e-2,
                     max_lr=self.arg.base_lr,
-                    step_size_up=len(self.data_loader)*2,
-                    step_size_down=len(self.data_loader)*3,
+                    step_size_up=step_size_up,
+                    step_size_down=step_size_down,
                     mode="triangular2"
                 ))
         elif self.arg.scheduler == 'onecyclelr':
@@ -211,7 +215,7 @@ class Processor():
                 optim.lr_scheduler.OneCycleLR(
                     self.optimizer,
                     max_lr=self.arg.base_lr,
-                    steps_per_epoch=len(self.data_loader),
+                    steps_per_epoch=len(self.data_loader['train']),
                     epochs=self.arg.num_epoch,
                     pct_start=self.arg.warm_up_epoch/self.arg.num_epoch,
                     anneal_strategy=self.arg.anneal_strategy,
