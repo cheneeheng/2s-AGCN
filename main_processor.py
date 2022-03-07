@@ -185,32 +185,39 @@ class Processor():
             raise ValueError()
 
         if self.arg.scheduler == 'cycliclr':
-            self.scheduler = ('BATCH',
-                              optim.lr_scheduler.CyclicLR(
-                                  self.optimizer,
-                                  base_lr=self.arg.base_lr*1e-2,
-                                  max_lr=self.arg.base_lr,
-                                  step_size_up=len(self.data_loader)*2,
-                                  step_size_down=len(self.data_loader)*3
-                              ))
+            self.scheduler = (
+                'BATCH',
+                optim.lr_scheduler.CyclicLR(
+                    self.optimizer,
+                    base_lr=self.arg.base_lr*1e-2,
+                    max_lr=self.arg.base_lr,
+                    step_size_up=len(self.data_loader)*2,
+                    step_size_down=len(self.data_loader)*3
+                ))
         elif self.arg.scheduler == 'cycliclrtri2':
-            self.scheduler = ('BATCH',
-                              optim.lr_scheduler.CyclicLR(
-                                  self.optimizer,
-                                  base_lr=self.arg.base_lr*1e-2,
-                                  max_lr=self.arg.base_lr,
-                                  step_size_up=len(self.data_loader)*2,
-                                  step_size_down=len(self.data_loader)*3,
-                                  mode="triangular2"
-                              ))
+            self.scheduler = (
+                'BATCH',
+                optim.lr_scheduler.CyclicLR(
+                    self.optimizer,
+                    base_lr=self.arg.base_lr*1e-2,
+                    max_lr=self.arg.base_lr,
+                    step_size_up=len(self.data_loader)*2,
+                    step_size_down=len(self.data_loader)*3,
+                    mode="triangular2"
+                ))
         elif self.arg.scheduler == 'onecyclelr':
-            self.scheduler = ('BATCH',
-                              optim.lr_scheduler.OneCycleLR(
-                                  self.optimizer,
-                                  max_lr=self.arg.base_lr,
-                                  steps_per_epoch=len(self.data_loader),
-                                  epochs=self.arg.num_epoch
-                              ))
+            self.scheduler = (
+                'BATCH',
+                optim.lr_scheduler.OneCycleLR(
+                    self.optimizer,
+                    max_lr=self.arg.base_lr,
+                    steps_per_epoch=len(self.data_loader),
+                    epochs=self.arg.num_epoch,
+                    pct_start=self.pct_start,
+                    anneal_strategy=self.anneal_strategy,
+                    div_factor=self.arg.base_lr/self.initial_lr,
+                    final_div_factor=self.arg.base_lr/self.final_lr,
+                ))
         else:
             self.scheduler = (None, None)
 
