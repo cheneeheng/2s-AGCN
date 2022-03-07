@@ -637,14 +637,14 @@ class Model(BaseModel):
         x1 = x1.reshape(N*M, V, T*C)  # nm,v,tc
         if self.s_cls_token is not None:
             s_cls_tokens = self.s_cls_token.repeat(x1.size(0), 1, 1)
-            x1 = torch.cat((s_cls_tokens, x1), dim=1)
+            x1 = torch.cat((s_cls_tokens, x1), dim=1)  # nm,v+1,tc
         x1 = self.s_pos_encoder(x1)
 
         x2 = x.view(N, M, C, T, V).permute(0, 1, 3, 4, 2).contiguous()  # n,m,t,v,c  # noqa
         x2 = x2.reshape(N, M*T, V*C)
         if self.cls_token is not None:
             cls_tokens = self.cls_token.repeat(x2.size(0), 1, 1)
-            x2 = torch.cat((cls_tokens, x2), dim=1)
+            x2 = torch.cat((cls_tokens, x2), dim=1)  # n,mt+1,vc
         x2 = self.t_pos_encoder(x2)
 
         attn = [[], []]
@@ -691,10 +691,10 @@ class Model(BaseModel):
             if self.cross_attn_enc_layers is not None:
                 # cross attention
                 x1 = x1.view(N, M, -1, T*C).permute(0, 2, 1, 3).contiguous()
-                x1 = x1.reshape(N, -1, M*T*C)  # n,v,mtc
+                x1 = x1.reshape(N, -1, M*T*C)  # n,v+1,mtc
                 x2, x1 = self.cross_attn_enc_layers[i](x2, x1)
                 x1 = x1.view(N, -1, M, T*C).permute(0, 2, 1, 3).contiguous()
-                x1 = x1.reshape(N*M, -1, T*C)  # nm,v,tc
+                x1 = x1.reshape(N*M, -1, T*C)  # nm,v+1,tc
 
         # if 'parallel' in self.trans_seq:
         #     if 'add' in self.trans_seq:

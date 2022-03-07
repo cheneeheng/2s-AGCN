@@ -164,6 +164,13 @@ def get_parser():
     parser.add_argument(
         '--scheduler', default='', help='pytorch lr scheduler')
     parser.add_argument(
+        '--anneal-strategy', default='cos')
+    parser.add_argument(
+        '--initial_lr', type=float, default=1e-5)
+    parser.add_argument(
+        '--final_lr', type=float, default=1e-6)
+
+    parser.add_argument(
         '--base-lr', type=float, default=0.01, help='initial learning rate')
     parser.add_argument(
         '--step',

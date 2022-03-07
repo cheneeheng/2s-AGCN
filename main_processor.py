@@ -213,7 +213,7 @@ class Processor():
                     max_lr=self.arg.base_lr,
                     steps_per_epoch=len(self.data_loader),
                     epochs=self.arg.num_epoch,
-                    pct_start=self.pct_start,
+                    pct_start=self.warm_up_epoch/self.num_epoch,
                     anneal_strategy=self.anneal_strategy,
                     div_factor=self.arg.base_lr/self.initial_lr,
                     final_div_factor=self.arg.base_lr/self.final_lr,
