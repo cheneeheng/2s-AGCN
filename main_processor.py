@@ -185,31 +185,34 @@ class Processor():
             raise ValueError()
 
         if self.arg.scheduler == 'cycliclr':
-            self.scheduler = optim.lr_scheduler.CyclicLR(
-                self.optimizer,
-                base_lr=self.arg.base_lr*1e-2,
-                max_lr=self.arg.base_lr,
-                step_size_up=len(self.data_loader)*2,
-                step_size_down=len(self.data_loader)*3
-            )
+            self.scheduler = ('BATCH',
+                              optim.lr_scheduler.CyclicLR(
+                                  self.optimizer,
+                                  base_lr=self.arg.base_lr*1e-2,
+                                  max_lr=self.arg.base_lr,
+                                  step_size_up=len(self.data_loader)*2,
+                                  step_size_down=len(self.data_loader)*3
+                              ))
         elif self.arg.scheduler == 'cycliclrtri2':
-            self.scheduler = optim.lr_scheduler.CyclicLR(
-                self.optimizer,
-                base_lr=self.arg.base_lr*1e-2,
-                max_lr=self.arg.base_lr,
-                step_size_up=len(self.data_loader)*2,
-                step_size_down=len(self.data_loader)*3,
-                mode="triangular2"
-            )
+            self.scheduler = ('BATCH',
+                              optim.lr_scheduler.CyclicLR(
+                                  self.optimizer,
+                                  base_lr=self.arg.base_lr*1e-2,
+                                  max_lr=self.arg.base_lr,
+                                  step_size_up=len(self.data_loader)*2,
+                                  step_size_down=len(self.data_loader)*3,
+                                  mode="triangular2"
+                              ))
         elif self.arg.scheduler == 'onecyclelr':
-            self.scheduler = optim.lr_scheduler.OneCycleLR(
-                self.optimizer,
-                max_lr=self.arg.base_lr,
-                steps_per_epoch=len(self.data_loader),
-                epochs=self.arg.num_epoch
-            )
+            self.scheduler = ('BATCH',
+                              optim.lr_scheduler.OneCycleLR(
+                                  self.optimizer,
+                                  max_lr=self.arg.base_lr,
+                                  steps_per_epoch=len(self.data_loader),
+                                  epochs=self.arg.num_epoch
+                              ))
         else:
-            self.scheduler = None
+            self.scheduler = (None, None)
 
         # lr_scheduler_post = optim.lr_scheduler.MultiStepLR(
         #     self.optimizer, milestones=self.arg.step, gamma=0.1)
@@ -296,16 +299,13 @@ class Processor():
     # **************************************************************************
 
     def train(self, epoch, save_model=False):
-        self.model.train()
-        self.print_log(f'Training epoch: {epoch + 1}')
-        loader = self.data_loader['train']
-        # for name, param in self.model.named_parameters():
-        #     self.train_writer.add_histogram(name, param.clone().cpu().data.numpy(), epoch)  # noqa
-        loss_value = []
-        self.train_writer.add_scalar('epoch', epoch, self.global_step)
+
+        # 1. Timing
         self.record_time()
         timer = dict(dataloader=0.001, model=0.001, statistics=0.001)
-        process = tqdm(loader)
+
+        # 2. Model Train
+        self.model.train()
         if self.arg.only_train_part:
             if epoch > self.arg.only_train_epoch:
                 print('only train part, require grad')
@@ -319,13 +319,29 @@ class Processor():
                     if 'PA' in key:
                         value.requires_grad = False
                         # print(key + '-not require grad')
+
+        # 3. Logging
+        self.print_log(f'Training epoch: {epoch + 1}')
+        # for name, param in self.model.named_parameters():
+        #     self.train_writer.add_histogram(name, param.clone().cpu().data.numpy(), epoch)  # noqa
+        self.train_writer.add_scalar('epoch', epoch, self.global_step)
+        loss_value = []
+
+        # 4. Loader
+        loader = self.data_loader['train']
+        process = tqdm(loader)
+
+        # 5. Main loop
         for batch_idx, (data, label, index) in enumerate(process):
+
             self.global_step += 1
-            # get data
+
+            # 5.1. get data
             data = data.float().cuda(self.output_device)
             label = label.long().cuda(self.output_device)
             timer['dataloader'] += self.split_time()
 
+            # 5.2. forward + backward + optimize
             if self.arg.optimizer == 'SAM_SGD':
                 # 1. first forward-backward pass
                 enable_running_stats(self.model)
@@ -369,6 +385,11 @@ class Processor():
                 loss.backward()
                 self.optimizer.step()
 
+            # 5.3. scheduler if applicable.
+            if self.scheduler[0] == 'BATCH':
+                self.scheduler[1].step()
+
+            # 5.4. logging
             loss_value.append(loss.data.item())
             timer['model'] += self.split_time()
 
@@ -380,7 +401,7 @@ class Processor():
             self.train_writer.add_scalar('loss_l1', l1, self.global_step)
             # self.train_writer.add_scalar('batch_time', process.iterable.last_duration, self.global_step)  # noqa
 
-            # statistics
+            # 5.5. Statistics
             _lr = self.optimizer.param_groups[0]['lr']
             self.train_writer.add_scalar('lr', _lr, self.global_step)
             # if self.global_step % self.arg.log_interval == 0:
@@ -389,7 +410,7 @@ class Processor():
             #             batch_idx, len(loader), loss.data[0], lr))
             timer['statistics'] += self.split_time()
 
-        # statistics of time consumption and loss
+        # 6. Statistics of time consumption and loss
         proportion = {
             k: f'{int(round(v * 100 / sum(timer.values()))):02d}%'
             for k, v in timer.items()
@@ -491,11 +512,11 @@ class Processor():
                 save_model = \
                     ((epoch + 1) % self.arg.save_interval == 0) or \
                     ((epoch + 1) == self.arg.num_epoch)
-                if self.scheduler is None:
+                if self.scheduler[0] is None:
                     self.adjust_learning_rate(epoch)
                 self.train(epoch, save_model=save_model)
-                if self.scheduler is not None:
-                    self.scheduler.step()
+                if self.scheduler[0] == 'EPOCH':
+                    self.scheduler[1].step()
                 # if ((epoch + 1) % self.arg.eval_interval == 0) or \
                 #         ((epoch + 1) == self.arg.num_epoch):
                 self.eval(epoch, save_score=self.arg.save_score,

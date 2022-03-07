@@ -948,4 +948,10 @@ aagcn_v36:
         - 220304100001_nopad_3ks_noaug_rel_pool_EmptyA_1l_v1:
                   - 89.5%
         - 220304100001_nopad_3ks_noaug_rel_pool_EmptyA_3l_v1:
+                  - 90.7%
         - 220304100001_nopad_3ks_noaug_rel_pool_EmptyA_5l_v1:
+                  - 90.2%
+        - 220304100001_nopad_3ks_noaug_rel_pool_EmptyA_cross_3l_v1:
+                  - 90.2%
+        - 220304100001_nopad_3ks_noaug_rel_pool_EmptyA_cross_5l_v1:
+                  - 90.0%
