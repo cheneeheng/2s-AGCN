@@ -1,5 +1,5 @@
-work_dir: ./data/data/openpose_b25_j15_ntu_result/xview/aagcn_joint/220314100001
-model_saved_name: ./data/data/openpose_b25_j15_ntu_result/xview/aagcn_joint/220314100001/op_b25_j15_ntu_cv_aagcn_joint
+work_dir: ./data/data/openpose_b25_j15_ntu_result/xview/aagcn_joint/220314090001
+model_saved_name: ./data/data/openpose_b25_j15_ntu_result/xview/aagcn_joint/220314090001/op_b25_j15_ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
@@ -14,8 +14,8 @@ print_log: true
 feeder: feeders.feeder.Feeder
 num_worker: 32
 train_feeder_args:
-  data_path: ./data/data/openpose_b25_j15_ntu/xview/train_data_joint.npy
-  label_path: ./data/data/openpose_b25_j15_ntu/xview/train_label.pkl
+  data_path: ./data/data/openpose_b25_j15_ntu/xsub/train_data_joint.npy
+  label_path: ./data/data/openpose_b25_j15_ntu/xsub/train_label.pkl
   debug: False
   random_choose: False
   random_shift: False
@@ -24,8 +24,8 @@ train_feeder_args:
   normalization: False
 
 test_feeder_args:
-  data_path: ./data/data/openpose_b25_j15_ntu/xview/val_data_joint.npy
-  label_path: ./data/data/openpose_b25_j15_ntu/xview/val_label.pkl
+  data_path: ./data/data/openpose_b25_j15_ntu/xsub/val_data_joint.npy
+  label_path: ./data/data/openpose_b25_j15_ntu/xsub/val_label.pkl
 
 # model
 model: model.aagcn.Model

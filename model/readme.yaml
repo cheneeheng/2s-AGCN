@@ -955,3 +955,20 @@ aagcn_v36:
                   - 90.2%
         - 220304100001_nopad_3ks_noaug_rel_pool_EmptyA_cross_5l_v1:
                   - 90.0%
+        - 220307120001_nopad_3ks_noaug_rel_pool_EmptyA_cross_3l_coslr_v1:
+                  - 90.5%
+        - 220307120001_nopad_3ks_noaug_rel_pool_EmptyA_cross_3l_coslrfrompaper_v1:
+                  - diverged with 0.004lr
+        - 220307120001_nopad_3ks_noaug_rel_pool_EmptyA_cross_3l_coslrfrompaper_v1:
+                  - diverged with 0.001lr
+        - 220307120001_nopad_3ks_noaug_rel_pool_EmptyA_cross_3l_coslrfrompaper_v1:
+                  - diverged with 0.0005lr, maybe because decay is 0.05
+                  - diverged during warmup
+        - 220307210001_nopad_3ks_noaug_rel_pool_3l_32f_coslr_v0:
+                  - diverged just after warmup
+        - 220307210001_nopad_3ks_noaug_rel_pool_3l_32f_noPAfreeze_coslrlong_v0:
+                  - cos with adam but very low LR
+                  - 90.0%
+        - 220307210001_nopad_3ks_noaug_rel_pool_3l_32f_noPAfreeze_coslrlongeps_v0:
+                  - cos with adamw (lr 1e-4, eps 1e-4)
+                  - 89.9%
