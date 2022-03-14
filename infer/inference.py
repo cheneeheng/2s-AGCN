@@ -229,7 +229,7 @@ if __name__ == '__main__':
         with open(output_file, 'a+') as f:
             output_str = ",".join([str(logit) for logit in logits])
             output_str = f'{pred},{output_str}\n'
-            f.write(output_str)
+            f.write(output_str.replace('[','').replace(']', ''))
             print(pred)
 
         if arg.timing:
