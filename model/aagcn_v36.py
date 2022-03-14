@@ -625,8 +625,6 @@ class Model(BaseModel):
         elif mode == 'v2':
             x1 = x + layers['sa_dropout'](x_l)  # dropout
             x1 = layers['sa_norm'](x1)  # norm
-        else:
-            raise ValueError
         return x1, attn
 
     def forward_postprocess(self, x: torch.Tensor, size: torch.Size):

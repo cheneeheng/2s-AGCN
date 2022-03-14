@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_v33_joint/220221150001_nopad_3ks_lowerlr_noaug_rel_pool_withAa_rerunori2
-model_saved_name: ./data/data/ntu_result/xview/aagcn_v33_joint/220221150001_nopad_3ks_lowerlr_noaug_rel_pool_withAa_rerunori2/ntu_cv_aagcn_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_v33_joint/220221150001_nopad_3ks_lowerlr_noaug_rel_pool_withAa_rerunori4
+model_saved_name: ./data/data/ntu_result/xview/aagcn_v33_joint/220221150001_nopad_3ks_lowerlr_noaug_rel_pool_withAa_rerunori4/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True

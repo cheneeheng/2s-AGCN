@@ -169,7 +169,8 @@ class Processor():
         elif self.arg.optimizer == 'AdamW':
             self.optimizer = optim.AdamW(self.model.parameters(),
                                          lr=self.arg.base_lr,
-                                         weight_decay=self.arg.weight_decay)
+                                         weight_decay=self.arg.weight_decay,
+                                         eps=self.arg.eps)
         elif self.arg.optimizer == 'AdamW-LLRD':
             self.optimizer = optim.AdamW(params_list,
                                          lr=self.arg.base_lr,
@@ -394,6 +395,7 @@ class Processor():
                 # backward
                 self.optimizer.zero_grad()
                 loss.backward()
+                # nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
                 self.optimizer.step()
 
             # 5.3. scheduler if applicable.

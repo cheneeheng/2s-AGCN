@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_joint/211214210001_zflip_xyshift_range0515
-model_saved_name: ./data/data/ntu_result/xview/aagcn_joint/211214210001_zflip_xyshift_range0515/ntu_cv_aagcn_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_joint/211214210001_zflip_xyshift_range0515_delme
+model_saved_name: ./data/data/ntu_result/xview/aagcn_joint/211214210001_zflip_xyshift_range0515_delme/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
