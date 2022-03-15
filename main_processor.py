@@ -92,11 +92,11 @@ class Processor():
         Model = import_class(self.arg.model)
         shutil.copy2(inspect.getfile(Model), self.arg.work_dir)
         # print(Model)
-        self.model = Model(**self.arg.model_args).cuda(output_device)
+        self.model = Model(**self.arg.model_args).cuda(self.output_device)
         if self.arg.ddp:
             self.model = DDP(self.model, device_ids=[self.rank])
         # print(self.model)
-        self.loss = nn.CrossEntropyLoss().cuda(output_device)
+        self.loss = nn.CrossEntropyLoss().cuda(self.output_device)
 
         if self.arg.weights:
             self.global_step = int(self.arg.weights[:-3].split('-')[-1])
@@ -109,7 +109,7 @@ class Processor():
 
             weights = OrderedDict(
                 [[k.split('module.')[-1],
-                  v.cuda(output_device)] for k, v in weights.items()])
+                  v.cuda(self.output_device)] for k, v in weights.items()])
 
             keys = list(weights.keys())
             for w in self.arg.ignore_weights:
@@ -138,7 +138,7 @@ class Processor():
                     self.model = nn.DataParallel(
                         self.model,
                         device_ids=self.arg.device,
-                        output_device=output_device)
+                        output_device=self.output_device)
 
     def load_optimizer(self):
         if 'LLRD' in self.arg.optimizer:
