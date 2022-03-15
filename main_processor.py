@@ -90,7 +90,8 @@ class Processor():
                 self.arg.device) is list else self.arg.device
             self.output_device = output_device
         Model = import_class(self.arg.model)
-        shutil.copy2(inspect.getfile(Model), self.arg.work_dir)
+        if self.rank == 0:
+            shutil.copy2(inspect.getfile(Model), self.arg.work_dir)
         # print(Model)
         self.model = Model(**self.arg.model_args).cuda(self.output_device)
         if self.arg.ddp:
@@ -370,7 +371,11 @@ class Processor():
 
         # 4. Loader
         loader = self.data_loader['train']
-        process = tqdm(loader)
+        if self.rank == 0:
+            process = tqdm(
+                loader, desc=f"Device {self.rank}", position=self.rank+1)
+        else:
+            process = loader
 
         # 5. Main loop
         for batch_idx, (data, label, index) in enumerate(process):
@@ -378,8 +383,8 @@ class Processor():
             self.global_step += 1
 
             # 5.1. get data
-            data = data.float().cuda(self.output_device)
-            label = label.long().cuda(self.output_device)
+            data = data.float().cuda(self.output_device, non_blocking=True)
+            label = label.long().cuda(self.output_device, non_blocking=True)
             timer['dataloader'] += self.split_time()
 
             # 5.2. forward + backward + optimize
@@ -436,17 +441,18 @@ class Processor():
 
             _loss = loss.data.item()
             if self.arg.ddp:
-                outputs = [None for _ in range(self.arg.world_size)]
-                dist.all_gather_object(outputs, _loss)
-                _loss = np.mean(outputs)
+                dist_tmp = [None for _ in range(self.arg.world_size)]
+                dist.all_gather_object(dist_tmp, _loss)
+                _loss = np.mean(dist_tmp)
             loss_value.append(_loss)
 
             value, predict_label = torch.max(output.data, 1)
             acc = torch.mean((predict_label == label.data).float())
+            acc = acc.data.item()
             if self.arg.ddp:
-                outputs = [None for _ in range(self.arg.world_size)]
-                dist.all_gather_object(outputs, acc)
-                acc = np.mean(outputs)
+                dist_tmp = [None for _ in range(self.arg.world_size)]
+                dist.all_gather_object(dist_tmp, acc)
+                acc = np.mean(dist_tmp)
 
             if self.rank == 0:
                 self.train_writer.add_scalar('acc', acc, self.global_step)
@@ -527,14 +533,14 @@ class Processor():
             loss = np.mean(loss_value)
 
             if self.arg.ddp:
-                outputs = [None for _ in range(self.arg.world_size)]
-                dist.all_gather_object(outputs, score)
-                score = np.mean(outputs)
+                dist_tmp = [None for _ in range(self.arg.world_size)]
+                dist.all_gather_object(dist_tmp, score)
+                score = np.mean(dist_tmp)
 
             if self.arg.ddp:
-                outputs = [None for _ in range(self.arg.world_size)]
-                dist.all_gather_object(outputs, loss)
-                loss = np.mean(outputs)
+                dist_tmp = [None for _ in range(self.arg.world_size)]
+                dist.all_gather_object(dist_tmp, loss)
+                loss = np.mean(dist_tmp)
 
             accuracy = self.data_loader[ln].dataset.top_k(score, 1)
 
@@ -573,7 +579,8 @@ class Processor():
     def start(self):
         if self.arg.phase == 'train':
             self.print_log(f'Parameters:\n')
-            print_arg(self.arg)
+            if self.rank == 0:
+                print_arg(self.arg)
             self.global_step = self.arg.start_epoch * \
                 len(self.data_loader['train']) / self.arg.batch_size
             for epoch in range(self.arg.start_epoch, self.arg.num_epoch):

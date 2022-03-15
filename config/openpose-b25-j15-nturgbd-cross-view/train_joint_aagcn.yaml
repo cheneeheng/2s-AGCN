@@ -1,5 +1,5 @@
-work_dir: ./data/data/openpose_b25_j15_ntu_result/xview/aagcn_joint/220314100001
-model_saved_name: ./data/data/openpose_b25_j15_ntu_result/xview/aagcn_joint/220314100001/op_b25_j15_ntu_cv_aagcn_joint
+work_dir: ./data/data/openpose_b25_j15_ntu_result/xview/aagcn_joint/220314100001_1em2lr
+model_saved_name: ./data/data/openpose_b25_j15_ntu_result/xview/aagcn_joint/220314100001_lowerlr_1em2lr/op_b25_j15_ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
@@ -46,7 +46,7 @@ test_batch_size: 64
 
 optimizer: SGD
 nesterov: True
-base_lr: 0.1
+base_lr: 0.01
 step: [30, 40]
 weight_decay: 0.0001
 

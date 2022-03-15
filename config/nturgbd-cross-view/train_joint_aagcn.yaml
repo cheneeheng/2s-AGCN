@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_joint/220315183001_delme
-model_saved_name: ./data/data/ntu_result/xview/aagcn_joint/220315183001_delme/ntu_cv_aagcn_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_joint/220315183001_ddp
+model_saved_name: ./data/data/ntu_result/xview/aagcn_joint/220315183001_ddp/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
@@ -12,7 +12,7 @@ print_log: true
 
 # feeder
 feeder: feeders.feeder.Feeder
-num_worker: 32
+num_worker: 16
 train_feeder_args:
   data_path: ./data/data/ntu/xview/train_data_joint.npy
   label_path: ./data/data/ntu/xview/train_label.pkl
@@ -51,8 +51,8 @@ model_args:
 #optim
 # device: [0, 1 ,2, 3]
 device: [0, 1]
-batch_size: 64
-test_batch_size: 64
+batch_size: 32
+test_batch_size: 32
 
 optimizer: SGD
 nesterov: True
@@ -64,7 +64,7 @@ start_epoch: 0
 num_epoch: 50
 warm_up_epoch: 5
 
-only_train_part: True
+only_train_part: False
 only_train_epoch: 5
 
 world_size: 2

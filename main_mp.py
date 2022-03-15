@@ -16,11 +16,12 @@ import torch.multiprocessing as mp
 from main_processor import *
 from main_utils import *
 
+# os.environ["TORCH_DISTRIBUTED_DEBUG"] = "INFO"
 
-# ------ Setting up the distributed environment -------
+
 def setup(rank, world_size):
     os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '12355'
+    os.environ['MASTER_PORT'] = '8081'
     # initialize the process group
     dist.init_process_group(backend="nccl", rank=rank, world_size=world_size)
     # this function is responsible for synchronizing and successfully
@@ -34,10 +35,10 @@ def cleanup():
 
 def train_model(rank, args):
     print(f"Running DDP on rank {rank}.")
+    torch.cuda.set_device(rank)
     setup(rank, args.world_size)
     init_seed(args.seed)
-    torch.cuda.device(rank)
-    processor = Processor(args)
+    processor = Processor(args, rank=rank)
     processor.start()
     cleanup()
 

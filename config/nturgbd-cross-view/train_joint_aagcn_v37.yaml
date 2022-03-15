@@ -97,7 +97,7 @@ test_batch_size: 64
 
 optimizer: SGD
 nesterov: True
-base_lr: 0.01
+base_lr: 0.001
 step: [30, 40]
 weight_decay: 0.0001
 # llrd_factor: 1.0
