@@ -16,6 +16,7 @@ num_joint = 15
 num_joint_ntu = 25
 max_frame = 300
 
+# openpose : ntu
 joint_mapping = {
     0: 4,
     1: 21,
@@ -158,7 +159,8 @@ def gendata(data_path, out_path, ignored_sample_path=None,
                         max_body=max_body_kinect, num_joint=num_joint_ntu)
         for new_id, old_id in joint_mapping.items():
             fp[i, :, 0:data.shape[1], new_id:new_id+1, :] = \
-                data[:, :, old_id-1:old_id:]
+                data[:, :, old_id-1:old_id, :]
+        break
 
     fp = pre_normalization(fp, zaxis=[8, 1], xaxis=[2, 5], verbose=True)
     np.save('{}/{}_data_joint.npy'.format(out_path, part), fp)
@@ -174,7 +176,7 @@ if __name__ == '__main__':
         default='./data/data/nturgbd_raw/samples_with_missing_skeletons.txt')
     parser.add_argument(
         '--out_folder',
-        default='./data/data/openpose_b25_j15_ntu/')
+        default='./data/data/openpose_b25_j15_ntu_delme/')
 
     benchmark = ['xsub', 'xview']
     part = ['train', 'val']

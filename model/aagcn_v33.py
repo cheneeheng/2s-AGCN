@@ -6,94 +6,10 @@ import numpy as np
 import math
 from typing import Optional
 
-from model.aagcn import conv_init
-from model.aagcn import bn_init
-from model.aagcn import batch_norm_2d
-from model.aagcn import GCNUnit
-from model.aagcn import AdaptiveGCN
+from model.aagcn import TCNGCNUnit
 from model.aagcn import BaseModel
 
 from model.module.multiheadattention import MultiheadAttention
-
-
-# ------------------------------------------------------------------------------
-# AAGCN Modules
-# ------------------------------------------------------------------------------
-class TCNUnit(nn.Module):
-    def __init__(self,
-                 in_channels: int,
-                 out_channels: int,
-                 kernel_size: int = 9,
-                 stride: int = 1,
-                 pad: bool = True,
-                 gbn_split: Optional[int] = None):
-        super().__init__()
-        padding = (kernel_size - 1) // 2 if pad else 0
-        self.conv = nn.Conv2d(in_channels,
-                              out_channels,
-                              kernel_size=(kernel_size, 1),
-                              padding=(padding, 0),
-                              stride=(stride, 1))
-        self.bn = batch_norm_2d(out_channels, gbn_split)
-        conv_init(self.conv)
-        bn_init(self.bn, 1)
-
-    def forward(self, x):
-        # relu is done after residual.
-        x = self.conv(x)
-        x = self.bn(x)
-        return x
-
-
-class TCNGCNUnit(nn.Module):
-    def __init__(self,
-                 in_channels: int,
-                 out_channels: int,
-                 A: np.ndarray,
-                 num_subset: int = 3,
-                 kernel_size: int = 9,
-                 stride: int = 1,
-                 pad: bool = True,
-                 residual: bool = True,
-                 adaptive: nn.Module = AdaptiveGCN,
-                 attention: bool = True,
-                 gbn_split: Optional[int] = None):
-        super().__init__()
-        self.gcn1 = GCNUnit(in_channels,
-                            out_channels,
-                            A,
-                            num_subset=num_subset,
-                            adaptive=adaptive,
-                            attention=attention,
-                            gbn_split=gbn_split)
-        self.tcn1 = TCNUnit(out_channels,
-                            out_channels,
-                            kernel_size=kernel_size,
-                            stride=stride,
-                            pad=pad,
-                            gbn_split=gbn_split)
-
-        if not residual:
-            self.residual = lambda x: 0
-        elif (in_channels == out_channels) and (stride == 1):
-            self.residual = lambda x: x
-        else:
-            # if the residual does not have the same channel dimensions.
-            # if stride > 1
-            self.residual = TCNUnit(in_channels,
-                                    out_channels,
-                                    kernel_size=1,
-                                    stride=stride,
-                                    gbn_split=gbn_split)
-
-        self.relu = nn.ReLU(inplace=True)
-
-    def forward(self, x):
-        y = self.gcn1(x)
-        y = self.tcn1(y)
-        y = y + self.residual(x)
-        y = self.relu(y)
-        return y
 
 
 # ------------------------------------------------------------------------------
@@ -696,8 +612,7 @@ if __name__ == '__main__':
                   )
     # print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
-    sd = torch.load(
-        './data/data/ntu_result/xview/aagcn_v33_joint/220221150001_nopad_3ks_lowerlr_noaug_rel_pool_withAa/ntu_cv_aagcn_joint-11-7056.pt')
+    sd = torch.load('./data/data/ntu_result/xview/aagcn_v33_joint/220221150001_nopad_3ks_lowerlr_noaug_rel_pool_withAa/ntu_cv_aagcn_joint-11-7056.pt')  # noqa
     model.load_state_dict(sd)
     model.eval()
     # print(sum(p.numel() for p in model.parameters() if p.requires_grad))

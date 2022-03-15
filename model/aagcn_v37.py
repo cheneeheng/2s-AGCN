@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torch.nn.functional import gelu
 
 import copy
 import numpy as np
@@ -297,9 +298,6 @@ class Model(BaseModel):
         self.num_subset = num_subset
         self.need_attn = need_attn
 
-        self.m_mask = m_mask
-        self.m_b_mask = None
-
         self.rel_emb_s = True if 'rel' in s_trans_cfg['pos_emb'] else False
         self.rel_emb_t = True if 'rel' in t_trans_cfg['pos_emb'] else False
 
@@ -323,6 +321,53 @@ class Model(BaseModel):
         self.init_model_backbone(model_layers=model_layers,
                                  tcngcn_unit=_TCNGCNUnit,
                                  output_channel=backbone_dim)
+
+        # TODO: change to the cross attention transformer.
+
+        # n,m,t,v,c (raw)
+
+        # 1. nm,t,vc (corr-time-per-m, joint stacked)
+        # 2. n,mt,vc (corr-time-inter-m, joint stacked)
+        # 3. n,t,mvc (corr-time-overall, global-ish)
+        # - 1. gives correlation over time per m using vc per m.
+        # - 2. gives correlation over time per m and also inter m using vc.
+        # - 3. gives correlation over time using mvc.
+        # - 1. assumes no corr in time between m, but 2. does.
+        # - 2. is useful if most actions have correlations between m.
+        # - 3. is person and joint agnostic.
+
+        # 4. nm,v,tc (corr-joint-per-m, time stacked)
+        # 5. n,mv,tc (corr-joint-inter-m, time stacked)
+        # 6. n,v,mtc (corr-joint-overall, global-ish)
+        # - same logic as before but with v instead of t.
+
+        # n,m,t,v,c (raw)
+        # n,t,mvc (corr-time-overall, global-ish)
+        # n,m,tvc (m=2, learn corr?)
+        # n,v,mtc (corr-joint-overall, global-ish)
+        # n,mt,vc (corr-time-inter-m, joint stacked)
+        # n,mv,tc (corr-joint-inter-m, time stacked)
+        # n,tv,mc (corr-joint/time-inter-time/joint, m stacked)
+        # n,mtv,c (corr-m-time-joint, too long?)
+        # nm,t,vc (corr-time-per-m, joint stacked)
+        # nm,v,tc (corr-joint-per-m, time stacked)
+        # nt,m,vc (corr-m-per-t, learn corr?)
+        # nt,v,mc (corr-joint-per-t, m stacked)
+        # nv,m,tc (corr-m-per-joint, learn corr?)
+        # nv,t,mc (corr-t-per-joimt, m stacked)
+        # nmv,t,c (corr-time-channel, joint+person independent)
+
+        # n,t,mvc (corr-time-overall, global-ish)
+        # n,v,mtc (corr-joint-overall, global-ish)
+        # nm,t,vc (corr-time-per-m, joint stacked)
+        # nm,v,tc (corr-joint-per-m, time stacked)
+        # n,mt,vc (corr-time-inter-m, joint stacked)
+        # n,mv,tc (corr-joint-inter-m, time stacked)
+
+        # nmv,t,c (corr-time-channel, joint+person independent)
+
+        # nv,t,mc (corr-t-per-joimt, m stacked)
+        # nt,v,mc (corr-joint-per-t, m stacked)
 
         # 3. transformer (temporal)
         if t_trans_cfg is not None:
@@ -471,26 +516,6 @@ class Model(BaseModel):
         else:
             self.cross_attn_enc_layers = None
 
-    def forward(self, x):
-        if self.m_mask:
-            if self.cls_token is not None:
-                t = self.t_trans_enc_layers[0].self_attn.pos_emb.tokens - 1
-            else:
-                t = self.t_trans_enc_layers[0].self_attn.pos_emb.tokens
-            self.m_b_mask = x.sum((1, 2, 3)) > 0   # n,m
-            self.m_b_mask = self.m_b_mask.repeat(t//self.num_person, 1, 1)
-            self.m_b_mask = self.m_b_mask.permute(1, 2, 0)  # n,m,t
-            self.m_b_mask = self.m_b_mask.reshape(x.size(0), -1, 1)  # n,mt, 1
-            if self.cls_token is not None:
-                device = self.m_b_mask.get_device()
-                if device == -1:
-                    device = 'cpu'
-                cls_token = torch.ones(
-                    (x.size(0), 1, 1), dtype=bool,
-                    device='cpu' if device == -1 else device)
-                self.m_b_mask = torch.cat([cls_token, self.m_b_mask], dim=1)
-        return super().forward(x)
-
     def forward_temporal_transformer(self,
                                      x: torch.Tensor,
                                      size: list,
@@ -499,8 +524,6 @@ class Model(BaseModel):
                                      pe: bool = False):
         N, C, T, V, M = size
         x = x.reshape(N, -1, V*C)  # n,1+mt,vc
-        if self.m_mask:
-            x = x * self.m_b_mask
         out = layer(x)  # x, attn, pe
         if self.need_attn:
             attn.append((out[1], out[2]) if pe else out[1])
@@ -546,7 +569,7 @@ class Model(BaseModel):
         N, _, _, V, M = size
         _, C, T, _ = x.size()
 
-        x1 = x.view(N, M, C, T, V).permute(0, 1, 4, 3, 2).contiguous()  # n,m,t,v,c  # noqa
+        x1 = x.view(N, M, C, T, V).permute(0, 1, 4, 3, 2).contiguous()  # n,m,v,t,c  # noqa
         x1 = x1.reshape(N*M, V, T*C)  # nm,v,tc
         if self.s_cls_token is not None:
             s_cls_tokens = self.s_cls_token.repeat(x1.size(0), 1, 1)
@@ -554,7 +577,7 @@ class Model(BaseModel):
         x1 = self.s_pos_encoder(x1)
 
         x2 = x.view(N, M, C, T, V).permute(0, 1, 3, 4, 2).contiguous()  # n,m,t,v,c  # noqa
-        x2 = x2.reshape(N, M*T, V*C)
+        x2 = x2.reshape(N, M*T, V*C)  # n,mt,vc
         if self.cls_token is not None:
             cls_tokens = self.cls_token.repeat(x2.size(0), 1, 1)
             x2 = torch.cat((cls_tokens, x2), dim=1)  # n,mt+1,vc
@@ -626,13 +649,6 @@ class Model(BaseModel):
         x1 = x1.view(N, M, 1, T, C).reshape(N, 1, -1)  # n,1,mtc
         x2 = x2[:, 0:1, :]  # n,1,vc
         x = torch.cat([x1, x2], dim=-1).squeeze(1)  # n,vc+mtc
-
-        # if 'CLS' in self.classifier_type:
-        #     x = x[:, 0, :]  # n,vc
-        # elif 'GAP' in self.classifier_type:
-        #     x = x.mean(1)  # n,vc
-        # else:
-        #     raise ValueError("Unknown classifier_type")
 
         if 'POOL' in self.classifier_type:
             x = self.cls_pool_fc(x)
