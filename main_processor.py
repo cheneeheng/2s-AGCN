@@ -40,43 +40,43 @@ class Processor():
         self.arg = arg
         if save_arg:
             self.save_arg()
-        if arg.phase == 'train':
-            if not arg.train_feeder_args['debug']:
-                if os.path.isdir(arg.model_saved_name):
-                    if self.arg.weights is None:
-                        raise ValueError(
-                            f'log_dir: {arg.model_saved_name} already exist')
-                    # print('log_dir: ', arg.model_saved_name, 'already exist')
-                    # answer = input('delete it? y/n:')
-                    # if answer == 'y':
-                    #     shutil.rmtree(arg.model_saved_name)
-                    #     print('Dir removed: ', arg.model_saved_name)
-                    #     input('Refresh the website of tensorboard by pressing any keys')  # noqa
-                    # else:
-                    #     print('Dir not removed: ', arg.model_saved_name)
-                if self.rank == 0:
+        if self.rank == 0:
+            if arg.phase == 'train':
+                if not arg.train_feeder_args['debug']:
+                    if os.path.isdir(arg.model_saved_name):
+                        if self.arg.weights is None:
+                            raise ValueError(
+                                f'log_dir: {arg.model_saved_name} already exist')
+                        # print('log_dir: ', arg.model_saved_name, 'already exist')
+                        # answer = input('delete it? y/n:')
+                        # if answer == 'y':
+                        #     shutil.rmtree(arg.model_saved_name)
+                        #     print('Dir removed: ', arg.model_saved_name)
+                        #     input('Refresh the website of tensorboard by pressing any keys')  # noqa
+                        # else:
+                        #     print('Dir not removed: ', arg.model_saved_name)
                     self.train_writer = SummaryWriter(
                         os.path.join(arg.model_saved_name, 'train'), 'train')
                     self.val_writer = SummaryWriter(
                         os.path.join(arg.model_saved_name, 'val'), 'val')
-            else:
-                if self.rank == 0:
+                else:
                     self.train_writer = self.val_writer = SummaryWriter(
                         os.path.join(arg.model_saved_name, 'test'), 'test')
         self.global_step = 0
         self.load_data()
-        print(len(self.data_loader['train'].label), self.rank)
+        print(len(self.data_loader['train'].dataset.label), self.rank)
         self.load_model()
         self.load_optimizer()
         self.best_acc = 0
 
     def save_arg(self):
         # save arg
-        arg_dict = vars(self.arg)
-        if not os.path.exists(self.arg.work_dir):
-            os.makedirs(self.arg.work_dir)
-        with open(f'{self.arg.work_dir}/config.yaml', 'w') as f:
-            yaml.dump(arg_dict, f)
+        if self.rank == 0:
+            arg_dict = vars(self.arg)
+            if not os.path.exists(self.arg.work_dir):
+                os.makedirs(self.arg.work_dir)
+            with open(f'{self.arg.work_dir}/config.yaml', 'w') as f:
+                yaml.dump(arg_dict, f)
 
     # **************************************************************************
     # LOADERS
@@ -132,7 +132,7 @@ class Processor():
                 state.update(weights)
                 self.model.load_state_dict(state)
 
-        if not self.args.ddp:
+        if not self.arg.ddp:
             if type(self.arg.device) is list:
                 if len(self.arg.device) > 1:
                     self.model = nn.DataParallel(
@@ -256,7 +256,7 @@ class Processor():
                 num_replicas=self.arg.world_size,
                 rank=self.rank,
                 shuffle=True
-            ) if self.args.ddp else None
+            ) if self.arg.ddp else None
             self.data_loader['train'] = DataLoader(
                 dataset=training_set,
                 batch_size=self.arg.batch_size,
@@ -270,9 +270,9 @@ class Processor():
         test_data_sampler = DistributedSampler(
             dataset=testing_set,
             num_replicas=self.arg.world_size,
-            rank=self.arg.rank,
+            rank=self.rank,
             shuffle=False,
-        ) if self.args.ddp else None
+        ) if self.arg.ddp else None
         self.data_loader['test'] = DataLoader(
             dataset=testing_set,
             batch_size=self.arg.test_batch_size,
