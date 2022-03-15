@@ -2,9 +2,9 @@
 
 IMAGE_NAME="2s-agcn:ubuntu20.04"
 
-CODE_PATH="/home/dhm/workspace/deployment/code/2s-AGCN"
-DATA_PATH="/home/dhm/workspace/deployment/data/2s-agcn"
-OPENPOSE_DATA_PATH="/home/dhm/workspace/deployment/data/openpose"
+CODE_PATH="/home/dhm/workspace/demo_event/code/2s-AGCN"
+DATA_PATH="/home/dhm/workspace/demo_event/data/2s-agcn"
+OPENPOSE_DATA_PATH="/home/dhm/workspace/demo_event/data/openpose"
 
 # By using --device-cgroup-rule flag we grant the docker continer permissions -
 # to the camera and usb endpoints of the machine.
