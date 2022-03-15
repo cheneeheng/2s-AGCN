@@ -13,8 +13,13 @@ import torch.optim as optim
 import yaml
 
 from collections import OrderedDict
+
+import torch.distributed as dist
+import torch.multiprocessing as mp
+from torch.nn.parallel import DistributedDataParallel as DDP
+
 from torch.utils.tensorboard import SummaryWriter
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, DistributedSampler
 from tqdm import tqdm
 
 from sam.sam.sam import SAM
@@ -30,7 +35,8 @@ __all__ = ['Processor']
 class Processor():
     """Processor for Skeleton-based Action Recognition """
 
-    def __init__(self, arg, save_arg=True):
+    def __init__(self, arg, rank=0, save_arg=True):
+        self.rank = rank
         self.arg = arg
         if save_arg:
             self.save_arg()
@@ -48,15 +54,18 @@ class Processor():
                     #     input('Refresh the website of tensorboard by pressing any keys')  # noqa
                     # else:
                     #     print('Dir not removed: ', arg.model_saved_name)
-                self.train_writer = SummaryWriter(
-                    os.path.join(arg.model_saved_name, 'train'), 'train')
-                self.val_writer = SummaryWriter(
-                    os.path.join(arg.model_saved_name, 'val'), 'val')
+                if self.rank == 0:
+                    self.train_writer = SummaryWriter(
+                        os.path.join(arg.model_saved_name, 'train'), 'train')
+                    self.val_writer = SummaryWriter(
+                        os.path.join(arg.model_saved_name, 'val'), 'val')
             else:
-                self.train_writer = self.val_writer = SummaryWriter(
-                    os.path.join(arg.model_saved_name, 'test'), 'test')
+                if self.rank == 0:
+                    self.train_writer = self.val_writer = SummaryWriter(
+                        os.path.join(arg.model_saved_name, 'test'), 'test')
         self.global_step = 0
         self.load_data()
+        print(len(self.data_loader['train'].label), self.rank)
         self.load_model()
         self.load_optimizer()
         self.best_acc = 0
@@ -74,14 +83,19 @@ class Processor():
     # **************************************************************************
 
     def load_model(self):
-        output_device = self.arg.device[0] if type(
-            self.arg.device) is list else self.arg.device
-        self.output_device = output_device
+        if self.arg.ddp:
+            self.output_device = self.rank
+        else:
+            output_device = self.arg.device[0] if type(
+                self.arg.device) is list else self.arg.device
+            self.output_device = output_device
         Model = import_class(self.arg.model)
         shutil.copy2(inspect.getfile(Model), self.arg.work_dir)
-        print(Model)
+        # print(Model)
         self.model = Model(**self.arg.model_args).cuda(output_device)
-        print(self.model)
+        if self.arg.ddp:
+            self.model = DDP(self.model, device_ids=[self.rank])
+        # print(self.model)
         self.loss = nn.CrossEntropyLoss().cuda(output_device)
 
         if self.arg.weights:
@@ -118,18 +132,13 @@ class Processor():
                 state.update(weights)
                 self.model.load_state_dict(state)
 
-        if type(self.arg.device) is list:
-            if len(self.arg.device) > 1:
-                # torch.distributed.init_process_group(
-                #     backend='nccl', world_size=len(self.arg.device))
-                # self.model = nn.parallel.DistributedDataParallel(
-                #     self.model,
-                #     device_ids=self.arg.device,
-                #     output_device=output_device)
-                self.model = nn.DataParallel(
-                    self.model,
-                    device_ids=self.arg.device,
-                    output_device=output_device)
+        if not self.args.ddp:
+            if type(self.arg.device) is list:
+                if len(self.arg.device) > 1:
+                    self.model = nn.DataParallel(
+                        self.model,
+                        device_ids=self.arg.device,
+                        output_device=output_device)
 
     def load_optimizer(self):
         if 'LLRD' in self.arg.optimizer:
@@ -241,20 +250,38 @@ class Processor():
         if self.arg.phase == 'train':
             assert os.path.exists(self.arg.train_feeder_args['data_path'])
             assert os.path.exists(self.arg.train_feeder_args['label_path'])
+            training_set = Feeder(**self.arg.train_feeder_args)
+            train_data_sampler = DistributedSampler(
+                dataset=training_set,
+                num_replicas=self.arg.world_size,
+                rank=self.rank,
+                shuffle=True
+            ) if self.args.ddp else None
             self.data_loader['train'] = DataLoader(
-                dataset=Feeder(**self.arg.train_feeder_args),
+                dataset=training_set,
                 batch_size=self.arg.batch_size,
-                shuffle=True,
+                shuffle=(train_data_sampler is None),
+                sampler=train_data_sampler,
                 num_workers=self.arg.num_worker,
                 drop_last=True,
-                worker_init_fn=init_seed)
+                worker_init_fn=init_seed
+            )
+        testing_set = Feeder(**self.arg.test_feeder_args)
+        test_data_sampler = DistributedSampler(
+            dataset=testing_set,
+            num_replicas=self.arg.world_size,
+            rank=self.arg.rank,
+            shuffle=False,
+        ) if self.args.ddp else None
         self.data_loader['test'] = DataLoader(
-            dataset=Feeder(**self.arg.test_feeder_args),
+            dataset=testing_set,
             batch_size=self.arg.test_batch_size,
             shuffle=False,
+            sampler=test_data_sampler,
             num_workers=self.arg.num_worker,
             drop_last=False,
-            worker_init_fn=init_seed)
+            worker_init_fn=init_seed
+        )
 
     # **************************************************************************
     # UTILS
@@ -265,13 +292,14 @@ class Processor():
         self.print_log("Local current time :  " + localtime)
 
     def print_log(self, str, print_time=True):
-        if print_time:
-            localtime = time.asctime(time.localtime(time.time()))
-            str = "[ " + localtime + ' ] ' + str
-        print(str)
-        if self.arg.print_log:
-            with open(f'{self.arg.work_dir}/log.txt', 'a') as f:
-                print(str, file=f)
+        if self.rank == 0:
+            if print_time:
+                localtime = time.asctime(time.localtime(time.time()))
+                str = "[ " + localtime + ' ] ' + str
+            print(str)
+            if self.arg.print_log:
+                with open(f'{self.arg.work_dir}/log.txt', 'a') as f:
+                    print(str, file=f)
 
     def record_time(self):
         self.cur_time = time.time()
@@ -336,7 +364,8 @@ class Processor():
         self.print_log(f'Training epoch: {epoch + 1}')
         # for name, param in self.model.named_parameters():
         #     self.train_writer.add_histogram(name, param.clone().cpu().data.numpy(), epoch)  # noqa
-        self.train_writer.add_scalar('epoch', epoch, self.global_step)
+        if self.rank == 0:
+            self.train_writer.add_scalar('epoch', epoch, self.global_step)
         loss_value = []
 
         # 4. Loader
@@ -403,20 +432,32 @@ class Processor():
                 self.scheduler[1].step()
 
             # 5.4. logging
-            loss_value.append(loss.data.item())
             timer['model'] += self.split_time()
+
+            _loss = loss.data.item()
+            if self.arg.ddp:
+                outputs = [None for _ in range(self.arg.world_size)]
+                dist.all_gather_object(outputs, _loss)
+                _loss = np.mean(outputs)
+            loss_value.append(_loss)
 
             value, predict_label = torch.max(output.data, 1)
             acc = torch.mean((predict_label == label.data).float())
-            self.train_writer.add_scalar('acc', acc, self.global_step)
-            self.train_writer.add_scalar(
-                'loss', loss.data.item(), self.global_step)
-            self.train_writer.add_scalar('loss_l1', l1, self.global_step)
-            # self.train_writer.add_scalar('batch_time', process.iterable.last_duration, self.global_step)  # noqa
+            if self.arg.ddp:
+                outputs = [None for _ in range(self.arg.world_size)]
+                dist.all_gather_object(outputs, acc)
+                acc = np.mean(outputs)
+
+            if self.rank == 0:
+                self.train_writer.add_scalar('acc', acc, self.global_step)
+                self.train_writer.add_scalar('loss', _loss, self.global_step)
+                self.train_writer.add_scalar('loss_l1', l1, self.global_step)
+                # self.train_writer.add_scalar('batch_time', process.iterable.last_duration, self.global_step)  # noqa
 
             # 5.5. Statistics
-            _lr = self.optimizer.param_groups[0]['lr']
-            self.train_writer.add_scalar('lr', _lr, self.global_step)
+            if self.rank == 0:
+                _lr = self.optimizer.param_groups[0]['lr']
+                self.train_writer.add_scalar('lr', _lr, self.global_step)
             # if self.global_step % self.arg.log_interval == 0:
             #     self.print_log(
             #         '\tBatch({}/{}) done. Loss: {:.4f}  lr:{:.6f}'.format(
@@ -435,7 +476,7 @@ class Processor():
             f'[Data]{proportion["dataloader"]}, '
             f'[Network]{proportion["model"]}')
 
-        if save_model:
+        if save_model and self.rank == 0:
             state_dict = self.model.state_dict()
             weights = OrderedDict([[k.split('module.')[-1],
                                     v.cpu()] for k, v in state_dict.items()])
@@ -484,16 +525,30 @@ class Processor():
 
             score = np.concatenate(score_frag)
             loss = np.mean(loss_value)
+
+            if self.arg.ddp:
+                outputs = [None for _ in range(self.arg.world_size)]
+                dist.all_gather_object(outputs, score)
+                score = np.mean(outputs)
+
+            if self.arg.ddp:
+                outputs = [None for _ in range(self.arg.world_size)]
+                dist.all_gather_object(outputs, loss)
+                loss = np.mean(outputs)
+
             accuracy = self.data_loader[ln].dataset.top_k(score, 1)
+
             if accuracy > self.best_acc:
                 self.best_acc = accuracy
             self.print_log(f'Accuracy: {accuracy:.4f}')
             self.print_log(f'Model: {self.arg.model_saved_name}')
 
-            if self.arg.phase == 'train':
-                self.val_writer.add_scalar('loss', loss, self.global_step)
-                self.val_writer.add_scalar('loss_l1', l1, self.global_step)
-                self.val_writer.add_scalar('acc', accuracy, self.global_step)
+            if self.rank == 0:
+                if self.arg.phase == 'train':
+                    self.val_writer.add_scalar('loss', loss, self.global_step)
+                    self.val_writer.add_scalar('loss_l1', l1, self.global_step)
+                    self.val_writer.add_scalar(
+                        'acc', accuracy, self.global_step)
 
             score_dict = dict(
                 zip(self.data_loader[ln].dataset.sample_name, score))
@@ -504,7 +559,7 @@ class Processor():
                 top_k = 100 * self.data_loader[ln].dataset.top_k(score, k)
                 self.print_log(f'\tTop{k}: {top_k:.2f}%')
 
-            if save_score:
+            if save_score and self.rank == 0:
                 s_path = f'{self.arg.work_dir}/epoch{epoch + 1}_{ln}_score.pkl'
                 with open(s_path, 'wb') as f:
                     pickle.dump(score_dict, f)

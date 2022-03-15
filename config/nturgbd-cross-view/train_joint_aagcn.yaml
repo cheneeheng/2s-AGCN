@@ -1,13 +1,13 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_joint/211214210001_zflip_xyshift_range0515_delme
-model_saved_name: ./data/data/ntu_result/xview/aagcn_joint/211214210001_zflip_xyshift_range0515_delme/ntu_cv_aagcn_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_joint/220315183001_delme
+model_saved_name: ./data/data/ntu_result/xview/aagcn_joint/220315183001_delme/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
 
 seed: 1
-log_interval: 100  # iter
-save_interval: 2  # iter
-eval_interval: 5  # iter
+log_interval: 100 # iter
+save_interval: 2 # iter
+eval_interval: 5 # iter
 print_log: true
 
 # feeder
@@ -22,9 +22,9 @@ train_feeder_args:
   random_move: False
   window_size: -1
   normalization: False
-  random_zaxis_flip: True
-  random_xaxis_shift: True
-  random_yaxis_shift: True
+  random_zaxis_flip: False
+  random_xaxis_shift: False
+  random_yaxis_shift: False
 
 test_feeder_args:
   data_path: ./data/data/ntu/xview/val_data_joint.npy
@@ -39,14 +39,14 @@ model_args:
   num_subset: 3
   graph: graph.ntu_rgb_d.Graph
   graph_args:
-    labeling_mode: 'spatial'
+    labeling_mode: "spatial"
   in_channels: 3
   drop_out: 0
   adaptive: True
   attention: True
   model_layers: 10
 #  gbn_split: 2
-# weights: None 
+# weights: None
 
 #optim
 # device: [0, 1 ,2, 3]
@@ -66,3 +66,6 @@ warm_up_epoch: 5
 
 only_train_part: True
 only_train_epoch: 5
+
+world_size: 2
+ddp: True

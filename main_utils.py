@@ -74,17 +74,26 @@ def import_class(name):
 def get_parser():
     # parameter priority: command line > config > default
     parser = argparse.ArgumentParser(
-        description='Spatial Temporal Graph Convolution Network')
+        description='Skeleton based action recognition')
     parser.add_argument(
         '--work-dir',
         default='./work_dir/temp',
         help='the work folder for storing results')
 
-    parser.add_argument('-model_saved_name', default='')
+    parser.add_argument('--model_saved_name', default='')
     parser.add_argument(
         '--config',
         default='./config/nturgbd-cross-view/test_bone.yaml',
         help='path to the configuration file')
+
+    parser.add_argument('--world-size',
+                        type=int,
+                        default=1,
+                        help='total number of processes')
+    parser.add_argument('--ddp',
+                        type=bool,
+                        default=False,
+                        help='whether to use DDP model')
 
     # processor
     parser.add_argument(

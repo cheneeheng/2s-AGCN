@@ -72,6 +72,17 @@ model_args:
     num_layers: 3
     length: 26
     pos_emb: rel-shared
+  c_trans_cfg:
+    depth: 1
+    sm_dim: 800
+    sm_heads: 8
+    sm_dim_head: 100
+    sm_dropout: 0.2
+    lg_dim: 3200
+    lg_heads: 8
+    lg_dim_head: 400
+    lg_dropout: 0.2
+    num_layers: 1
   trans_mode: None
   pos_enc: None
   add_s_cls_token: True
