@@ -11,3 +11,4 @@ from . import aagcn_v33
 from . import aagcn_v34
 from . import aagcn_v35
 from . import aagcn_v36
+from . import aagcn_v37

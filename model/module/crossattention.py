@@ -1,6 +1,7 @@
 # TAKEN FROM :
 # https://github.com/lucidrains/vit-pytorch/blob/main/vit_pytorch/cross_vit.py
 
+from collections import OrderedDict
 
 import torch
 from torch import nn, einsum
@@ -36,12 +37,12 @@ class PreNorm(nn.Module):
 class FeedForward(nn.Module):
     def __init__(self, dim, hidden_dim, dropout=0.):
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(dim, hidden_dim),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, dim),
-            nn.Dropout(dropout)
+        self.net = nn.Sequential(OrderedDict([
+            ('linear1', nn.Linear(dim, hidden_dim)),
+            ('gelu', nn.GELU()),
+            ('dropout1', nn.Dropout(dropout)),
+            ('linear2', nn.Linear(hidden_dim, dim)),
+            ('dropout2', nn.Dropout(dropout))])
         )
 
     def forward(self, x):
@@ -60,9 +61,9 @@ class Attention(nn.Module):
         self.to_q = nn.Linear(dim, inner_dim, bias=False)
         self.to_kv = nn.Linear(dim, inner_dim * 2, bias=False)
 
-        self.to_out = nn.Sequential(
-            nn.Linear(inner_dim, dim),
-            nn.Dropout(dropout)
+        self.to_out = nn.Sequential(OrderedDict([
+            ('linear', nn.Linear(inner_dim, dim)),
+            ('dropout', nn.Dropout(dropout))])
         )
 
     def forward(self, x, context=None, kv_include_self=False):
@@ -82,27 +83,46 @@ class Attention(nn.Module):
 
         out = einsum('b h i j, b h j d -> b h i d', attn, v)
         out = rearrange(out, 'b h n d -> b n (h d)')
-        return self.to_out(out)
+        return self.to_out(out), attn
 
 
 # transformer encoder, for small and large patches
 class Transformer(nn.Module):
-    def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout=0.):
+    def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout=0.,
+                 **kwargs):
         super().__init__()
-        self.layers = nn.ModuleList([])
+        attn_kwargs = dict(dim=dim,
+                           heads=heads,
+                           dim_head=dim_head,
+                           dropout=dropout)
+        ffnn_kwargs = dict(dim=dim,
+                           hidden_dim=mlp_dim,
+                           dropout=dropout)
+        self.layers = nn.ModuleDict({})
         self.norm = nn.LayerNorm(dim)
-        for _ in range(depth):
-            self.layers.append(nn.ModuleList([
-                PreNorm(dim, Attention(dim, heads=heads,
-                        dim_head=dim_head, dropout=dropout)),
-                PreNorm(dim, FeedForward(dim, mlp_dim, dropout=dropout))
-            ]))
+        for i in range(depth):
+            self.layers.update(
+                {
+                    f'l{i+1}':
+                    nn.ModuleDict(
+                        OrderedDict({
+                            'attn': PreNorm(dim=dim,
+                                            fn=Attention(**attn_kwargs)),
+                            'ffn': PreNorm(dim=dim,
+                                           fn=FeedForward(**ffnn_kwargs))
+                        })
+                    )
+                }
+            )
 
     def forward(self, x):
-        for attn, ff in self.layers:
-            x = attn(x) + x
-            x = ff(x) + x
-        return self.norm(x)
+        attn_list = []
+        for _, layer in self.layers.items():
+            x1, attn = layer['attn'](x)
+            x = x1 + x
+            x = layer['ffn'](x) + x
+            attn_list.append(attn)
+        return self.norm(x), attn_list
 
 
 # projecting CLS tokens, in the case that small and large patch tokens
@@ -120,37 +140,79 @@ class ProjectInOut(nn.Module):
 
     def forward(self, x, *args, **kwargs):
         x = self.project_in(x)
-        x = self.fn(x, *args, **kwargs)
+        x, attn = self.fn(x, *args, **kwargs)
         x = self.project_out(x)
-        return x
+        return x, attn
 
 
 # cross attention transformer
 class CrossTransformer(nn.Module):
-    def __init__(self, sm_dim, lg_dim, depth, heads, dim_head, dropout):
+    def __init__(self, depth,
+                 sm_dim, sm_heads, sm_dim_head, sm_dropout,
+                 lg_dim, lg_heads, lg_dim_head, lg_dropout,
+                 **kwargs):
         super().__init__()
-        self.layers = nn.ModuleList([])
-        for _ in range(depth):
-            self.layers.append(nn.ModuleList([
-                ProjectInOut(sm_dim, lg_dim, PreNorm(lg_dim, Attention(
-                    lg_dim, heads=heads, dim_head=dim_head, dropout=dropout))),
-                ProjectInOut(lg_dim, sm_dim, PreNorm(sm_dim, Attention(
-                    sm_dim, heads=heads, dim_head=dim_head, dropout=dropout)))
-            ]))
+        sm_attn_kwargs = dict(dim=lg_dim,
+                              heads=sm_heads,
+                              dim_head=sm_dim_head,
+                              dropout=sm_dropout)
+        lg_attn_kwargs = dict(dim=sm_dim,
+                              heads=lg_heads,
+                              dim_head=lg_dim_head,
+                              dropout=lg_dropout)
+        self.layers = nn.ModuleDict({})
+        for i in range(depth):
+            self.layers.update(
+                {
+                    f'l{i+1}':
+                    nn.ModuleDict(
+                        OrderedDict({
+                            'sm_lg':
+                            ProjectInOut(
+                                dim_in=sm_dim,
+                                dim_out=lg_dim,
+                                fn=PreNorm(dim=lg_dim,
+                                           fn=Attention(**sm_attn_kwargs))
+                            ),
+                            'lg_sm':
+                            ProjectInOut(
+                                dim_in=lg_dim,
+                                dim_out=sm_dim,
+                                fn=PreNorm(dim=sm_dim,
+                                           fn=Attention(**lg_attn_kwargs))
+                            )
+                        })
+                    )
+                }
+            )
 
     def forward(self, sm_tokens, lg_tokens):
         (sm_cls, sm_patch_tokens), (lg_cls, lg_patch_tokens) = map(
             lambda t: (t[:, :1], t[:, 1:]), (sm_tokens, lg_tokens))
 
-        for sm_attend_lg, lg_attend_sm in self.layers:
-            sm_cls = sm_attend_lg(
-                sm_cls, context=lg_patch_tokens, kv_include_self=True) + sm_cls
-            lg_cls = lg_attend_sm(
-                lg_cls, context=sm_patch_tokens, kv_include_self=True) + lg_cls
+        attn_list = []
+        for _, layer in self.layers.items():
+            sm_attend_lg, lg_attend_sm = layer['sm_lg'], layer['lg_sm']
+            sm_cls_1, sm_attn = sm_attend_lg(
+                sm_cls, context=lg_patch_tokens, kv_include_self=True)
+            sm_cls += sm_cls_1
+            lg_cls_1, lg_attn = lg_attend_sm(
+                lg_cls, context=sm_patch_tokens, kv_include_self=True)
+            lg_cls += lg_cls_1
+            attn_list.append((sm_attn, lg_attn))
 
         sm_tokens = torch.cat((sm_cls, sm_patch_tokens), dim=1)
         lg_tokens = torch.cat((lg_cls, lg_patch_tokens), dim=1)
-        return sm_tokens, lg_tokens
+
+        return sm_tokens, lg_tokens, attn_list
+
+
+class CrossTransformerIdentity(nn.Identity):
+    def __init__(self, *args, **kwargs):
+        super(CrossTransformerIdentity, self).__init__()
+
+    def forward(self, input1, input2):
+        return input1, input2, []
 
 
 # multi-scale encoder

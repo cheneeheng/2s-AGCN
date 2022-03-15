@@ -5,13 +5,15 @@ from torch.nn.functional import gelu
 import copy
 import numpy as np
 import math
-from typing import Optional, Union
+from typing import Optional, OrderedDict, Union
 
 from model.aagcn import TCNGCNUnit
 from model.aagcn import BaseModel
 
 from model.module.multiheadattention import MultiheadAttention
-from model.module.crossattention import ProjectInOut, Attention, PreNorm
+from model.module.crossattention import Transformer
+from model.module.crossattention import CrossTransformer
+from model.module.crossattention import CrossTransformerIdentity
 
 
 # ------------------------------------------------------------------------------
@@ -170,16 +172,31 @@ class TransformerEncoderLayerExtV2(TransformerEncoderLayerExt):
         )
 
 
+def ca_transformer_config_checker(cfg: dict):
+    trans_cfg_names = [
+        'depth',
+        'sm_dim',
+        'sm_heads',
+        'sm_dim_head',
+        'sm_dropout',
+        'lg_dim',
+        'lg_heads',
+        'lg_dim_head',
+        'lg_dropout',
+        'num_layers',
+    ]
+    for x in cfg:
+        assert f'{x}' in trans_cfg_names, f'{x} not in transformer ca config'
+
+
 def transformer_config_checker(cfg: dict):
     trans_cfg_names = [
-        'num_heads',
-        'model_dim',
-        'ffn_dim',
+        'dim',
+        'depth',
+        'heads',
+        'dim_head',
+        'mlp_dim',
         'dropout',
-        'activation',
-        'prenorm',
-        'batch_first',
-        'layer_norm_eps',
         'num_layers',
         'length',
         'pos_emb'
@@ -188,56 +205,72 @@ def transformer_config_checker(cfg: dict):
         assert f'{x}' in trans_cfg_names, f'{x} not in transformer config'
 
 
-# cross attention transformer
-class CrossTransformer(nn.Module):
-    def __init__(self, depth,
-                 sm_dim, sm_heads, sm_dim_head, sm_dropout,
-                 lg_dim, lg_heads, lg_dim_head, lg_dropout):
-        super().__init__()
-        self.layers = nn.ModuleList([])
-        for _ in range(depth):
-            self.layers.append(nn.ModuleList([
-                ProjectInOut(sm_dim, lg_dim,
-                             PreNorm(lg_dim,
-                                     Attention(lg_dim,
-                                               heads=sm_heads,
-                                               dim_head=sm_dim_head,
-                                               dropout=sm_dropout))),
-                ProjectInOut(lg_dim, sm_dim,
-                             PreNorm(sm_dim,
-                                     Attention(sm_dim,
-                                               heads=lg_heads,
-                                               dim_head=lg_dim_head,
-                                               dropout=lg_dropout)))
-            ]))
-
-    def forward(self, sm_tokens, lg_tokens):
-        (sm_cls, sm_patch_tokens), (lg_cls, lg_patch_tokens) = map(
-            lambda t: (t[:, :1], t[:, 1:]), (sm_tokens, lg_tokens))
-
-        for sm_attend_lg, lg_attend_sm in self.layers:
-            sm_cls = sm_attend_lg(
-                sm_cls, context=lg_patch_tokens, kv_include_self=True) + sm_cls
-            lg_cls = lg_attend_sm(
-                lg_cls, context=sm_patch_tokens, kv_include_self=True) + lg_cls
-
-        sm_tokens = torch.cat((sm_cls, sm_patch_tokens), dim=1)
-        lg_tokens = torch.cat((lg_cls, lg_patch_tokens), dim=1)
-        return sm_tokens, lg_tokens
-
 # ------------------------------------------------------------------------------
-# Network
-# - uses original transformer
-# - from v17
-# - 1 PE
-# n,mt,vc => temp trans (v17)
-# nmt,v,c => spatial trans (individual)
-# nt,mv,c => spatial trans (joint+individual)
+"""
+Network
+- uses s and t transformers with cross attention transformer
+
+n, m, t, v, c(raw)
+
+1. nm, t, vc(corr-time-per-m, joint stacked)
+2. n, mt, vc(corr-time-inter-m, joint stacked)(vvvvvv)
+3. nv, t, mc(corr-t-per-joimt, m stacked)
+4. n, vt, mc(corr-joint-inter-time, m stacked)
+- (seems to be overkill, corr across time is there in 2.)
+5. n, mv, tc(corr-joint-inter-m, time stacked)(vvvvv)
+6. n, t, mvc(corr-time-overall, global-ish)(vvvvv)
+7. n, v, mtc(corr-joint-overall, global-ish)(vvvvv)
+- 1. gives correlation over time per m, (using vc per m).
+- 2. gives correlation over time per m and also inter m, (using vc).
+- 3. gives correlation over time per v, (using mc per v).
+- 4. gives correlation over time per v and also inter v, (using mc).
+- 5. gives correlation over V per m and also inter m, (using mc).
+- 6. gives correlation over time, using mvc.
+- 1. assumes no corr in time between m, but 2. does.
+- 2. is useful if most actions have correlations between m.
+- 3. assumes no corr in time between v.
+- 4. is useful if most actions have correlations between v.
+- 6. is person and joint agnostic.
+
+nm, v, tc(corr-joint-per-m, time stacked)
+n, mv, tc(corr-joint-inter-m, time stacked)
+n, v, mtc(corr-joint-overall, global-ish)
+- same logic as before but with v instead of t.
+
+n, m, t, v, c(raw)
+n, t, mvc(corr-time-overall, global-ish)
+n, m, tvc(m=2, learn corr?)
+n, v, mtc(corr-joint-overall, global-ish)
+n, mt, vc(corr-time-inter-m, joint stacked)
+n, mv, tc(corr-joint-inter-m, time stacked)
+n, tv, mc(corr-joint/time-inter-time/joint, m stacked)
+n, mtv, c(corr-m-time-joint, too long?)
+nm, t, vc(corr-time-per-m, joint stacked)
+nm, v, tc(corr-joint-per-m, time stacked)
+nt, m, vc(corr-m-per-t, learn corr?)
+nt, v, mc(corr-joint-per-t, m stacked)
+nv, m, tc(corr-m-per-joint, learn corr?)
+nv, t, mc(corr-t-per-joimt, m stacked)
+nmv, t, c(corr-time-channel, joint+person independent)
+
+n, t, mvc(corr-time-overall, global-ish)
+n, v, mtc(corr-joint-overall, global-ish)
+nm, t, vc(corr-time-per-m, joint stacked)
+nm, v, tc(corr-joint-per-m, time stacked)
+n, mt, vc(corr-time-inter-m, joint stacked)
+n, mv, tc(corr-joint-inter-m, time stacked)
+
+nmv, t, c(corr-time-channel, joint+person independent)
+
+nv, t, mc(corr-t-per-joimt, m stacked)
+nt, v, mc(corr-joint-per-t, m stacked)
+"""
 # ------------------------------------------------------------------------------
 
 
 class Model(BaseModel):
     def __init__(self,
+                 # aagcn args
                  num_class: int = 60,
                  num_point: int = 25,
                  num_person: int = 2,
@@ -249,57 +282,46 @@ class Model(BaseModel):
                  adaptive: bool = True,
                  attention: bool = True,
                  gbn_split: Optional[int] = None,
-
+                 # additional aagcn args
                  kernel_size: int = 9,
                  pad: bool = True,
-
-                 need_attn: bool = False,
-
                  backbone_dim: int = 16,
-                 trans_len: int = 100,
-
+                 model_layers: int = 10,
+                 # transformer args
                  t_trans_cfg: Optional[dict] = None,
                  s_trans_cfg: Optional[dict] = None,
-
-                 add_A: Optional[str] = None,
-                 add_Aa: str = None,
-                 invert_A: bool = False,
-
-                 trans_seq: str = 's-t',
-
-                 add_s_cls: bool = True,
-                 cross_attn: bool = False,
-
-                 m_mask: bool = False,
-
-                 sa_dropout: float = 0.0,
-                 res_dropout: float = 0.2,
-
+                 c_trans_cfg: Optional[dict] = None,
+                 trans_mode: str = 'n-t-mvc',
                  pos_enc: str = 'True',
+                 # global A args
+                 add_A: Optional[str] = None,
+                 add_alpha_A: Optional[str] = None,
+                 invert_A: bool = False,
+                 # transformer classifier
+                 add_s_cls_token: bool = True,
+                 add_t_cls_token: bool = True,
                  classifier_type: str = 'CLS',
-                 model_layers: int = 10
                  ):
 
         super().__init__(num_class, num_point, num_person,
                          in_channels, drop_out, adaptive, gbn_split)
 
+        # 0. setup
         if t_trans_cfg is not None:
-            t_trans_cfg['layer_norm_eps'] = 1e-5
-            t_trans_cfg['batch_first'] = True
             transformer_config_checker(t_trans_cfg)
         if s_trans_cfg is not None:
-            s_trans_cfg['layer_norm_eps'] = 1e-5
-            s_trans_cfg['batch_first'] = True
             transformer_config_checker(s_trans_cfg)
+        if c_trans_cfg is not None:
+            ca_transformer_config_checker(c_trans_cfg)
 
-        self.trans_seq = trans_seq
-        mha = MultiheadAttention
+        assert t_trans_cfg['num_layers'] == s_trans_cfg['num_layers']
+        assert t_trans_cfg['num_layers'] % c_trans_cfg['num_layers'] == 0
 
         self.num_subset = num_subset
-        self.need_attn = need_attn
+        self.trans_mode = trans_mode
 
-        self.rel_emb_s = True if 'rel' in s_trans_cfg['pos_emb'] else False
-        self.rel_emb_t = True if 'rel' in t_trans_cfg['pos_emb'] else False
+        # self.rel_emb_s = True if 'rel' in s_trans_cfg['pos_emb'] else False
+        # self.rel_emb_t = True if 'rel' in t_trans_cfg['pos_emb'] else False
 
         # 1. joint graph
         self.init_graph(graph, graph_args)
@@ -322,339 +344,125 @@ class Model(BaseModel):
                                  tcngcn_unit=_TCNGCNUnit,
                                  output_channel=backbone_dim)
 
-        # TODO: change to the cross attention transformer.
-
-        # n,m,t,v,c (raw)
-
-        # 1. nm,t,vc (corr-time-per-m, joint stacked)
-        # 2. n,mt,vc (corr-time-inter-m, joint stacked)
-        # 3. n,t,mvc (corr-time-overall, global-ish)
-        # - 1. gives correlation over time per m using vc per m.
-        # - 2. gives correlation over time per m and also inter m using vc.
-        # - 3. gives correlation over time using mvc.
-        # - 1. assumes no corr in time between m, but 2. does.
-        # - 2. is useful if most actions have correlations between m.
-        # - 3. is person and joint agnostic.
-
-        # 4. nm,v,tc (corr-joint-per-m, time stacked)
-        # 5. n,mv,tc (corr-joint-inter-m, time stacked)
-        # 6. n,v,mtc (corr-joint-overall, global-ish)
-        # - same logic as before but with v instead of t.
-
-        # n,m,t,v,c (raw)
-        # n,t,mvc (corr-time-overall, global-ish)
-        # n,m,tvc (m=2, learn corr?)
-        # n,v,mtc (corr-joint-overall, global-ish)
-        # n,mt,vc (corr-time-inter-m, joint stacked)
-        # n,mv,tc (corr-joint-inter-m, time stacked)
-        # n,tv,mc (corr-joint/time-inter-time/joint, m stacked)
-        # n,mtv,c (corr-m-time-joint, too long?)
-        # nm,t,vc (corr-time-per-m, joint stacked)
-        # nm,v,tc (corr-joint-per-m, time stacked)
-        # nt,m,vc (corr-m-per-t, learn corr?)
-        # nt,v,mc (corr-joint-per-t, m stacked)
-        # nv,m,tc (corr-m-per-joint, learn corr?)
-        # nv,t,mc (corr-t-per-joimt, m stacked)
-        # nmv,t,c (corr-time-channel, joint+person independent)
-
-        # n,t,mvc (corr-time-overall, global-ish)
-        # n,v,mtc (corr-joint-overall, global-ish)
-        # nm,t,vc (corr-time-per-m, joint stacked)
-        # nm,v,tc (corr-joint-per-m, time stacked)
-        # n,mt,vc (corr-time-inter-m, joint stacked)
-        # n,mv,tc (corr-joint-inter-m, time stacked)
-
-        # nmv,t,c (corr-time-channel, joint+person independent)
-
-        # nv,t,mc (corr-t-per-joimt, m stacked)
-        # nt,v,mc (corr-joint-per-t, m stacked)
-
         # 3. transformer (temporal)
         if t_trans_cfg is not None:
-            t_trans_dim = t_trans_cfg['model_dim'] * num_point
-            t_trans_cfg['model_dim'] = t_trans_dim
-            t_trans_cfg['ffn_dim'] *= num_point
-            t_trans_enc_layer = TransformerEncoderLayerExtV2(
-                cfg=t_trans_cfg,
-                mha=mha,
-                Aa=str(add_Aa)
+            self.t_trans_enc = nn.ModuleDict(
+                {
+                    f'block{i+1}': Transformer(**t_trans_cfg)
+                    for i in range(t_trans_cfg['num_layers'])
+                }
             )
-            self.t_trans_enc_layers = torch.nn.ModuleList(
-                [copy.deepcopy(t_trans_enc_layer)
-                 for _ in range(t_trans_cfg['num_layers'])])
-
-            if 'res' in trans_seq:
-                res_trans_enc_layers = torch.nn.ModuleDict(
-                    {
-                        'res_norm': nn.LayerNorm(
-                            t_trans_dim, eps=t_trans_cfg['layer_norm_eps']),
-                        'res_dropout': nn.Dropout(p=res_dropout),
-                    }
-                )
-                self.res_trans_enc_layers = torch.nn.ModuleList(
-                    [copy.deepcopy(res_trans_enc_layers)
-                     for _ in range(t_trans_cfg['num_layers'])])
 
             pos_enc = str(pos_enc)
             if pos_enc == 'True' or pos_enc == 'original':
-                self.t_pos_encoder = PositionalEncoding(t_trans_dim)
+                self.t_pos_encoder = PositionalEncoding(t_trans_cfg['dim'])
             elif pos_enc == 'cossin':
-                self.t_pos_encoder = CosSinPositionalEncoding(t_trans_dim)
+                self.t_pos_encoder = CosSinPositionalEncoding(
+                    t_trans_cfg['dim'])
             else:
                 self.t_pos_encoder = lambda x: x
 
         # 4. transformer (spatial)
         if s_trans_cfg is not None:
-            s_trans_dim = s_trans_cfg['model_dim'] * trans_len
-            s_trans_cfg['model_dim'] = s_trans_dim
-            s_trans_cfg['ffn_dim'] *= trans_len
-
-            add_A = str(add_A)
-            if add_A == 'True' or add_A == 'Empty':
-                m_dict = {}
-                for a_i in range(self.num_subset):
-                    if add_A == 'True':
-                        m_dict[f'subset{a_i}'] = copy.deepcopy(
-                            TransformerEncoderLayerExtV2(
-                                cfg=s_trans_cfg,
-                                mha=mha,
-                                A=self.graph.A[a_i].transpose((1, 0)) if invert_A else self.graph.A[a_i],  # noqa
-                                Aa=str(add_Aa)
-                            )
-                        )
-                    elif add_A == 'Empty':
-                        m_dict[f'subset{a_i}'] = copy.deepcopy(
-                            TransformerEncoderLayerExtV2(
-                                cfg=s_trans_cfg,
-                                mha=mha,
-                                A=None,
-                                Aa=str(add_Aa)
-                            )
-                        )
-                s_trans_enc_layer = torch.nn.ModuleDict(m_dict)
-                s_trans_enc_layer.update(
-                    {
-                        'sa_norm': nn.LayerNorm(
-                            s_trans_dim, eps=s_trans_cfg['layer_norm_eps']),
-                        # 'sa_fc': nn.Linear(s_trans_dim, s_trans_dim)
-                        'sa_dropout': nn.Dropout(p=sa_dropout),
-                    }
-                )
-            elif add_A == 'False' or add_A == 'None':
-                assert 'v0' in self.trans_seq, 'v0 not in self.trans_seq'
-                s_trans_enc_layer = TransformerEncoderLayerExtV2(
-                    cfg=s_trans_cfg,
-                    mha=mha,
-                    A=None,
-                    Aa=str(add_Aa)
-                )
-            else:
-                raise ValueError()
-
-            self.s_trans_enc_layers = torch.nn.ModuleList(
-                [copy.deepcopy(s_trans_enc_layer)
-                    for _ in range(s_trans_cfg['num_layers'])]
+            self.s_trans_enc = nn.ModuleDict(
+                {
+                    f'block{i+1}': Transformer(**s_trans_cfg)
+                    for i in range(s_trans_cfg['num_layers'])
+                }
             )
 
             pos_enc = str(pos_enc)
             if pos_enc == 'True' or pos_enc == 'original':
-                self.s_pos_encoder = PositionalEncoding(s_trans_dim)
+                self.s_pos_encoder = PositionalEncoding(s_trans_cfg['dim'])
             elif pos_enc == 'cossin':
-                self.s_pos_encoder = CosSinPositionalEncoding(s_trans_dim)
+                self.s_pos_encoder = CosSinPositionalEncoding(
+                    s_trans_cfg['dim'])
             else:
                 self.s_pos_encoder = lambda x: x
 
         # 5. classifier
-        self.classifier_type = classifier_type
-        if 'CLS' in classifier_type:
-            self.cls_token = nn.Parameter(torch.randn(1, 1, t_trans_dim))
-        else:
-            self.cls_token = None
-        output_dim = t_trans_dim+s_trans_dim*num_person
-        if 'POOL' in classifier_type:
-            # # vc+mtc
-            self.cls_pool_fc = nn.Linear(output_dim, output_dim)
-            self.cls_pool_act = nn.Tanh()
-        self.init_fc(output_dim, num_class)
-
-        # 6. s cls token
-        if add_s_cls and self.cls_token is not None:
-            self.s_cls_token = nn.Parameter(torch.randn(1, 1, s_trans_dim))
-            # self.s_t_trans_enc_layer = torch.nn.ModuleDict(
-            #     {
-            #         'st_linear1': nn.Linear(s_trans_dim*num_person,
-            #                                 t_trans_dim),
-            #         'st_linear2': nn.Linear(t_trans_dim, t_trans_dim),
-            #         'st_dropout1': nn.Dropout(p=0.2),
-            #         'st_dropout2': nn.Dropout(p=0.2),
-            #         'st_act': GELU(),
-            #         'st_norm': nn.LayerNorm(
-            #             t_trans_dim, eps=t_trans_cfg['layer_norm_eps']),
-            #     }
-            # )
+        if add_s_cls_token:
+            self.s_cls_token = nn.Parameter(
+                torch.randn(1, 1, s_trans_cfg['dim']))
         else:
             self.s_cls_token = None
+        if add_t_cls_token:
+            self.t_cls_token = nn.Parameter(
+                torch.randn(1, 1, t_trans_cfg['dim']))
+        else:
+            self.t_cls_token = None
+
+        output_dim = t_trans_cfg['dim'] + s_trans_cfg['dim']
+        if 'POOL' in classifier_type:
+            self.cls_pool_fc = nn.Linear(output_dim, output_dim)
+            self.cls_pool_act = nn.Tanh()
+        else:
+            self.cls_pool_fc = lambda x: x
+            self.cls_pool_act = lambda x: x
+        self.init_fc(output_dim, num_class)
 
         # 7. cross attention
-        if cross_attn:
-            # sm = longer token length
-            cross_attn_layer = CrossTransformer(
-                # depth=t_trans_cfg['num_layers'],
-                depth=1,
-                sm_dim=t_trans_dim,
-                sm_heads=t_trans_cfg['num_heads'],
-                sm_dim_head=s_trans_dim * \
-                num_person//4//t_trans_cfg['num_heads'],
-                sm_dropout=t_trans_cfg['dropout'],
-                lg_dim=s_trans_dim*num_person,
-                lg_heads=s_trans_cfg['num_heads'],
-                lg_dim_head=t_trans_dim//4//s_trans_cfg['num_heads'],
-                lg_dropout=s_trans_cfg['dropout'])
-            self.cross_attn_enc_layers = torch.nn.ModuleList(
-                [copy.deepcopy(cross_attn_layer)
-                    for _ in range(t_trans_cfg['num_layers'])])
-        else:
-            self.cross_attn_enc_layers = None
-
-    def forward_temporal_transformer(self,
-                                     x: torch.Tensor,
-                                     size: list,
-                                     layer: torch.nn.Module,
-                                     attn: list,
-                                     pe: bool = False):
-        N, C, T, V, M = size
-        x = x.reshape(N, -1, V*C)  # n,1+mt,vc
-        out = layer(x)  # x, attn, pe
-        if self.need_attn:
-            attn.append((out[1], out[2]) if pe else out[1])
-        return out[0], attn
-
-    def forward_spatial_Aa_trans(self,
-                                 x: torch.Tensor,
-                                 size: list,
-                                 layers: Union[torch.nn.ModuleDict,
-                                               torch.nn.ModuleList],
-                                 attn: list,
-                                 pe: bool = False,
-                                 mode: str = 'v1'):
-        assert mode in ['v0', 'v1', 'v2'], f"{mode} is not supported."
-        x1 = x
-        x_l = []
-        if mode == 'v0':
-            for s_name, s_layer in layers:
-                out = s_layer(x1)
-                x1 = out[0]
-                if self.need_attn:
-                    attn.append((out[1], out[2]) if pe else out[1])
-        elif mode == 'v1' or mode == 'v2':
-            for s_name, s_layer in layers.items():
-                if 'subset' not in s_name:
-                    continue
-                out = s_layer(x1, global_attn=s_layer.PA, alpha=s_layer.alpha)
-                x_l.append(out[0])
-                if self.need_attn:
-                    attn.append((out[1], out[2]) if pe else out[1])
-            x_l = torch.stack(x_l, dim=0).sum(dim=0)
-        else:
-            raise ValueError
-        if mode == 'v1':
-            x1 = layers['sa_dropout'](x_l)  # dropout
-            x1 = layers['sa_norm'](x1)  # norm
-        elif mode == 'v2':
-            x1 = x + layers['sa_dropout'](x_l)  # dropout
-            x1 = layers['sa_norm'](x1)  # norm
-        return x1, attn
+        # sm = longer token length
+        ratio = s_trans_cfg['num_layers']//c_trans_cfg['num_layers']
+        assert ratio >= 1
+        self.cross_attn_enc = nn.ModuleDict({})
+        for i in range(s_trans_cfg['num_layers']):
+            if (i+1) % ratio == 0:
+                self.cross_attn_enc.update(
+                    {
+                        f'block{i+1}': CrossTransformer(**c_trans_cfg)
+                    }
+                )
+            else:
+                self.cross_attn_enc.update(
+                    {
+                        f'block{i+1}': CrossTransformerIdentity()
+                    }
+                )
 
     def forward_postprocess(self, x: torch.Tensor, size: torch.Size):
         N, _, _, V, M = size
         _, C, T, _ = x.size()
 
-        x1 = x.view(N, M, C, T, V).permute(0, 1, 4, 3, 2).contiguous()  # n,m,v,t,c  # noqa
-        x1 = x1.reshape(N*M, V, T*C)  # nm,v,tc
+        x1 = x.view(N, M, C, T, V).permute(0, 4, 1, 3, 2).contiguous()  # n,v,m,t,c  # noqa
+        x1 = x1.reshape(N, V, M*T*C)  # n,v,mtc
         if self.s_cls_token is not None:
             s_cls_tokens = self.s_cls_token.repeat(x1.size(0), 1, 1)
-            x1 = torch.cat((s_cls_tokens, x1), dim=1)  # nm,v+1,tc
+            x1 = torch.cat((s_cls_tokens, x1), dim=1)  # n,v+1,mtc
         x1 = self.s_pos_encoder(x1)
 
-        x2 = x.view(N, M, C, T, V).permute(0, 1, 3, 4, 2).contiguous()  # n,m,t,v,c  # noqa
-        x2 = x2.reshape(N, M*T, V*C)  # n,mt,vc
-        if self.cls_token is not None:
-            cls_tokens = self.cls_token.repeat(x2.size(0), 1, 1)
-            x2 = torch.cat((cls_tokens, x2), dim=1)  # n,mt+1,vc
+        x2 = x.view(N, M, C, T, V).permute(0, 3, 1, 4, 2).contiguous()  # n,t,m,v,c  # noqa
+        x2 = x2.reshape(N, T, M*V*C)  # n,t,mvc
+        if self.t_cls_token is not None:
+            t_cls_token = self.t_cls_token.repeat(x2.size(0), 1, 1)
+            x2 = torch.cat((t_cls_token, x2), dim=1)  # n,t+1,mvc
         x2 = self.t_pos_encoder(x2)
 
-        attn = [[], []]
+        attn_list = [[], [], []]
 
-        for i in range(len(self.t_trans_enc_layers)):
-
+        for (_, t_block), (_, s_block), (_, c_block) in zip(
+            self.t_trans_enc.items(),
+            self.s_trans_enc.items(),
+            self.cross_attn_enc.items()
+        ):
             # Spatial
-            if isinstance(self.s_trans_enc_layers[i], torch.nn.ModuleDict):
-                s_trans_enc_layers = self.s_trans_enc_layers[i]
-            else:
-                s_trans_enc_layers = [(None, self.s_trans_enc_layers[i])]
-
-            if 'v0' in self.trans_seq:
-                # single s trans
-                mode = 'v0'
-            elif 'v1' in self.trans_seq:
-                # 3 s trans -> sum -> norm -> dropout
-                mode = 'v1'
-            elif 'v2' in self.trans_seq:
-                # 3 s trans -> sum -> res -> norm -> dropout
-                mode = 'v2'
-            else:
-                raise ValueError
-
-            # Spatial
-            x1, attn[0] = self.forward_spatial_Aa_trans(
-                x=x1,
-                size=[N, C, T, V, M],
-                layers=s_trans_enc_layers,
-                attn=attn[0],
-                pe=self.rel_emb_s,
-                mode=mode
-            )
-
+            x1, attn = s_block(x1)  # n,v+1,mtc
+            attn_list[0].append(attn)
             # Temporal
-            x2, attn[1] = self.forward_temporal_transformer(
-                x=x2,
-                size=[N, C, T, V, M],
-                layer=self.t_trans_enc_layers[i],
-                attn=attn[1],
-                pe=self.rel_emb_t
-            )
+            x2, attn = t_block(x2)  # n,t+1,mvc
+            attn_list[1].append(attn)
+            # cross attention
+            x2, x1, attn = c_block(x2, x1)
+            attn_list[2].append(attn)
 
-            if self.cross_attn_enc_layers is not None:
-                # cross attention
-                x1 = x1.view(N, M, -1, T*C).permute(0, 2, 1, 3).contiguous()
-                x1 = x1.reshape(N, -1, M*T*C)  # n,v+1,mtc
-                x2, x1 = self.cross_attn_enc_layers[i](x2, x1)
-                x1 = x1.view(N, -1, M, T*C).permute(0, 2, 1, 3).contiguous()
-                x1 = x1.reshape(N*M, -1, T*C)  # nm,v+1,tc
+        x1 = x1[:, 0, :]  # n,mtc
+        x2 = x2[:, 0, :]  # n,mvc
+        x = torch.cat([x1, x2], dim=-1)  # n,mtc+mvc
 
-        # if 'parallel' in self.trans_seq:
-        #     if 'add' in self.trans_seq:
-        #         x2 += x1
-        #     else:
-        #         raise ValueError()
+        x = self.cls_pool_fc(x)
+        x = self.cls_pool_act(x)
 
-        # if 'res' in self.trans_seq:
-        #     # Residual
-        #     x = x + self.res_trans_enc_layers[i]['res_dropout'](x2)
-        #     x = self.res_trans_enc_layers[i]['res_norm'](x)
-        # else:
-        #     x = x2
-
-        x1 = x1[:, 0:1, :]  # nm,1,tc
-        x1 = x1.view(N, M, 1, T, C).reshape(N, 1, -1)  # n,1,mtc
-        x2 = x2[:, 0:1, :]  # n,1,vc
-        x = torch.cat([x1, x2], dim=-1).squeeze(1)  # n,vc+mtc
-
-        if 'POOL' in self.classifier_type:
-            x = self.cls_pool_fc(x)
-            x = self.cls_pool_act(x)
-
-        return x, attn
+        return x, attn_list
 
 
 if __name__ == '__main__':
@@ -662,40 +470,50 @@ if __name__ == '__main__':
     model = Model(graph=graph,
                   model_layers=101,
                   t_trans_cfg={
-                      'num_heads': 25,
-                      'model_dim': 16,
-                      'ffn_dim': 64,
+                      'dim': 16*2*25,
+                      'depth': 1,
+                      'heads': 25,
+                      'dim_head': 16,
+                      'mlp_dim': 64*2*25,
                       'dropout': 0.2,
-                      'activation': 'gelu',
-                      'prenorm': False,
-                      'num_layers': 3,
                       'pos_emb': 'rel-shared',
-                      'length': 201,
+                      'length': 101,
+                      'num_layers': 3,
                   },
                   s_trans_cfg={
-                      'num_heads': 1,
-                      'model_dim': 16,
-                      'ffn_dim': 64,
+                      'dim': 16*100*2,
+                      'depth': 3,
+                      'heads': 1,
+                      'dim_head': 26*16,
+                      'mlp_dim': 64*100*2,
                       'dropout': 0.2,
-                      'activation': 'gelu',
-                      'prenorm': False,
-                      'num_layers': 3,
                       'pos_emb': 'rel-shared',
                       'length': 26,
+                      'num_layers': 3,
                   },
-                  trans_seq='sa-t-res-v2',
-                  add_A='Empty',
-                  add_Aa='False',
-                  add_s_cls=True,
+                  c_trans_cfg={
+                      'depth': 1,
+                      'sm_dim': 16*2*25,
+                      'sm_heads': 16,
+                      'sm_dim_head': 2*25,
+                      'sm_dropout': 0.2,
+                      'lg_dim': 16*2*100,
+                      'lg_heads': 1,
+                      'lg_dim_head': 16*2*100,
+                      'lg_dropout': 0.2,
+                      'num_layers': 1,
+                  },
+                  add_s_cls_token=True,
+                  add_t_cls_token=True,
                   kernel_size=3,
                   pad=False,
                   pos_enc=None,
                   classifier_type='CLS-POOL'
                   )
 
-    # print(model)
+    print(model)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
     # print(sum(p.numel() for p in model.parameters() if p.requires_grad))
     print([i[0] for i in model.named_parameters() if 'PA' in i[0]])
     # print(model(torch.ones((1, 3, 300, 25, 2))))
-    print(model(torch.rand((1, 3, 300, 25, 2))))
+    print(model(torch.rand((1, 3, 300, 25, 2)))[0])
