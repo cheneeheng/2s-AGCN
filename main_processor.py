@@ -456,20 +456,22 @@ class Processor():
             # 5.4. logging
             timer['model'] += self.split_time()
 
-            _loss = loss.data.item()
             if self.arg.ddp:
-                dist_tmp = [None for _ in range(self.arg.world_size)]
-                dist.all_gather_object(dist_tmp, _loss)
-                _loss = np.mean(dist_tmp)
+                # dist_tmp = [None for _ in range(self.arg.world_size)]
+                # dist.all_gather_object(dist_tmp, _loss)
+                # _loss = np.mean(dist_tmp)
+                dist.all_reduce(loss, op=dist.ReduceOp.AVG)
+            _loss = loss.data.item()
             loss_value.append(_loss)
 
             value, predict_label = torch.max(output.data, 1)
             acc = torch.mean((predict_label == label.data).float())
-            acc = acc.data.item()
             if self.arg.ddp:
-                dist_tmp = [None for _ in range(self.arg.world_size)]
-                dist.all_gather_object(dist_tmp, acc)
-                acc = np.mean(dist_tmp)
+                # dist_tmp = [None for _ in range(self.arg.world_size)]
+                # dist.all_gather_object(dist_tmp, acc)
+                # acc = np.mean(dist_tmp)
+                dist.all_reduce(acc, op=dist.ReduceOp.AVG)
+            acc = acc.data.item()
 
             if self.rank == 0:
                 self.train_writer.add_scalar('acc', acc, self.global_step)

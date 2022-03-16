@@ -1,6 +1,5 @@
 import torch
 from torch import nn
-from torch.nn.functional import gelu
 
 import copy
 import numpy as np
@@ -10,7 +9,6 @@ from typing import Optional, OrderedDict, Union
 from model.aagcn import TCNGCNUnit
 from model.aagcn import BaseModel
 
-from model.module.multiheadattention import MultiheadAttention
 from model.module.crossattention import Transformer
 from model.module.crossattention import CrossTransformer
 from model.module.crossattention import CrossTransformerIdentity
@@ -59,117 +57,6 @@ class CosSinPositionalEncoding(nn.Module):
         x = x + self.pe[:, :x.size(1), :]
         x = self.dropout(x)
         return x
-
-
-class TransformerEncoderLayerExt(nn.TransformerEncoderLayer):
-    """Option for pre of postnorm"""
-
-    def __init__(self,
-                 mha: nn.Module,
-                 d_model: int,
-                 nhead: int,
-                 dim_feedforward: int = 2048,
-                 dropout: float = 0.1,
-                 activation: str = "relu",
-                 layer_norm_eps: float = 1e-5,
-                 batch_first: bool = False,
-                 device=None,
-                 dtype=None,
-                 pre_norm: bool = False,
-                 pos_emb: dict = None,
-                 A: np.ndarray = None,
-                 Aa: str = None) -> None:
-        factory_kwargs = {'device': device, 'dtype': dtype}
-        super().__init__(d_model, nhead, dim_feedforward, dropout, activation,
-                         layer_norm_eps, batch_first, device, dtype)
-        self.pre_norm = pre_norm
-        if A is None:
-            self.PA = None
-        else:
-            self.PA = nn.Parameter(
-                torch.from_numpy(A.astype(np.float32)))  # Bk
-        Aa = str(Aa)
-        if Aa == 'None' or Aa == 'False':
-            self.alpha = None
-        elif Aa == 'True' or Aa == 'zero':
-            self.alpha = nn.Parameter(torch.zeros(1))
-        elif Aa == 'one':
-            self.alpha = nn.Parameter(torch.ones(1))
-        if mha == MultiheadAttention:
-            kwargs = {
-                'embed_dim': d_model,
-                'num_heads': nhead,
-                'dropout': dropout,
-                'batch_first': batch_first,
-            }
-            kwargs.update(factory_kwargs)
-            kwargs['pos_emb'] = pos_emb
-            self.self_attn = MultiheadAttention(**kwargs)
-
-    def forward(self,
-                src: torch.Tensor,
-                src_mask: Optional[torch.Tensor] = None,
-                src_key_padding_mask: Optional[torch.Tensor] = None,
-                alpha: Optional[torch.Tensor] = None,
-                global_attn: Optional[torch.Tensor] = None,
-                ) -> torch.Tensor:
-        kwargs = {
-            'attn_mask': src_mask,
-            'key_padding_mask': src_key_padding_mask,
-        }
-        if isinstance(self.self_attn, MultiheadAttention):
-            kwargs['alpha'] = alpha
-            kwargs['global_attn'] = global_attn
-
-        if self.pre_norm:
-            src = self.norm1(src)
-            output = self.self_attn(src, src, src, **kwargs)
-            src1 = output[0]
-            src = src + self.dropout1(src1)
-            src = self.norm2(src)
-            src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))  # noqa
-            src = src + self.dropout2(src2)
-            return src, *output[1:]
-
-        else:
-            output = self.self_attn(src, src, src, **kwargs)
-            src1 = output[0]
-            src = src + self.dropout1(src1)
-            src = self.norm1(src)
-            src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))  # noqa
-            src = src + self.dropout2(src2)
-            src = self.norm2(src)
-            return src, *output[1:]
-
-
-class TransformerEncoderLayerExtV2(TransformerEncoderLayerExt):
-    """Option for pre of postnorm"""
-
-    def __init__(self,
-                 cfg: dict,
-                 mha: nn.Module,
-                 A: np.ndarray = None,
-                 Aa: str = None) -> None:
-        pos_emb = {
-            'name': cfg['pos_emb'],
-            'tokens': cfg['length'],
-            'dim_head': cfg['model_dim']//cfg['num_heads'],
-            'heads': True if 'share' in cfg['pos_emb'] else False,
-        }
-        super().__init__(
-            mha=mha,
-            d_model=cfg['model_dim'],
-            nhead=cfg['num_heads'],
-            dim_feedforward=cfg['ffn_dim'],
-            dropout=cfg['dropout'],
-            activation=cfg['activation'],
-            layer_norm_eps=cfg['layer_norm_eps'],
-            batch_first=cfg['batch_first'],
-            pre_norm=cfg['prenorm'],
-            pos_emb=pos_emb,
-            A=A,
-            Aa=Aa,
-        )
 
 
 def ca_transformer_config_checker(cfg: dict):

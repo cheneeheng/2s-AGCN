@@ -1,4 +1,12 @@
 aagcn:
+        - xsub:
+                  - ./data/data/openpose_b25_j15_ntu_result/xview/aagcn_joint/220314090001
+                  - 85.6%
+        - xview:
+                  - ./data/data/openpose_b25_j15_ntu_result/xview/aagcn_joint/220314100001
+                  - 93.0%
+                  - ./data/data/openpose_b25_j15_ntu_result/xview/aagcn_joint/220314100001_lowerlr_1em2lr
+                  - 92.6%
         - 10 layers:
                   - original, old dataset generation:
                             - 94.7%
@@ -957,18 +965,31 @@ aagcn_v36:
                   - 90.0%
         - 220307120001_nopad_3ks_noaug_rel_pool_EmptyA_cross_3l_coslr_v1:
                   - 90.5%
-        - 220307120001_nopad_3ks_noaug_rel_pool_EmptyA_cross_3l_coslrfrompaper_v1:
-                  - diverged with 0.004lr
-        - 220307120001_nopad_3ks_noaug_rel_pool_EmptyA_cross_3l_coslrfrompaper_v1:
-                  - diverged with 0.001lr
-        - 220307120001_nopad_3ks_noaug_rel_pool_EmptyA_cross_3l_coslrfrompaper_v1:
-                  - diverged with 0.0005lr, maybe because decay is 0.05
-                  - diverged during warmup
-        - 220307210001_nopad_3ks_noaug_rel_pool_3l_32f_coslr_v0:
-                  - diverged just after warmup
-        - 220307210001_nopad_3ks_noaug_rel_pool_3l_32f_noPAfreeze_coslrlong_v0:
-                  - cos with adam but very low LR
-                  - 90.0%
-        - 220307210001_nopad_3ks_noaug_rel_pool_3l_32f_noPAfreeze_coslrlongeps_v0:
-                  - cos with adamw (lr 1e-4, eps 1e-4)
-                  - 89.9%
+        # - 220307120001_nopad_3ks_noaug_rel_pool_EmptyA_cross_3l_coslrfrompaper_v1:
+        #           - diverged with 0.004lr
+        # - 220307120001_nopad_3ks_noaug_rel_pool_EmptyA_cross_3l_coslrfrompaper_v1:
+        #           - diverged with 0.001lr
+        # - 220307120001_nopad_3ks_noaug_rel_pool_EmptyA_cross_3l_coslrfrompaper_v1:
+        #           - diverged with 0.0005lr, maybe because decay is 0.05
+        #           - diverged during warmup
+        # - 220307210001_nopad_3ks_noaug_rel_pool_3l_32f_coslr_v0:
+        #           - diverged just after warmup
+        # - 220307210001_nopad_3ks_noaug_rel_pool_3l_32f_noPAfreeze_coslrlong_v0:
+        #           - cos with adam but very low LR
+        #           - 90.0%
+        # - 220307210001_nopad_3ks_noaug_rel_pool_3l_32f_noPAfreeze_coslrlongeps_v0:
+        #           - cos with adamw (lr 1e-4, eps 1e-4)
+        #           - 89.9%
+
+aagcn_v37:
+        - new transformer implementation
+        - 220315153001_nopad_3ks_noaug_pool:
+                  - 3s-t trans layers, 1 cross attention
+                  - 89.0%
+        - 220315153001_nopad_3ks_noaug_pool_cossin:
+                  - 3s-t trans layers, 1 cross attention
+                  - cossin PE
+                  - 88.8%
+        - 220315153001_nopad_3ks_noaug_pool_cossin_ddp:
+                  - 86.8%
+

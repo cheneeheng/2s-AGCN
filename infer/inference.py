@@ -52,8 +52,8 @@ def prepare_model(arg):
     Model = import_class(arg.model)
     AAGCN = Model(**arg.model_args)
     AAGCN.eval()
-    weight_file = [i for i in os.listdir(arg.model_path) if '.pt' in i]
-    weight_file = os.path.join(arg.model_path, weight_file[0])
+    weight_file = [i for i in os.listdir(arg.weight_path) if '.pt' in i]
+    weight_file = os.path.join(arg.weight_path, weight_file[0])
     weights = torch.load(weight_file)
     AAGCN.load_state_dict(weights)
     return AAGCN
@@ -155,6 +155,12 @@ if __name__ == '__main__':
         type=str,
         default='/data/2s-agcn/model/ntu_15j/')
     parser.add_argument(
+        '--weight-path',
+        type=str,
+        # default='/data/2s-agcn/model/ntu_15j/xview/211130150001/')
+        # default='/data/2s-agcn/model/ntu_15j/xview/220314100001/')
+        default='/data/2s-agcn/model/ntu_15j/xsub/220314090001/')
+    parser.add_argument(
         '--out-folder',
         type=str,
         default='/data/2s-agcn/prediction/ntu_15j/')
@@ -229,7 +235,7 @@ if __name__ == '__main__':
         with open(output_file, 'a+') as f:
             output_str = ",".join([str(logit) for logit in logits])
             output_str = f'{pred},{output_str}\n'
-            f.write(output_str.replace('[','').replace(']', ''))
+            f.write(output_str.replace('[', '').replace(']', ''))
             print(pred)
 
         if arg.timing:
