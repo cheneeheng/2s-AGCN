@@ -93,6 +93,7 @@ class Processor():
         # print(Model)
         self.model = Model(**self.arg.model_args).cuda(self.output_device)
         if self.arg.ddp:
+            self.model = nn.SyncBatchNorm.convert_sync_batchnorm(self.model)
             self.model = DDP(self.model, device_ids=[self.rank])
         # print(self.model)
         self.loss = nn.CrossEntropyLoss().cuda(self.output_device)
@@ -350,8 +351,8 @@ class Processor():
 
         # 2. Model Train
         self.model.train()
+        zero_grad_PA = False
         if self.arg.ddp:
-            zero_grad_PA = False
             if self.arg.only_train_part:
                 if epoch <= self.arg.only_train_epoch:
                     zero_grad_PA = True

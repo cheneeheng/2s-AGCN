@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_v37_joint/220315153001_nopad_3ks_noaug_pool_001lr
-model_saved_name: ./data/data/ntu_result/xview/aagcn_v37_joint/220315153001_nopad_3ks_noaug_pool_001lr/ntu_cv_aagcn_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_v37_joint/220315153001_nopad_3ks_noaug_pool_cossin_ddp_syncbn
+model_saved_name: ./data/data/ntu_result/xview/aagcn_v37_joint/220315153001_nopad_3ks_noaug_pool_cossin_ddp_syncbn/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
@@ -12,7 +12,7 @@ print_log: true
 
 # feeder
 feeder: feeders.feeder.Feeder
-num_worker: 32
+num_worker: 1
 train_feeder_args:
   #  data_path: ./data/data/ntu_stretched/xview/train_data_joint.npy
   #  label_path: ./data/data/ntu_stretched/xview/train_label.pkl
@@ -84,7 +84,7 @@ model_args:
     lg_dropout: 0.2
     num_layers: 1
   trans_mode: None
-  pos_enc: None
+  pos_enc: cossin
   add_s_cls_token: True
   add_t_cls_token: True
   classifier_type: CLS-POOL
@@ -92,8 +92,8 @@ model_args:
 # optim
 # device: [0, 1 ,2, 3]
 device: [0, 1]
-batch_size: 64
-test_batch_size: 64
+batch_size: 32
+test_batch_size: 32
 
 optimizer: SGD
 nesterov: True
@@ -111,3 +111,6 @@ warm_up_epoch: 5
 
 only_train_part: False
 only_train_epoch: 5
+
+world_size : 2
+ddp : True
