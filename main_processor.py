@@ -45,9 +45,8 @@ class Processor():
                 if not arg.train_feeder_args['debug']:
                     if os.path.isdir(arg.model_saved_name):
                         if self.arg.weights is None:
-                            raise ValueError(
-                                f'log_dir: {arg.model_saved_name} already exist')
-                        # print('log_dir: ', arg.model_saved_name, 'already exist')
+                            raise ValueError(f'log_dir: {arg.model_saved_name} already exist')  # noqa
+                        # print('log_dir: ', arg.model_saved_name, 'already exist')  # noqa
                         # answer = input('delete it? y/n:')
                         # if answer == 'y':
                         #     shutil.rmtree(arg.model_saved_name)
@@ -64,7 +63,6 @@ class Processor():
                         os.path.join(arg.model_saved_name, 'test'), 'test')
         self.global_step = 0
         self.load_data()
-        print(len(self.data_loader['train'].dataset.label), self.rank)
         self.load_model()
         self.load_optimizer()
         self.best_acc = 0
@@ -371,11 +369,15 @@ class Processor():
 
         # 4. Loader
         loader = self.data_loader['train']
-        if self.rank == 0:
-            process = tqdm(
-                loader, desc=f"Device {self.rank}", position=self.rank+1)
-        else:
-            process = loader
+        # if self.rank == 0:
+        #     process = tqdm(loader,
+        #                    desc=f"Device {self.rank}",
+        #                    position=self.rank)
+        # else:
+        #     process = loader
+        process = tqdm(loader,
+                       desc=f"Train on device {self.rank}",
+                       position=self.rank)
 
         # 5. Main loop
         for batch_idx, (data, label, index) in enumerate(process):
@@ -502,7 +504,16 @@ class Processor():
             loss_value = []
             score_frag = []
             step = 0
-            process = tqdm(self.data_loader[ln])
+            loader = self.data_loader[ln]
+            # if self.rank == 0:
+            #     process = tqdm(loader,
+            #                    desc=f"Device {self.rank}",
+            #                    position=self.rank)
+            # else:
+            #     process = loader
+            process = tqdm(loader,
+                           desc=f"Eval on device {self.rank}",
+                           position=self.rank)
             for batch_idx, (data, label, index) in enumerate(process):
                 with torch.no_grad():
                     data = data.float().cuda(self.output_device)
@@ -529,18 +540,17 @@ class Processor():
                             f_w.write(str(index[i]) + ',' +
                                       str(x) + ',' + str(true[i]) + '\n')
 
-            score = np.concatenate(score_frag)
             loss = np.mean(loss_value)
-
-            if self.arg.ddp:
-                dist_tmp = [None for _ in range(self.arg.world_size)]
-                dist.all_gather_object(dist_tmp, score)
-                score = np.mean(dist_tmp)
-
             if self.arg.ddp:
                 dist_tmp = [None for _ in range(self.arg.world_size)]
                 dist.all_gather_object(dist_tmp, loss)
                 loss = np.mean(dist_tmp)
+
+            score = np.concatenate(score_frag)
+            if self.arg.ddp:
+                dist_tmp = [None for _ in range(self.arg.world_size)]
+                dist.all_gather_object(dist_tmp, score)
+                score = np.concatenate(dist_tmp)
 
             accuracy = self.data_loader[ln].dataset.top_k(score, 1)
 
@@ -556,15 +566,20 @@ class Processor():
                     self.val_writer.add_scalar(
                         'acc', accuracy, self.global_step)
 
-            score_dict = dict(
-                zip(self.data_loader[ln].dataset.sample_name, score))
             self.print_log(f'\tMean {ln} '
                            f'loss of {len(self.data_loader[ln])} '
                            f'batches: {np.mean(loss_value):.4f}')
+
             for k in self.arg.show_topk:
                 top_k = 100 * self.data_loader[ln].dataset.top_k(score, k)
                 self.print_log(f'\tTop{k}: {top_k:.2f}%')
 
+            score_dict = dict(
+                zip(self.data_loader[ln].dataset.sample_name, score))
+            if self.arg.ddp:
+                dist_tmp = [None for _ in range(self.arg.world_size)]
+                dist.all_gather_object(dist_tmp, score_dict)
+                score_dict = {k: v for d in dist_tmp for k, v in d.items()}
             if save_score and self.rank == 0:
                 s_path = f'{self.arg.work_dir}/epoch{epoch + 1}_{ln}_score.pkl'
                 with open(s_path, 'wb') as f:
