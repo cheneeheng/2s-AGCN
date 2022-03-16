@@ -460,8 +460,8 @@ class Processor():
                 # dist_tmp = [None for _ in range(self.arg.world_size)]
                 # dist.all_gather_object(dist_tmp, _loss)
                 # _loss = np.mean(dist_tmp)
-                dist.all_reduce(loss, op=dist.ReduceOp.AVG)
-            _loss = loss.data.item()
+                dist.all_reduce(loss, op=dist.ReduceOp.SUM)
+            _loss = loss.data.item() / self.arg.world_size
             loss_value.append(_loss)
 
             value, predict_label = torch.max(output.data, 1)
@@ -470,8 +470,8 @@ class Processor():
                 # dist_tmp = [None for _ in range(self.arg.world_size)]
                 # dist.all_gather_object(dist_tmp, acc)
                 # acc = np.mean(dist_tmp)
-                dist.all_reduce(acc, op=dist.ReduceOp.AVG)
-            acc = acc.data.item()
+                dist.all_reduce(acc, op=dist.ReduceOp.SUM)
+            acc = acc.data.item() / self.arg.world_size
 
             if self.rank == 0:
                 self.train_writer.add_scalar('acc', acc, self.global_step)

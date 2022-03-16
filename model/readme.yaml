@@ -992,4 +992,6 @@ aagcn_v37:
                   - 88.8%
         - 220315153001_nopad_3ks_noaug_pool_cossin_ddp:
                   - 86.8%
+        - 220315153001_nopad_3ks_noaug_pool_cossin_ddp_syncbn:
+                  - ~87.5%
 
