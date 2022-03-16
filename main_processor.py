@@ -106,9 +106,14 @@ class Processor():
             else:
                 weights = torch.load(self.arg.weights)
 
-            weights = OrderedDict(
-                [[k.split('module.')[-1],
-                  v.cuda(self.output_device)] for k, v in weights.items()])
+            if not self.arg.ddp:
+                weights = OrderedDict(
+                    [[k.split('module.')[-1],
+                      v.cuda(self.output_device)] for k, v in weights.items()])
+            else:
+                weights = OrderedDict(
+                    [[k if k[:7] == 'module.' else 'module.'+k,
+                      v.cuda(self.output_device)] for k, v in weights.items()])
 
             keys = list(weights.keys())
             for w in self.arg.ignore_weights:
@@ -345,19 +350,25 @@ class Processor():
 
         # 2. Model Train
         self.model.train()
-        if self.arg.only_train_part:
-            if epoch > self.arg.only_train_epoch:
-                print('only train part, require grad')
-                for key, value in self.model.named_parameters():
-                    if 'PA' in key:
-                        value.requires_grad = True
-                        # print(key + '-require grad')
-            else:
-                print('only train part, do not require grad')
-                for key, value in self.model.named_parameters():
-                    if 'PA' in key:
-                        value.requires_grad = False
-                        # print(key + '-not require grad')
+        if self.arg.ddp:
+            zero_grad_PA = False
+            if self.arg.only_train_part:
+                if epoch <= self.arg.only_train_epoch:
+                    zero_grad_PA = True
+        else:
+            if self.arg.only_train_part:
+                if epoch > self.arg.only_train_epoch:
+                    print('only train part, require grad')
+                    for key, value in self.model.named_parameters():
+                        if 'PA' in key:
+                            value.requires_grad = True
+                            # print(key + '-require grad')
+                else:
+                    print('only train part, do not require grad')
+                    for key, value in self.model.named_parameters():
+                        if 'PA' in key:
+                            value.requires_grad = False
+                            # print(key + '-not require grad')
 
         # 3. Logging
         self.print_log(f'Training epoch: {epoch + 1}')
@@ -368,16 +379,15 @@ class Processor():
         loss_value = []
 
         # 4. Loader
-        loader = self.data_loader['train']
-        # if self.rank == 0:
-        #     process = tqdm(loader,
-        #                    desc=f"Device {self.rank}",
-        #                    position=self.rank)
-        # else:
-        #     process = loader
-        process = tqdm(loader,
-                       desc=f"Train on device {self.rank}",
-                       position=self.rank)
+        if self.rank == 0:
+            process = tqdm(self.data_loader['train'],
+                           desc=f"Device {self.rank}",
+                           position=self.rank)
+        else:
+            process = self.data_loader['train']
+        # process = tqdm(self.data_loader['train'],
+        #                desc=f"Train on device {self.rank}",
+        #                position=self.rank)
 
         # 5. Main loop
         for batch_idx, (data, label, index) in enumerate(process):
@@ -432,6 +442,10 @@ class Processor():
                 self.optimizer.zero_grad()
                 loss.backward()
                 # nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+                if zero_grad_PA:
+                    for name, param in self.model.named_parameters():
+                        if 'PA' in name:
+                            param.grad *= 0
                 self.optimizer.step()
 
             # 5.3. scheduler if applicable.
@@ -504,16 +518,15 @@ class Processor():
             loss_value = []
             score_frag = []
             step = 0
-            loader = self.data_loader[ln]
-            # if self.rank == 0:
-            #     process = tqdm(loader,
-            #                    desc=f"Device {self.rank}",
-            #                    position=self.rank)
-            # else:
-            #     process = loader
-            process = tqdm(loader,
-                           desc=f"Eval on device {self.rank}",
-                           position=self.rank)
+            if self.rank == 0:
+                process = tqdm(self.data_loader[ln],
+                               desc=f"Device {self.rank}",
+                               position=self.rank)
+            else:
+                process = self.data_loader[ln]
+            # process = tqdm(self.data_loader[ln],
+            #                desc=f"Eval on device {self.rank}",
+            #                position=self.rank)
             for batch_idx, (data, label, index) in enumerate(process):
                 with torch.no_grad():
                     data = data.float().cuda(self.output_device)
@@ -551,6 +564,8 @@ class Processor():
                 dist_tmp = [None for _ in range(self.arg.world_size)]
                 dist.all_gather_object(dist_tmp, score)
                 score = np.concatenate(dist_tmp)
+                for idx, val in enumerate(dist_tmp):
+                    score[idx::len(dist_tmp)] = val
 
             accuracy = self.data_loader[ln].dataset.top_k(score, 1)
 

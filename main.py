@@ -5,6 +5,7 @@ import os
 import sys
 import argparse
 import yaml
+import random
 
 import torch
 
@@ -21,7 +22,7 @@ from main_utils import *
 
 def setup(rank, world_size):
     os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '8081'
+    os.environ['MASTER_PORT'] = '8020'  # str(random.randint(8100, 8200))
     # initialize the process group
     dist.init_process_group(backend="nccl", rank=rank, world_size=world_size)
     # this function is responsible for synchronizing and successfully
