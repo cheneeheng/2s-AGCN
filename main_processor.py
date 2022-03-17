@@ -380,15 +380,16 @@ class Processor():
         loss_value = []
 
         # 4. Loader
+        loader = self.data_loader['train']
+        if self.arg.ddp:
+            loader.sampler.set_epoch(epoch)
+
         if self.rank == 0:
-            process = tqdm(self.data_loader['train'],
+            process = tqdm(loader,
                            desc=f"Device {self.rank}",
                            position=self.rank)
         else:
-            process = self.data_loader['train']
-        # process = tqdm(self.data_loader['train'],
-        #                desc=f"Train on device {self.rank}",
-        #                position=self.rank)
+            process = loader
 
         # 5. Main loop
         for batch_idx, (data, label, index) in enumerate(process):
@@ -527,9 +528,6 @@ class Processor():
                                position=self.rank)
             else:
                 process = self.data_loader[ln]
-            # process = tqdm(self.data_loader[ln],
-            #                desc=f"Eval on device {self.rank}",
-            #                position=self.rank)
             for batch_idx, (data, label, index) in enumerate(process):
                 with torch.no_grad():
                     data = data.float().cuda(self.output_device)

@@ -7,6 +7,13 @@ aagcn:
                   - 93.0%
                   - ./data/data/openpose_b25_j15_ntu_result/xview/aagcn_joint/220314100001_lowerlr_1em2lr
                   - 92.6%
+        - ddp:
+                  - 211209190001:
+                            - 94.3%
+                  - 220315183001_ddp:
+                            - 91.5%
+                  - 220315183001_ddp_syncbn:
+                            - 91.7%
         - 10 layers:
                   - original, old dataset generation:
                             - 94.7%
@@ -994,4 +1001,6 @@ aagcn_v37:
                   - 86.8%
         - 220315153001_nopad_3ks_noaug_pool_cossin_ddp_syncbn:
                   - ~87.5%
-
+        - 220315153001_nopad_3ks_noaug_pool_cossin_ddp_syncbn_6l:
+                  - 88.0%
+        - 

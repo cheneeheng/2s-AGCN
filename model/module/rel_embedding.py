@@ -79,8 +79,8 @@ class RelPosEmb1D(nn.Module):
             self.rel_pos_emb = nn.Parameter(
                 torch.randn(2 * tokens - 1, dim_head) * scale)
         else:
-            self.rel_pos_emb = nn.Parameter(torch.randn(
-                heads, 2 * tokens - 1, dim_head) * scale)
+            self.rel_pos_emb = nn.Parameter(
+                torch.randn(heads, 2 * tokens - 1, dim_head) * scale)
 
     def forward(self, q):
         return rel_pos_emb_1d(q, self.rel_pos_emb, self.shared_heads)
