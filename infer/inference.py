@@ -16,12 +16,13 @@ from data_gen.ntu_gendata import (
     num_joint
 )
 from infer.data_preprocess import DataPreprocessor
+from data_gen.ntu_gendata import read_xyz as reader
 from main_utils import get_parser, import_class, init_seed
 
 
 def arg_parser(parser):
     p = parser.parse_args()
-    with open(os.path.join(p.model_path, 'config.yaml'), 'r') as f:
+    with open(os.path.join(p.weight_path, 'config.yaml'), 'r') as f:
         default_arg = yaml.safe_load(f)
     key = vars(p).keys()
     for k in default_arg.keys():
@@ -82,13 +83,13 @@ def predict(preprocessor: DataPreprocessor,
     # 3. Inference.
     with torch.no_grad():
         if next(model.parameters()).is_cuda:
-            output = model(torch.Tensor(input_data).cuda(0))
+            output, _ = model(torch.Tensor(input_data).cuda(0))
             _, predict_label = torch.max(output, 1)
             output = output.data.cpu()
             predict_label = predict_label.data.cpu()
 
         else:
-            output = model(torch.Tensor(input_data))
+            output, _ = model(torch.Tensor(input_data))
             _, predict_label = torch.max(output, 1)
 
     return output.tolist(), predict_label.item()
@@ -115,36 +116,15 @@ if __name__ == '__main__':
     init_seed(0)
 
     parser = get_parser()
-    parser.add_argument(
-        '--max-frame',
-        type=int,
-        default=max_frame)
-    parser.add_argument(
-        '--max-num-skeleton-true',
-        type=int,
-        default=max_body_true)
-    parser.add_argument(
-        '--max-num-skeleton',
-        type=int,
-        default=max_body_kinect)
-    parser.add_argument(
-        '--num-joint',
-        type=int,
-        default=15)
+    # parser.add_argument('--max-person', type=int, default=2)
+    parser.add_argument('--max-frame', type=int, default=max_frame)
+    parser.add_argument('--max-num-skeleton-true', type=int, default=2)  # noqa
+    parser.add_argument('--max-num-skeleton', type=int, default=4)  # noqa
+    parser.add_argument('--num-joint', type=int, default=15)
 
-    parser.add_argument(
-        '--gpu',
-        type=bool,
-        default=False)
-
-    parser.add_argument(
-        '--timing',
-        type=bool,
-        default=False)
-    parser.add_argument(
-        '--interval',
-        type=int,
-        default=0)
+    parser.add_argument('--gpu', type=bool, default=False)
+    parser.add_argument('--timing', type=bool, default=False)
+    parser.add_argument('--interval', type=int, default=0)
 
     parser.add_argument(
         '--data-path',
@@ -157,9 +137,11 @@ if __name__ == '__main__':
     parser.add_argument(
         '--weight-path',
         type=str,
-        # default='/data/2s-agcn/model/ntu_15j/xview/211130150001/')
-        # default='/data/2s-agcn/model/ntu_15j/xview/220314100001/')
-        default='/data/2s-agcn/model/ntu_15j/xsub/220314090001/')
+        # default='./data/model/ntu_25j/'
+        default='/data/2s-agcn/model/ntu_15j/xview/211130150001/'
+        # default='/data/2s-agcn/model/ntu_15j/xview/220314100001/'
+        # default='/data/2s-agcn/model/ntu_15j/xsub/220314090001/'
+    )
     parser.add_argument(
         '--out-folder',
         type=str,
@@ -177,7 +159,9 @@ if __name__ == '__main__':
     os.makedirs(output_dir, exist_ok=True)
 
     # Data processor -----------------------------------------------------------
-    DataProc = DataPreprocessor(arg.num_joint, arg.max_frame)
+    DataProc = DataPreprocessor(num_joint=arg.num_joint,
+                                max_seq_length=arg.max_frame,
+                                max_person=arg.max_num_skeleton)
 
     # Prepare model ------------------------------------------------------------
     AAGCN = prepare_model(arg)
@@ -195,6 +179,8 @@ if __name__ == '__main__':
     skel_path_mem = None
     infer_flag = False
 
+    last_skel_file = None
+
     print("Start loop...")
     while True:
 
@@ -209,6 +195,12 @@ if __name__ == '__main__':
                 infer_flag = False
 
         skel_files = sorted(os.listdir(skel_dir))[-arg.max_frame:]
+        if last_skel_file is not None:
+            try:
+                skel_files = skel_files[skel_files.index(last_skel_file)+1:]
+            except ValueError:
+                skel_files = skel_files[:]
+        last_skel_file = skel_files[-1]
 
         infer_flag = True
 

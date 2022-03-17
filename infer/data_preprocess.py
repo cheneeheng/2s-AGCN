@@ -6,12 +6,13 @@ from data_gen.preprocess import pre_normalization
 
 class DataPreprocessor(object):
 
-    def __init__(self, num_joint=25, max_seq_length=300) -> None:
+    def __init__(self, num_joint=25, max_seq_length=300, max_person=4) -> None:
         super().__init__()
         self.num_joint = num_joint
         self.max_seq_length = max_seq_length
         self.data = None
         self.data_counter = 0
+        self.max_person = max_person
         self.clear_data_array()
 
     def clear_data_array(self) -> None:
@@ -19,7 +20,7 @@ class DataPreprocessor(object):
         Creates an empty/zero array of size (M,T,V,C).
         We assume that the input data can have up to 4 possible skeletons ids.
         """
-        self.data = np.zeros((4,
+        self.data = np.zeros((self.max_person,
                               self.max_seq_length,
                               self.num_joint,
                               3),

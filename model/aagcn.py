@@ -615,8 +615,38 @@ class Model(BaseModel):
 
 if __name__ == '__main__':
     graph = 'graph.ntu_rgb_d.Graph'
-    model = Model(graph=graph, fc_cv=False, model_layers=10, attention=True)
+    model = Model(graph=graph, fc_cv=False, model_layers=3, attention=True)
     # summary(model, (1, 3, 300, 25, 2), device='cpu')
-    print(sum(p.numel() for p in model.parameters() if p.requires_grad))
-    # model(torch.ones((1, 3, 300, 25, 2)))
-    print(model)
+    # print(sum(p.numel() for p in model.parameters() if p.requires_grad))
+    # # model(torch.ones((1, 3, 300, 25, 2)))
+    # print(model)
+
+    loss = nn.CrossEntropyLoss()
+    x = torch.randn(4, 3, 300, 25, 2, requires_grad=True)
+    y = torch.empty(4, dtype=torch.long).random_(5)
+
+    # Simulate DP
+    b1 = x[0:2]
+    b2 = x[2:4]
+    b1, _ = model(b1)
+    b2, _ = model(b2)
+    output = loss(torch.cat((b1, b2), 0), y)
+    output.backward()
+    print(x.grad[0, :, 1, 1, 1])
+    grad1 = x.grad
+    x.grad = None
+
+    # Simulate DDP
+    b1 = x[0:2]
+    b2 = x[2:4]
+    t1 = y[0:2]
+    t2 = y[2:4]
+    b1, _ = model(b1)
+    output = loss(b1, t1)
+    output.backward()
+    b2, _ = model(b2)
+    output = loss(b2, t2)
+    output.backward()
+    print((x.grad/2)[0, :, 1, 1, 1])
+    grad2 = x.grad/2
+    print((grad1 == grad2).all())
