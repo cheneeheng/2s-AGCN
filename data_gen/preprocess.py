@@ -10,7 +10,9 @@ def __verbose(x, out=None, verbose=False):
         return x
 
 
-def pre_normalization(data, zaxis=[0, 1], xaxis=[8, 4], pad=True, center=True,
+def pre_normalization(data,
+                      zaxis=[0, 1], zaxis2=None, xaxis=[8, 4],
+                      pad=True, center=True,
                       verbose=False, tqdm=True):
     N, C, T, V, M = data.shape
     s = np.transpose(data, [0, 4, 2, 3, 1])  # N, C, T, V, M  to  N, M, T, V, C
@@ -86,6 +88,25 @@ def pre_normalization(data, zaxis=[0, 1], xaxis=[8, 4], pad=True, center=True,
                         continue
                     for i_j, joint in enumerate(frame):
                         s[i_s, i_p, i_f, i_j] = np.dot(matrix_x, joint)
+
+    if zaxis2 is not None:
+        s_list = __verbose(s, out='parallel the bone between hip(jpt 0) and spine(jpt 1) of the first person to the z axis', verbose=verbose)  # noqa
+        for i_s, skeleton in enumerate(s_list):
+            if skeleton.sum() == 0:
+                continue
+            joint_bottom = skeleton[0, 0, zaxis2[0]]
+            joint_top = skeleton[0, 0, zaxis2[1]]
+            axis = np.cross(joint_top - joint_bottom, [0, 0, 1])
+            angle = angle_between(joint_top - joint_bottom, [0, 0, 1])
+            matrix_z = rotation_matrix(axis, angle)
+            for i_p, person in enumerate(skeleton):
+                if person.sum() == 0:
+                    continue
+                for i_f, frame in enumerate(person):
+                    if frame.sum() == 0:
+                        continue
+                    for i_j, joint in enumerate(frame):
+                        s[i_s, i_p, i_f, i_j] = np.dot(matrix_z, joint)
 
     data = np.transpose(s, [0, 4, 2, 3, 1])  # N, M, T, V, C to N, C, T, V, M
     return data

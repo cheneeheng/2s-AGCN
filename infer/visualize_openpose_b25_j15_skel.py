@@ -11,17 +11,18 @@ import numpy as np
 
 from dash.dependencies import Input, Output
 
+import os
 import numpy as np
 import pickle
 import matplotlib
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-
-
 from matplotlib.animation import FuncAnimation
 
 from plotly import graph_objects as go
 from time import sleep
+
+from data_gen.preprocess import pre_normalization
 
 
 JOINT_COLOR = [
@@ -65,7 +66,7 @@ def _plot_skel(p, f, m=0):
     rightleg = np.array([11, 10, 9, 8])
     leftleg = np.array([14, 13, 12, 8])
     body = np.array([0, 1, 8])    # body
-    print(f"{p[0, f, 0, m]}, {p[1, f, 0, m]}, {p[2, f, 0, m]}")
+    # print(f"{p[0, f, 0, m]}, {p[1, f, 0, m]}, {p[2, f, 0, m]}")
 
     return [
         # Bones
@@ -207,8 +208,23 @@ def draw_skeleton_offline(data, pause_sec=10, action=""):
     fig.show(renderer='notebook_connected')
 
 
-joint_file = r'/code/2s-AGCN/data/data/openpose_b25_j15_ntu/xview/val_data_joint.npy'  # noqa
-# joint_file = r'/code/2s-AGCN/data/data/openpose_b25_j15_ntu/xview/val_data_joint_100.npy'  # noqa
+def read_xyz(file, max_body=4, num_joint=25):
+    skel_data = np.loadtxt(file, delimiter=',')
+    data = np.zeros((max_body, 1, num_joint, 3))
+    for m, body_joint in enumerate(skel_data):
+        for j in range(0, len(body_joint), 3):
+            if m < max_body and j//3 < num_joint:
+                data[m, 0, j//3, :] = [body_joint[j],
+                                       body_joint[j+1],
+                                       body_joint[j+2]]
+            else:
+                pass
+    data = np.swapaxes(data, 0, 3)/1000.0   # M, T, V, C > C, T, V, M
+    return data
+
+
+# joint_file = r'/code/2s-AGCN/data/data/openpose_b25_j15_ntu/xview/val_data_joint.npy'  # noqa
+joint_file = r'/code/2s-AGCN/data/data/openpose_b25_j15_ntu/xview/val_data_joint_100.npy'  # noqa
 label_file = r'/code/2s-AGCN/data/data/openpose_b25_j15_ntu/xview/val_label.pkl'  # noqa
 
 # np.where(np.array(label)==22)[0][0]
@@ -218,6 +234,27 @@ with open(label_file, 'rb') as f:
 data = np.load(joint_file)
 # data = np.load(joint_file, mmap_mode='r')
 
+joint_path = './data/data_tmp/220317182701'
+joint_files = [os.path.join(joint_path, i)
+               for i in sorted(os.listdir(joint_path))]
+
+data = []
+data_raw = []
+data_path = []
+for joint_file in joint_files:
+    data_i = read_xyz(joint_file, max_body=4, num_joint=25)  # C, T, V, M
+    data_raw.append(np.array(data_i))
+    data_i = np.expand_dims(data_i, axis=0)
+    data_i = pre_normalization(data_i, zaxis2=[8, 1], xaxis=[2, 5],
+                               verbose=False, tqdm=False)
+    data.append(data_i[0])
+    data_path.append(joint_file)
+data = np.concatenate(data, 1)
+# data = np.concatenate(data, 1)[:, 28:36]
+# data_raw = np.concatenate(data_raw, 1)[:, 28:36]
+# data_path = data_path[28:36]
+
+
 app = dash.Dash(__name__, update_title=None)
 app.layout = html.Div(
     [dcc.Input(id='text', type="text", value=0),
@@ -225,8 +262,8 @@ app.layout = html.Div(
      dcc.Interval(id="interval", interval=0.5 * 1000)])
 
 
-@app.callback(Output('graph', 'figure'),
-              [Input('interval', 'n_intervals'),
+@ app.callback(Output('graph', 'figure'),
+               [Input('interval', 'n_intervals'),
                Input('text', 'value')])
 def update_data(n_intervals, aid):
 
@@ -242,7 +279,19 @@ def update_data(n_intervals, aid):
         # eye=dict(x=0, y=0, z=0.)
     )
 
-    fig = go.Figure(_plot_skel(data[idx][:, ::3, :, :], n_intervals % 100))
+    # data_i = read_xyz(
+    #     joint_files[n_intervals % len(joint_files)],
+    #     max_body=4, num_joint=25)  # C, T, V, M
+    # data_i = np.expand_dims(data_i, axis=0)
+    # data_i = pre_normalization(data_i, zaxis=[8, 1], xaxis=[2, 5],
+    #                            verbose=False, tqdm=False)[0]
+    # fig = go.Figure(data=_plot_skel(data_i, 0, 0))
+    fig = go.Figure(_plot_skel(data, (n_intervals*3) % (data.shape[1]//3)))
+    # print(n_intervals % data.shape[1],
+    #       joint_files[n_intervals % data.shape[1]])
+
+    # fig = go.Figure(_plot_skel(data[idx][:, ::3, :, :], n_intervals % 100))
+
     fig.update_layout(scene_camera=camera,
                       showlegend=False,
                       margin=dict(l=0, r=0, b=0, t=0),
@@ -274,7 +323,8 @@ def update_data(n_intervals, aid):
                                      #  visible=False,
                                      )
                       ))
-    print('Action :', label[idx], n_intervals)
+    print('Action :', label[idx],
+          (n_intervals*3) % (data.shape[1]//3), data.shape[1]//3)
 
     return fig
 

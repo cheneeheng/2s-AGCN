@@ -14,6 +14,10 @@ aagcn:
                             - 91.5%
                   - 220315183001_ddp_syncbn:
                             - 91.7%
+                  - 220315183001_ddp_syncbn_epochupdate_002lr:
+                            - 93.9%
+                  - 220315183001_ddp_syncbn_epochupdate_01lr:
+                            - 94.6%
         - 10 layers:
                   - original, old dataset generation:
                             - 94.7%
@@ -1003,4 +1007,13 @@ aagcn_v37:
                   - ~87.5%
         - 220315153001_nopad_3ks_noaug_pool_cossin_ddp_syncbn_6l:
                   - 88.0%
-        - 
+        - 220315153001_nopad_3ks_noaug_pool_cossin_ddp_syncbn_0002lr:
+                  - 90.3%
+        - 220315153001_nopad_3ks_noaug_pool_cossin_ddp_syncbn_0002lr_6l:
+                  - 90.8%
+        - 220315153001_nopad_3ks_noaug_pool_cossin_ddp_syncbn_0002lr_6lSE:
+                  - smaller dim head in attn module
+                  - 90.8%
+        - 220315153001_nopad_3ks_noaug_pool_cossin_ddp_syncbn_0002lr_6lSE2:
+                  - smaller dim head in attn module + mlp
+                  - 90.4%
