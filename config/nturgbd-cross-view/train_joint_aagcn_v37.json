@@ -1,0 +1,122 @@
+{
+  "SETUP": {
+    "work_dir": "./data/data/ntu_result/xview/aagcn_v37_joint/220315153001_nopad_3ks_noaug_pool_cossin_ddp_syncbn",
+    "model_saved_name": "./data/data/ntu_result/xview/aagcn_v37_joint/220315153001_nopad_3ks_noaug_pool_cossin_ddp_syncbn/ntu_cv_aagcn_joint",
+    "phase": "train",
+    "save_score": true,
+    "seed": 1,
+    "log_interval": 100,
+    "save_interval": 2,
+    "eval_interval": 5,
+    "print_log": true
+  },
+  "DATALOADER": {
+    "feeder": "feeders.feeder.Feeder",
+    "num_worker": 1,
+    "train_feeder_args": {
+      "data_path": "./data/data/ntu_nopad/xview/train_data_joint.npy",
+      "label_path": "./data/data/ntu_nopad/xview/train_label.pkl",
+      "debug": false,
+      "random_choose": false,
+      "random_shift": false,
+      "random_move": false,
+      "window_size": -1,
+      "normalization": false
+    },
+    "test_feeder_args": {
+      "data_path": "./data/data/ntu_nopad/xview/val_data_joint.npy",
+      "label_path": "./data/data/ntu_nopad/xview/val_label.pkl"
+    }
+  },
+  "MODEL": {
+    "model": "model.aagcn_v37.Model",
+    "model_args": {
+      "num_class": 60,
+      "num_point": 25,
+      "num_person": 2,
+      "num_subset": 3,
+      "graph": "graph.ntu_rgb_d.Graph",
+      "graph_args": {
+        "labeling_mode": "spatial"
+      },
+      "in_channels": 3,
+      "drop_out": 0,
+      "adaptive": true,
+      "attention": true,
+      "kernel_size": 3,
+      "pad": false,
+      "backbone_dim": 16,
+      "model_layers": 101,
+      "t_trans_cfg": {
+        "dim": 800,
+        "depth": 1,
+        "heads": 8,
+        "dim_head": 100,
+        "mlp_dim": 3200,
+        "dropout": 0.2,
+        "num_layers": 3,
+        "length": 101,
+        "pos_emb": "rel-shared"
+      },
+      "s_trans_cfg": {
+        "dim": 3200,
+        "depth": 1,
+        "heads": 8,
+        "dim_head": 400,
+        "mlp_dim": 12800,
+        "dropout": 0.2,
+        "num_layers": 3,
+        "length": 26,
+        "pos_emb": "rel-shared"
+      },
+      "c_trans_cfg": {
+        "depth": 1,
+        "sm_dim": 800,
+        "sm_heads": 8,
+        "sm_dim_head": 100,
+        "sm_dropout": 0.2,
+        "lg_dim": 3200,
+        "lg_heads": 8,
+        "lg_dim_head": 400,
+        "lg_dropout": 0.2,
+        "num_layers": 1
+      },
+      "trans_mode": "None",
+      "pos_enc": "cossin",
+      "add_s_cls_token": true,
+      "add_t_cls_token": true,
+      "classifier_type": "CLS-POOL"
+    }
+  },
+  "TRAINING_SETTING": {
+    "world_size": 2,
+    "ddp": false,
+    "device": [
+      0,
+      1
+    ],
+    "batch_size": 2,
+    "test_batch_size": 2,
+    "start_epoch": 0,
+    "num_epoch": 50
+  },
+  "OPTIMIZER": {
+    "optimizer": "SGD",
+    "nesterov": true,
+    "base_lr": 0.01,
+    "weight_decay": 0.0001,
+    "eps": 0.0001
+  },
+  "SCHEDULER": {
+    "only_train_part": false,
+    "only_train_epoch": 5,
+    "warm_up_epoch": 5,
+    "step": [
+      30,
+      40
+    ],
+    "llrd_factor": 1.0,
+    "scheduler": null,
+    "anneal_strategy": "cos"
+  }
+}

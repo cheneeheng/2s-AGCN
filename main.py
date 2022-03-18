@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 # from __future__ import print_function
 
-import os
-import sys
 import argparse
-import yaml
+import json
+import os
 import random
+import sys
+import yaml
 
 import torch
-
 from torch.utils import tensorboard
 
 import torch.distributed as dist
@@ -49,8 +49,18 @@ if __name__ == '__main__':
     # load arg form config file
     p = parser.parse_args()
     if p.config is not None:
-        with open(p.config, 'r') as f:
-            default_arg = yaml.safe_load(f)
+        if ".yaml" in p.config:
+            with open(p.config, 'r') as f:
+                default_arg = yaml.safe_load(f)
+        elif ".json" in p.config:
+            with open(p.config, 'r') as f:
+                default_arg = json.load(f)
+            default_arg = {k: v
+                           for _, kv in default_arg.items()
+                           for k, v in kv.items()}
+        else:
+            raise ValueError("Unknown config format...")
+
         key = vars(p).keys()
         for k in default_arg.keys():
             if k not in key:
