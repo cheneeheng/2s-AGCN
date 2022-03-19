@@ -1038,3 +1038,4 @@ aagcn_v37:
 
         # nopad, 3ks, noaug, pool, syncbn
         - 220319103001_cossin_ddp_9l1cSE2_8gpu:
+                  - 69.2%

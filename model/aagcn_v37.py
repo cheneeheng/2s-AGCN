@@ -171,6 +171,7 @@ class Model(BaseModel):
                  gbn_split: Optional[int] = None,
                  # additional aagcn args
                  kernel_size: int = 9,
+                 stride: int = 3,
                  pad: bool = True,
                  backbone_dim: int = 16,
                  model_layers: int = 10,
@@ -214,15 +215,15 @@ class Model(BaseModel):
         self.init_graph(graph, graph_args)
 
         # 2. aagcn layer
-        def _TCNGCNUnit(_in, _out, stride=1, residual=True):
+        def _TCNGCNUnit(_in, _out, _stride=1, _residual=True):
             return TCNGCNUnit(_in,
                               _out,
                               self.graph.A,
                               num_subset=num_subset,
                               kernel_size=kernel_size,
-                              stride=kernel_size,
+                              stride=stride,
                               pad=pad,
-                              residual=residual,
+                              residual=_residual,
                               adaptive=self.adaptive_fn,
                               attention=attention,
                               gbn_split=gbn_split)
