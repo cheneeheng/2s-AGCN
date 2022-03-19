@@ -15,8 +15,8 @@ class Feeder(Dataset):
                  window_size=-1,
                  normalization=False,
                  random_zaxis_flip=False,
-                 random_xaxis_shift=False,
-                 random_yaxis_shift=False,
+                 random_xaxis_scale=False,
+                 random_yaxis_scale=False,
                  stretch=False,
                  debug=False,
                  use_mmap=True):
@@ -44,8 +44,8 @@ class Feeder(Dataset):
         self.window_size = window_size
         self.normalization = normalization
         self.random_zaxis_flip = random_zaxis_flip
-        self.random_xaxis_shift = random_xaxis_shift
-        self.random_yaxis_shift = random_yaxis_shift
+        self.random_xaxis_scale = random_xaxis_scale
+        self.random_yaxis_scale = random_yaxis_scale
         self.stretch = stretch
         self.use_mmap = use_mmap
         self.load_data()
