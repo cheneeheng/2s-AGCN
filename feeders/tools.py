@@ -61,10 +61,17 @@ def random_yaxis_scale(data_numpy, candidate=None):
     return random_axis_scale(data_numpy, candidate, 1)
 
 
+# def random_flip(data_numpy, channel):
+#     C, T, V, M = data_numpy.shape
+#     flip_idx = random.sample(range(0, T), T//2)
+#     data_numpy[channel, flip_idx, :, :] = -data_numpy[channel, flip_idx, :, :]
+#     return data_numpy
+
 def random_flip(data_numpy, channel):
     C, T, V, M = data_numpy.shape
-    flip_idx = random.sample(range(0, T), T//2)
-    data_numpy[channel, flip_idx, :, :] = -data_numpy[channel, flip_idx, :, :]
+    flip_prob = random.random()
+    if flip_prob > 0.5:
+        data_numpy[channel, :, :, :] = -data_numpy[channel, :, :, :]
     return data_numpy
 
 
