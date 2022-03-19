@@ -392,39 +392,37 @@ class BaseModel(nn.Module):
             Graph = import_class(graph)
             self.graph = Graph(**graph_args)
 
+    def init_empty_model_backbone(self) -> None:
+        self.l1 = lambda x: x
+        self.l2 = lambda x: x
+        self.l3 = lambda x: x
+        self.l4 = lambda x: x
+        self.l5 = lambda x: x
+        self.l6 = lambda x: x
+        self.l7 = lambda x: x
+        self.l8 = lambda x: x
+        self.l9 = lambda x: x
+        self.l10 = lambda x: x
+
     def init_original_model_backbone(self, model_layers, tcngcn_unit):
         if model_layers == 3:
             self.l1 = tcngcn_unit(3, 64, residual=False)
-            self.l2 = lambda x: x
-            self.l3 = lambda x: x
-            self.l4 = lambda x: x
             self.l5 = tcngcn_unit(64, 128, stride=2)
-            self.l6 = lambda x: x
-            self.l7 = lambda x: x
             self.l8 = tcngcn_unit(128, 256, stride=2)
-            self.l9 = lambda x: x
-            self.l10 = lambda x: x
         elif model_layers == 6:
             self.l1 = tcngcn_unit(3, 64, residual=False)
-            self.l2 = lambda x: x
-            self.l3 = lambda x: x
             self.l4 = tcngcn_unit(64, 64)
             self.l5 = tcngcn_unit(64, 128, stride=2)
-            self.l6 = lambda x: x
             self.l7 = tcngcn_unit(128, 128)
             self.l8 = tcngcn_unit(128, 256, stride=2)
-            self.l9 = lambda x: x
             self.l10 = tcngcn_unit(256, 256)
         elif model_layers == 7:
             self.l1 = tcngcn_unit(3, 64, residual=False)
-            self.l2 = lambda x: x
             self.l3 = tcngcn_unit(64, 64)
             self.l4 = tcngcn_unit(64, 64)
             self.l5 = tcngcn_unit(64, 128, stride=2)
-            self.l6 = lambda x: x
             self.l7 = tcngcn_unit(128, 128)
             self.l8 = tcngcn_unit(128, 256, stride=2)
-            self.l9 = lambda x: x
             self.l10 = tcngcn_unit(256, 256)
         elif model_layers == 10:
             self.l1 = tcngcn_unit(3, 64, residual=False)
@@ -441,70 +439,36 @@ class BaseModel(nn.Module):
             raise ValueError(
                 f"Model with {model_layers} layers is not supported.")
 
-    def init_model_backbone(self, model_layers, tcngcn_unit,
-                            output_channel=None):
-        if model_layers in [3, 6, 7, 10]:
+    def init_model_backbone(self,
+                            model_layers: int,
+                            tcngcn_unit: nn.Module,
+                            output_channel: int = None) -> None:
+        self.init_empty_model_backbone()
+        if model_layers == 0:
+            pass
+        elif model_layers in [3, 6, 7, 10]:
             self.init_original_model_backbone(model_layers, tcngcn_unit)
         elif model_layers == 101:
             c = output_channel if output_channel is not None else 64
             self.l1 = tcngcn_unit(3, c, residual=False)
-            self.l2 = lambda x: x
-            self.l3 = lambda x: x
-            self.l4 = lambda x: x
-            self.l5 = lambda x: x
-            self.l6 = lambda x: x
-            self.l7 = lambda x: x
-            self.l8 = lambda x: x
-            self.l9 = lambda x: x
-            self.l10 = lambda x: x
         elif model_layers == 102:
             c = output_channel if output_channel is not None else 64
             self.l1 = tcngcn_unit(3, c, residual=False)
             self.l2 = tcngcn_unit(c, c)
-            self.l3 = lambda x: x
-            self.l4 = lambda x: x
-            self.l5 = lambda x: x
-            self.l6 = lambda x: x
-            self.l7 = lambda x: x
-            self.l8 = lambda x: x
-            self.l9 = lambda x: x
-            self.l10 = lambda x: x
         elif model_layers == 103:
             c = output_channel if output_channel is not None else 64
             self.l1 = tcngcn_unit(3, c, residual=False)
             self.l2 = tcngcn_unit(c, c)
             self.l3 = tcngcn_unit(c, c)
-            self.l4 = lambda x: x
-            self.l5 = lambda x: x
-            self.l6 = lambda x: x
-            self.l7 = lambda x: x
-            self.l8 = lambda x: x
-            self.l9 = lambda x: x
-            self.l10 = lambda x: x
         elif model_layers == 1002:
             c = output_channel if output_channel is not None else 64
             self.l1 = tcngcn_unit(3, c, stride=1, padding=True, residual=False)
             self.l2 = tcngcn_unit(c, c)
-            self.l3 = lambda x: x
-            self.l4 = lambda x: x
-            self.l5 = lambda x: x
-            self.l6 = lambda x: x
-            self.l7 = lambda x: x
-            self.l8 = lambda x: x
-            self.l9 = lambda x: x
-            self.l10 = lambda x: x
         elif model_layers == 1003:
             c = output_channel if output_channel is not None else 64
             self.l1 = tcngcn_unit(3, c, stride=1, padding=True, residual=False)
             self.l2 = tcngcn_unit(c, c, stride=1, padding=True)
             self.l3 = tcngcn_unit(c, c)
-            self.l4 = lambda x: x
-            self.l5 = lambda x: x
-            self.l6 = lambda x: x
-            self.l7 = lambda x: x
-            self.l8 = lambda x: x
-            self.l9 = lambda x: x
-            self.l10 = lambda x: x
         else:
             raise ValueError(
                 f"Model with {model_layers} layers is not supported.")
