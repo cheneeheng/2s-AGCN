@@ -194,6 +194,8 @@ class Model(BaseModel):
         super().__init__(num_class, num_point, num_person,
                          in_channels, drop_out, adaptive, gbn_split)
 
+        _stride = stride
+
         # 0. setup
         if t_trans_cfg is not None:
             transformer_config_checker(t_trans_cfg)
@@ -215,15 +217,15 @@ class Model(BaseModel):
         self.init_graph(graph, graph_args)
 
         # 2. aagcn layer
-        def _TCNGCNUnit(_in, _out, _stride=1, _residual=True):
+        def _TCNGCNUnit(_in, _out, stride=1, residual=True):
             return TCNGCNUnit(_in,
                               _out,
                               self.graph.A,
                               num_subset=num_subset,
                               kernel_size=kernel_size,
-                              stride=stride,
+                              stride=_stride,
                               pad=pad,
-                              residual=_residual,
+                              residual=residual,
                               adaptive=self.adaptive_fn,
                               attention=attention,
                               gbn_split=gbn_split)
