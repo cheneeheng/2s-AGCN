@@ -41,7 +41,7 @@ def auto_pading(data_numpy, size, random_pad=False):
         return data_numpy
 
 
-def random_axis_shift(data_numpy, candidate, channel):
+def random_axis_scale(data_numpy, candidate, channel):
     C, T, V, M = data_numpy.shape
     S = np.random.choice(candidate, 1)
     distance = \
@@ -51,14 +51,14 @@ def random_axis_shift(data_numpy, candidate, channel):
     return data_numpy
 
 
-def random_xaxis_shift(data_numpy, candidate=None):
+def random_xaxis_scale(data_numpy, candidate=None):
     candidate = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5]
-    return random_axis_shift(data_numpy, candidate, 0)
+    return random_axis_scale(data_numpy, candidate, 0)
 
 
-def random_yaxis_shift(data_numpy, candidate=None):
+def random_yaxis_scale(data_numpy, candidate=None):
     candidate = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5]
-    return random_axis_shift(data_numpy, candidate, 1)
+    return random_axis_scale(data_numpy, candidate, 1)
 
 
 def random_flip(data_numpy, channel):
