@@ -1023,7 +1023,18 @@ aagcn_v37:
                   - ~70%
         - 220315153001_pool_cossin_ddp_syncbn_0001lr_6lSE2_adamw_clip:
                   - diverged
-        - 220315153001_pool_cossin_ddp_syncbn_00002lr_6lSE2_clip: (AdamW)
-        - 220315153001_pool_cossin_ddp_syncbn_00002lr_6lSE2_adamw_clip_coslr:
-        - 220315153001_pool_cossin_ddp_syncbn_00002lr_9lSE2_adamw_clip_coslr:
-        - 220315153001_pool_cossin_ddp_syncbn_00002lr_9l1cSE2_clip_coslr: (AdamW)
+        - 220315153001_pool_cossin_ddp_syncbn_00002lr_6lSE2_clip:
+                  - AdamW
+                  - diverged after 10 epoch
+        - 220315153001_pool_cossin_ddp_syncbn_00002lr_6lSE2_clip_coslr:
+                  - AdamW
+                  - diverged after 14 epochs
+        - 220315153001_pool_cossin_ddp_syncbn_00002lr_9lSE2_clip_coslr:
+                  - AdamW
+                  - diverged after 7 epochs
+        - 220315153001_pool_cossin_ddp_syncbn_00002lr_9l1cSE2_clip_coslr:
+                  - AdamW
+                  - diverged after 4 epochs
+
+        # nopad, 3ks, noaug, pool, syncbn
+        - 220319103001_cossin_ddp_9l1cSE2_8gpu:

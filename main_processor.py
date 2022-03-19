@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # from __future__ import print_function
 
+import json
 import inspect
 import numpy as np
 import os
@@ -73,8 +74,14 @@ class Processor():
             arg_dict = vars(self.arg)
             if not os.path.exists(self.arg.work_dir):
                 os.makedirs(self.arg.work_dir)
-            with open(f'{self.arg.work_dir}/config.yaml', 'w') as f:
-                yaml.dump(arg_dict, f)
+            if ".yaml" in self.arg.config:
+                with open(f'{self.arg.work_dir}/config.yaml', 'w') as f:
+                    yaml.dump(arg_dict, f)
+            elif ".json" in self.arg.config:
+                with open(f'{self.arg.work_dir}/config.json', 'w') as f:
+                    json.dump(arg_dict, f)
+            else:
+                raise ValueError("Unknown config format...")
 
     # **************************************************************************
     # LOADERS

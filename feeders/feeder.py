@@ -21,16 +21,18 @@ class Feeder(Dataset):
                  debug=False,
                  use_mmap=True):
         """
-
         :param data_path:
         :param label_path:
-        :param random_choose: If true, randomly choose a portion of the input sequence
-        :param random_shift: If true, randomly pad zeros at the begining or end of sequence
+        :param random_choose: If true, randomly choose a portion of the
+        input sequence
+        :param random_shift: If true, randomly pad zeros at the begining or
+        end of sequence
         :param random_move:
         :param window_size: The length of the output sequence
         :param normalization: If true, normalize input sequence
         :param debug: If true, only use the first 100 samples
-        :param use_mmap: If true, use mmap mode to load data, which can save the running memory
+        :param use_mmap: If true, use mmap mode to load data, which can save
+        the running memory
         """
 
         self.debug = debug
@@ -55,11 +57,13 @@ class Feeder(Dataset):
         try:
             with open(self.label_path) as f:
                 self.sample_name, self.label = pickle.load(f)
-        except:
+        except UnicodeDecodeError:
             # for pickle file from python2
             with open(self.label_path, 'rb') as f:
                 self.sample_name, self.label = pickle.load(
                     f, encoding='latin1')
+        else:
+            raise ValueError("label data cannot be opened...")
 
         # load data
         if self.use_mmap:
@@ -74,9 +78,11 @@ class Feeder(Dataset):
     def get_mean_map(self):
         data = self.data
         N, C, T, V, M = data.shape
-        self.mean_map = data.mean(axis=2, keepdims=True).mean(
-            axis=4, keepdims=True).mean(axis=0)
-        self.std_map = data.transpose((0, 2, 4, 1, 3)).reshape(
+        self.mean_map = data.mean(
+            axis=2, keepdims=True).mean(
+            axis=4, keepdims=True).mean(
+            axis=0, keepdims=False)
+        self.std_map = data.transpose(s(0, 2, 4, 1, 3)).reshape(
             (N * T * M, C * V)).std(axis=0).reshape((C, 1, V, 1))
 
     def __len__(self):
@@ -104,10 +110,10 @@ class Feeder(Dataset):
             data_numpy = tools.random_move(data_numpy)
         if self.random_zaxis_flip:
             data_numpy = tools.random_zaxis_flip(data_numpy)
-        if self.random_xaxis_shift:
-            data_numpy = tools.random_xaxis_shift(data_numpy)
-        if self.random_yaxis_shift:
-            data_numpy = tools.random_yaxis_shift(data_numpy)
+        if self.random_xaxis_scale:
+            data_numpy = tools.random_xaxis_scale(data_numpy)
+        if self.random_yaxis_scale:
+            data_numpy = tools.random_yaxis_scale(data_numpy)
 
         return data_numpy, label, index
 
@@ -128,12 +134,12 @@ def import_class(name):
 def test(data_path, label_path, vid=None, graph=None, is_3d=False):
     '''
     vis the samples using matplotlib
-    :param data_path: 
-    :param label_path: 
+    :param data_path:
+    :param label_path:
     :param vid: the id of sample
-    :param graph: 
+    :param graph:
     :param is_3d: when vis NTU, set it True
-    :return: 
+    :return:
     '''
     import matplotlib.pyplot as plt
     loader = torch.utils.data.DataLoader(
@@ -164,7 +170,8 @@ def test(data_path, label_path, vid=None, graph=None, is_3d=False):
             p_type = ['b.', 'g.', 'r.', 'c.',
                       'm.', 'y.', 'k.', 'k.', 'k.', 'k.']
             pose = [
-                ax.plot(np.zeros(V), np.zeros(V), p_type[m])[0] for m in range(M)
+                ax.plot(np.zeros(V), np.zeros(V), p_type[m])[0]
+                for m in range(M)
             ]
             ax.axis([-1, 1, -1, 1])
             for t in range(T):
@@ -179,7 +186,14 @@ def test(data_path, label_path, vid=None, graph=None, is_3d=False):
             import sys
             from os import path
             sys.path.append(
-                path.dirname(path.dirname(path.dirname(path.abspath(__file__)))))
+                path.dirname(
+                    path.dirname(
+                        path.dirname(
+                            path.abspath(__file__)
+                        )
+                    )
+                )
+            )
             G = import_class(graph)()
             edge = G.inward
             pose = []
@@ -201,14 +215,13 @@ def test(data_path, label_path, vid=None, graph=None, is_3d=False):
                     for i, (v1, v2) in enumerate(edge):
                         x1 = data[0, :2, t, v1, m]
                         x2 = data[0, :2, t, v2, m]
-                        if (x1.sum() != 0 and x2.sum() != 0) or v1 == 1 or v2 == 1:
+                        if (x1.sum() != 0 and x2.sum() != 0) or v1 == 1 or v2 == 1:  # noqa
                             pose[m][i].set_xdata(data[0, 0, t, [v1, v2], m])
                             pose[m][i].set_ydata(data[0, 1, t, [v1, v2], m])
                             if is_3d:
                                 pose[m][i].set_3d_properties(
                                     data[0, 2, t, [v1, v2], m])
                 fig.canvas.draw()
-                # plt.savefig('/home/lshi/Desktop/skeleton_sequence/' + str(t) + '.jpg')
                 plt.pause(0.01)
 
 
@@ -219,7 +232,8 @@ if __name__ == '__main__':
     data_path = "./data/ntu/xview/val_data_joint.npy"
     label_path = "./data/ntu/xview/val_label.pkl"
     graph = 'graph.ntu_rgb_d.Graph'
-    test(data_path, label_path, vid='S004C001P003R001A032', graph=graph, is_3d=True)
+    test(data_path, label_path, vid='S004C001P003R001A032', graph=graph,
+         is_3d=True)
     # data_path = "../data/kinetics/val_data.npy"
     # label_path = "../data/kinetics/val_label.pkl"
     # graph = 'graph.Kinetics'
