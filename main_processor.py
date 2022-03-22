@@ -450,7 +450,7 @@ class Processor():
                 # backward
                 self.optimizer.zero_grad()
                 loss.backward()
-                # nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+                nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
                 if zero_grad_PA:
                     for name, param in self.model.named_parameters():
                         if 'PA' in name:

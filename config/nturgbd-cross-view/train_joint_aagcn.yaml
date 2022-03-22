@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_joint/220315183001_ddp_syncbn
-model_saved_name: ./data/data/ntu_result/xview/aagcn_joint/220315183001_ddp_syncbn/ntu_cv_aagcn_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_joint/220315183001_ddp_syncbn_epochupdate_01lr_coslr
+model_saved_name: ./data/data/ntu_result/xview/aagcn_joint/220315183001_ddp_syncbn_epochupdate_01lr_coslr/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
@@ -57,15 +57,20 @@ test_batch_size: 32
 
 optimizer: SGD
 nesterov: True
-base_lr: 0.01
+base_lr: 0.1
 step: [30, 40]
 weight_decay: 0.0001
+
+llrd_factor: 1.0
+scheduler: onecyclelr
+anneal_strategy: cos
+eps: 0.0001
 
 start_epoch: 0
 num_epoch: 50
 warm_up_epoch: 5
 
-only_train_part: True
+only_train_part: False
 only_train_epoch: 5
 
 world_size: 2
