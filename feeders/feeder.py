@@ -17,7 +17,7 @@ class Feeder(Dataset):
                  random_zaxis_flip=False,
                  random_xaxis_scale=False,
                  random_yaxis_scale=False,
-                 random_subsample=False,
+                 random_subsample=None,
                  stretch=False,
                  debug=False,
                  use_mmap=True):
@@ -84,7 +84,7 @@ class Feeder(Dataset):
             axis=2, keepdims=True).mean(
             axis=4, keepdims=True).mean(
             axis=0, keepdims=False)
-        self.std_map = data.transpose(s(0, 2, 4, 1, 3)).reshape(
+        self.std_map = data.transpose((0, 2, 4, 1, 3)).reshape(
             (N * T * M, C * V)).std(axis=0).reshape((C, 1, V, 1))
 
     def __len__(self):
@@ -116,9 +116,10 @@ class Feeder(Dataset):
             data_numpy = tools.random_xaxis_scale(data_numpy)
         if self.random_yaxis_scale:
             data_numpy = tools.random_yaxis_scale(data_numpy)
-        if self.random_subsample:
-            freq = 20.0
-            data_numpy = tools.random_subsample(data_numpy, freq)
+        if self.random_subsample is not None:
+            assert self.random_subsample > 0 and self.random_subsample < 300
+            data_numpy = tools.random_subsample(
+                data_numpy, self.random_subsample)
 
         return data_numpy, label, index
 
