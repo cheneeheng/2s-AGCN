@@ -1,6 +1,5 @@
 import random
 
-import torch
 import numpy as np
 from scipy import interpolate
 
@@ -151,41 +150,42 @@ def random_move(data_numpy,
 
 
 def _rot(rot):
-    cos_r, sin_r = rot.cos(), rot.sin()
-    zeros = rot.new(rot.size()[:2] + (1,)).zero_()
-    ones = rot.new(rot.size()[:2] + (1,)).fill_(1)
+    cos_r, sin_r = np.cos(rot), np.sin(rot)
+    zeros = np.zeros(rot.shape[:2] + (1,))
+    ones = np.ones(rot.shape[:2] + (1,))
 
-    r1 = torch.stack((ones, zeros, zeros), dim=-1)
-    rx2 = torch.stack((zeros, cos_r[:, :, 0:1], sin_r[:, :, 0:1]), dim=-1)
-    rx3 = torch.stack((zeros, -sin_r[:, :, 0:1], cos_r[:, :, 0:1]), dim=-1)
-    rx = torch.cat((r1, rx2, rx3), dim=2)
+    r1 = np.stack((ones, zeros, zeros), axis=-1)
+    rx2 = np.stack((zeros, cos_r[:, :, 0:1], sin_r[:, :, 0:1]), axis=-1)
+    rx3 = np.stack((zeros, -sin_r[:, :, 0:1], cos_r[:, :, 0:1]), axis=-1)
+    rx = np.concatenate((r1, rx2, rx3), axis=2)
 
-    ry1 = torch.stack((cos_r[:, :, 1:2], zeros, -sin_r[:, :, 1:2]), dim=-1)
-    r2 = torch.stack((zeros, ones, zeros), dim=-1)
-    ry3 = torch.stack((sin_r[:, :, 1:2], zeros, cos_r[:, :, 1:2]), dim=-1)
-    ry = torch.cat((ry1, r2, ry3), dim=2)
+    ry1 = np.stack((cos_r[:, :, 1:2], zeros, -sin_r[:, :, 1:2]), axis=-1)
+    r2 = np.stack((zeros, ones, zeros), axis=-1)
+    ry3 = np.stack((sin_r[:, :, 1:2], zeros, cos_r[:, :, 1:2]), axis=-1)
+    ry = np.concatenate((ry1, r2, ry3), axis=2)
 
-    rz1 = torch.stack((cos_r[:, :, 2:3], sin_r[:, :, 2:3], zeros), dim=-1)
-    r3 = torch.stack((zeros, zeros, ones), dim=-1)
-    rz2 = torch.stack((-sin_r[:, :, 2:3], cos_r[:, :, 2:3], zeros), dim=-1)
-    rz = torch.cat((rz1, rz2, r3), dim=2)
+    rz1 = np.stack((cos_r[:, :, 2:3], sin_r[:, :, 2:3], zeros), axis=-1)
+    r3 = np.stack((zeros, zeros, ones), axis=-1)
+    rz2 = np.stack((-sin_r[:, :, 2:3], cos_r[:, :, 2:3], zeros), axis=-1)
+    rz = np.concatenate((rz1, rz2, r3), axis=2)
 
-    rot = rz.matmul(ry).matmul(rx)
+    # rot = rz.matmul(ry).matmul(rx)
+    rot = np.matmul(np.matmul(rz, ry), rx)
     return rot
 
 
 # https://github.com/microsoft/SGN/blob/master/data.py
 def random_rotation(x, theta=0.5):
     # x: N,T'(m is merged into it), vc = n,t,vc
-    x = x.contiguous().view(x.size()[:2] + (-1, 3))  # n,t,v,c
-    rot = x.new(x.size()[0], 3).uniform_(-theta, theta)
-    rot = rot.repeat(1, x.size()[1])
-    rot = rot.contiguous().view((-1, x.size()[1], 3))
+    x = x.reshape(x.shape[:2] + (-1, 3))
+    rot = np.random.uniform(-theta, theta, (x.shape[0], 3))
+    rot = np.tile(rot, (1, x.shape[1]))
+    rot = rot.reshape((-1, x.shape[1], 3))
     rot = _rot(rot)
-    x = torch.transpose(x, 2, 3)
-    x = torch.matmul(rot, x)
-    x = torch.transpose(x, 2, 3)
-    x = x.contiguous().view(x.size()[:2] + (-1,))
+    x = np.transpose(x, (0, 1, 3, 2))
+    x = np.matmul(rot, x)
+    x = np.transpose(x, (0, 1, 3, 2))
+    x = x.reshape(x.shape[:2] + (-1,))
     return x
 
 

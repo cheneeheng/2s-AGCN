@@ -126,9 +126,9 @@ class Feeder(Dataset):
                 data_numpy, self.random_subsample)
         if self.random_rotation:
             if 'NTU60' in self.dataset:
-                if 'cs' in self.dataset:
+                if 'CS' in self.dataset:
                     theta = 0.3
-                elif 'cv' in self.dataset:
+                elif 'CV' in self.dataset:
                     theta = 0.5
             elif 'NTU120' in self.dataset:
                 theta = 0.3
