@@ -1,12 +1,15 @@
 import numpy as np
 
 from data_gen.ntu_gendata import get_nonzero_std
-from data_gen.preprocess import pre_normalization
 
 
 class DataPreprocessor(object):
 
-    def __init__(self, num_joint=25, max_seq_length=300, max_person=4) -> None:
+    def __init__(self,
+                 num_joint: int = 25,
+                 max_seq_length: int = 300,
+                 max_person: int = 4,
+                 preprocess_fn=None) -> None:
         super().__init__()
         self.num_joint = num_joint
         self.max_seq_length = max_seq_length
@@ -14,6 +17,7 @@ class DataPreprocessor(object):
         self.data_counter = 0
         self.max_person = max_person
         self.clear_data_array()
+        self.preprocess_fn = preprocess_fn
 
     def clear_data_array(self) -> None:
         """
@@ -53,7 +57,7 @@ class DataPreprocessor(object):
         if data.ndim == 4:
             data = np.expand_dims(data, axis=0)
         data = np.transpose(data, [0, 4, 2, 3, 1])  # N, C, T, V, M
-        data = pre_normalization(data, verbose=verbose, tqdm=False)
+        data = self.preprocess_fn(data)
         data = np.transpose(data, [0, 4, 2, 3, 1])  # N, M, T, V, C
         return data
 

@@ -9,6 +9,7 @@ class Feeder(Dataset):
     def __init__(self,
                  data_path,
                  label_path,
+                 dataset='NTU60-CV',
                  random_choose=False,
                  random_shift=False,
                  random_move=False,
@@ -18,6 +19,7 @@ class Feeder(Dataset):
                  random_xaxis_scale=False,
                  random_yaxis_scale=False,
                  random_subsample=None,
+                 random_rotation=False,
                  stretch=False,
                  debug=False,
                  use_mmap=True):
@@ -39,6 +41,7 @@ class Feeder(Dataset):
         self.debug = debug
         self.data_path = data_path
         self.label_path = label_path
+        self.dataset = dataset
         self.random_choose = random_choose
         self.random_shift = random_shift
         self.random_move = random_move
@@ -48,6 +51,7 @@ class Feeder(Dataset):
         self.random_xaxis_scale = random_xaxis_scale
         self.random_yaxis_scale = random_yaxis_scale
         self.random_subsample = random_subsample
+        self.random_rotation = random_rotation
         self.stretch = stretch
         self.use_mmap = use_mmap
         self.load_data()
@@ -120,6 +124,17 @@ class Feeder(Dataset):
             assert self.random_subsample > 0 and self.random_subsample < 300
             data_numpy = tools.random_subsample(
                 data_numpy, self.random_subsample)
+        if self.random_rotation:
+            if 'NTU60' in self.dataset:
+                if 'cs' in self.dataset:
+                    theta = 0.3
+                elif 'cv' in self.dataset:
+                    theta = 0.5
+            elif 'NTU120' in self.dataset:
+                theta = 0.3
+            else:
+                theta = 0.3
+            data_numpy = tools.random_rotation(data_numpy, theta)
 
         return data_numpy, label, index
 

@@ -1076,3 +1076,6 @@ aagcn_v37:
         - 220319103001_cossin_ddp_9l1cSE5_0bb_01lr:
                   - 8 heads, no dim shrink, 4 depth for t
                   - 88.9%
+        - 220319103001_cossin_ddp_9l1cSE6_0bb_01lr_subsample20:
+                  - 6 heads, no dim change
+                  - 83.7%

@@ -16,6 +16,7 @@ from data_gen.ntu_gendata import (
     num_joint
 )
 from infer.data_preprocess import DataPreprocessor
+from data_gen.preprocess import pre_normalization
 from data_gen.ntu_gendata import read_xyz as reader
 from main_utils import get_parser, import_class, init_seed
 
@@ -60,15 +61,6 @@ def prepare_model(arg):
     return AAGCN
 
 
-def append_data(data: np.ndarray, preprocessor: DataPreprocessor) -> None:
-    """
-    Args:
-        data (np.ndarray): (M, 1, V, C)
-    """
-    # 1. Batch frames to fixed length.
-    preprocessor.append_data(data)
-
-
 def predict(preprocessor: DataPreprocessor,
             model: torch.nn.Module,
             num_skels: int) -> Tuple[list, int]:
@@ -93,22 +85,6 @@ def predict(preprocessor: DataPreprocessor,
             _, predict_label = torch.max(output, 1)
 
     return output.tolist(), predict_label.item()
-
-
-def append_data_and_predict(data: np.ndarray,
-                            preprocessor: DataPreprocessor,
-                            model: torch.nn.Module,
-                            num_skels: int) -> Tuple[list, int]:
-    """
-    Args:
-        data (np.ndarray): (M, 1, V, C)
-    """
-    # 1. Batch frames to fixed length.
-    append_data(data, preprocessor)
-
-    # 2. Normalization.
-    # 3. Inference.
-    return predict(preprocessor, model, num_skels)
 
 
 if __name__ == '__main__':
@@ -159,20 +135,19 @@ if __name__ == '__main__':
     os.makedirs(output_dir, exist_ok=True)
 
     # Data processor -----------------------------------------------------------
+    preprocess_fn = partial(pre_normalization, zaxis2=[8, 1], xaxis=[2, 5],
+                            verbose=False, tqdm=False)
+
     DataProc = DataPreprocessor(num_joint=arg.num_joint,
                                 max_seq_length=arg.max_frame,
-                                max_person=arg.max_num_skeleton)
+                                max_person=arg.max_num_skeleton,
+                                preprocess_fn=preprocess_fn)
 
     # Prepare model ------------------------------------------------------------
     AAGCN = prepare_model(arg)
     if arg.gpu:
         AAGCN = AAGCN.cuda(0)
     print("Model loaded...")
-
-    append_data_and_predict_fn = partial(append_data_and_predict,
-                                         preprocessor=DataProc,
-                                         model=AAGCN,
-                                         num_skels=arg.max_num_skeleton_true)
 
     # MAIN LOOP ----------------------------------------------------------------
     start = time.time()
@@ -213,12 +188,12 @@ if __name__ == '__main__':
             data = read_xyz(os.path.join(skel_dir, skel_file),
                             max_body=arg.max_num_skeleton,
                             num_joint=arg.num_joint)
-            append_data(data=data, preprocessor=DataProc)
+            # Batch frames to fixed length.
+            DataProc.append_data(data)
 
         # 2. Batch frames to fixed length. -------------------------------------
         # 3. Normalization. ----------------------------------------------------
         # 4. Inference. --------------------------------------------------------
-        # logits, pred = append_data_and_predict_fn(data=data)
         logits, pred = predict(preprocessor=DataProc,
                                model=AAGCN,
                                num_skels=arg.max_num_skeleton_true)
