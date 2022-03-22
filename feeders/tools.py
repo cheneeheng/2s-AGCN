@@ -164,6 +164,16 @@ def random_shift(data_numpy):
     return data_shift
 
 
+# https://github.com/microsoft/SGN/blob/master/data/ntu/seq_transformation.py
+def random_subsample(data_numpy, freq):
+    C, T, V, M = data_numpy.shape
+    data = T // freq
+    offsets = \
+        np.multiply(list(range(freq)), data) + \
+        np.random.randint(data, size=freq)
+    data = data_numpy[:, offsets, :, :]
+
+
 def stretch_to_maximum_length(data_numpy):
     C, T, V, M = data_numpy.shape
     t_last = T - np.where(np.flip(data_numpy.sum((0, 2, 3))) != 0.0)[0][0]

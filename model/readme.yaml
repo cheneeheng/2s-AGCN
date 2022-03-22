@@ -1,4 +1,4 @@
-aagcn:
+/aagcn:
         - xsub:
                   - ./data/data/openpose_b25_j15_ntu_result/xview/aagcn_joint/220314090001
                   - 85.6%
@@ -1038,7 +1038,41 @@ aagcn_v37:
 
         # nopad, 3ks, noaug, pool, syncbn
         - 220319103001_cossin_ddp_9l1cSE2_8gpu:
+                  - 6 heads, shrink s by 4, no shrink t
                   - 69.2%
         - 220319103001_cossin_ddp_9l1cSE2:
+                  - 79.8%
         - 220319103001_cossin_ddp_9l3cSE2:
+                  - 80.1%
         - 220319103001_cossin_ddp_9l1cSE2_aug:
+                  - 61.2%
+        - 220319103001_cossin_ddp_3l1cSE2_0bb:
+                  - 76.0%
+                  - base_lr = 0.002
+        - 220319103001_cossin_ddp_3l1cSE2_0bb_002lr:
+                  - 86.6%
+        - 220319103001_cossin_ddp_3l1cSE2_0bb_01lr:
+                  - 88.5%
+        - 220319103001_cossin_ddp_9l3cSE2_0bb_01lr:
+                  - 89.2%
+        - 220319103001_cossin_ddp_9l1cSE2_0bb_01lr:
+                  - 89.5%
+        - 220319103001_cossin_ddp_9l1cSE2_0bb_01lr_coslr:
+                  - 89.6%
+        - 220319103001_cossin_ddp_9l1cSE2_0bb_001lr_coslr:
+                  - 85.9%
+        - 220319103001_cossin_ddp_9l1cSE3_0bb_01lr:
+                  - 8 heads, no dim shrink for s, but expand for t
+                  - 89.7%
+        - 220319103001_cossin_ddp_18l2cSE4_0bb_01lr:
+                  - 8 heads, no dim shrink (dim head for t is 25)
+                  - 86.8%
+        - 220319103001_cossin_ddp_9l1cSE4_0bb_01lr:
+                  - 89.9%
+        - 220319103001_cossin_ddp_9l1cSE4_0bb_01lr_0drop:
+                  - 90.2%
+        - 220319103001_cossin_ddp_9l1cSE4_0bb_01lr_01drop:
+                  - 90.0%
+        - 220319103001_cossin_ddp_9l1cSE5_0bb_01lr:
+                  - 8 heads, no dim shrink, 4 depth for t
+                  - 88.9%

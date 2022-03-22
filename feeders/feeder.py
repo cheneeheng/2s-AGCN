@@ -17,6 +17,7 @@ class Feeder(Dataset):
                  random_zaxis_flip=False,
                  random_xaxis_scale=False,
                  random_yaxis_scale=False,
+                 random_subsample=False,
                  stretch=False,
                  debug=False,
                  use_mmap=True):
@@ -46,6 +47,7 @@ class Feeder(Dataset):
         self.random_zaxis_flip = random_zaxis_flip
         self.random_xaxis_scale = random_xaxis_scale
         self.random_yaxis_scale = random_yaxis_scale
+        self.random_subsample = random_subsample
         self.stretch = stretch
         self.use_mmap = use_mmap
         self.load_data()
@@ -114,6 +116,9 @@ class Feeder(Dataset):
             data_numpy = tools.random_xaxis_scale(data_numpy)
         if self.random_yaxis_scale:
             data_numpy = tools.random_yaxis_scale(data_numpy)
+        if self.random_subsample:
+            freq = 20.0
+            data_numpy = tools.random_subsample(data_numpy, freq)
 
         return data_numpy, label, index
 
