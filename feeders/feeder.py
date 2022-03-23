@@ -1,8 +1,17 @@
 import numpy as np
+import os
 import pickle
+import time
+
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader, DistributedSampler
+
 from feeders import tools
+from feeders.sgn_dataloader import NTUDataLoaders, _transform
+
+from main_utils import init_seed
+
+from utils.visualization import visualize_3dskeleton_in_matplotlib
 
 
 class Feeder(Dataset):
@@ -132,8 +141,6 @@ class Feeder(Dataset):
                     theta = 0.5
             elif 'NTU120' in self.dataset:
                 theta = 0.3
-            else:
-                theta = 0.3
             data_numpy = tools.random_rotation(data_numpy, theta)
 
         return data_numpy, label, index
@@ -142,6 +149,48 @@ class Feeder(Dataset):
         rank = score.argsort()
         hit_top_k = [l in rank[i, -top_k:] for i, l in enumerate(self.label)]
         return sum(hit_top_k) * 1.0 / len(hit_top_k)
+
+
+class FeederDataLoader(NTUDataLoaders):
+    def __init__(self, dataset='NTU60-CV', aug=1, seg=30):
+        if 'CS' in dataset:
+            case = 0
+        elif 'CV' in dataset:
+            case = 1
+        else:
+            case = -1
+        super(FeederDataLoader, self).__init__(dataset, case, aug, seg)
+
+    def get_loader(self,
+                   feeder: Dataset,
+                   world_size: int = 1,
+                   rank: int = 0,
+                   ddp: bool = False,
+                   shuffle_ds: bool = False,
+                   shuffle_dl: bool = False,
+                   batch_size: int = 1,
+                   num_worker: int = 1,
+                   drop_last: bool = False,
+                   worker_init_fn=None,
+                   collate_fn: str = None
+                   ):
+        data_sampler = DistributedSampler(
+            dataset=feeder,
+            num_replicas=world_size,
+            rank=rank,
+            shuffle=shuffle_ds
+        ) if ddp else None
+        data_loader = DataLoader(
+            dataset=feeder,
+            batch_size=batch_size,
+            shuffle=shuffle_dl,
+            sampler=data_sampler,
+            num_workers=num_worker,
+            drop_last=drop_last,
+            worker_init_fn=worker_init_fn,
+            collate_fn=collate_fn
+        )
+        return data_loader
 
 
 def import_class(name):
@@ -162,7 +211,6 @@ def test(data_path, label_path, vid=None, graph=None, is_3d=False):
     :param is_3d: when vis NTU, set it True
     :return:
     '''
-    import matplotlib.pyplot as plt
     loader = torch.utils.data.DataLoader(
         dataset=Feeder(data_path, label_path),
         batch_size=64,
@@ -175,87 +223,60 @@ def test(data_path, label_path, vid=None, graph=None, is_3d=False):
         index = sample_id.index(vid)
         data, label, index = loader.dataset[index]
         data = data.reshape((1,) + data.shape)
-
-        # for batch_idx, (data, label) in enumerate(loader):
-        N, C, T, V, M = data.shape
-
-        plt.ion()
-        fig = plt.figure()
-        if is_3d:
-            from mpl_toolkits.mplot3d import Axes3D
-            ax = fig.add_subplot(111, projection='3d')
-        else:
-            ax = fig.add_subplot(111)
-
-        if graph is None:
-            p_type = ['b.', 'g.', 'r.', 'c.',
-                      'm.', 'y.', 'k.', 'k.', 'k.', 'k.']
-            pose = [
-                ax.plot(np.zeros(V), np.zeros(V), p_type[m])[0]
-                for m in range(M)
-            ]
-            ax.axis([-1, 1, -1, 1])
-            for t in range(T):
-                for m in range(M):
-                    pose[m].set_xdata(data[0, 0, t, :, m])
-                    pose[m].set_ydata(data[0, 1, t, :, m])
-                fig.canvas.draw()
-                plt.pause(0.001)
-        else:
-            p_type = ['b-', 'g-', 'r-', 'c-',
-                      'm-', 'y-', 'k-', 'k-', 'k-', 'k-']
-            import sys
-            from os import path
-            sys.path.append(
-                path.dirname(
-                    path.dirname(
-                        path.dirname(
-                            path.abspath(__file__)
-                        )
-                    )
-                )
-            )
-            G = import_class(graph)()
-            edge = G.inward
-            pose = []
-            for m in range(M):
-                a = []
-                for i in range(len(edge)):
-                    if is_3d:
-                        a.append(
-                            ax.plot(np.zeros(3), np.zeros(3), p_type[m])[0])
-                    else:
-                        a.append(
-                            ax.plot(np.zeros(2), np.zeros(2), p_type[m])[0])
-                pose.append(a)
-            ax.axis([-1, 1, -1, 1])
-            if is_3d:
-                ax.set_zlim3d(-1, 1)
-            for t in range(T):
-                for m in range(M):
-                    for i, (v1, v2) in enumerate(edge):
-                        x1 = data[0, :2, t, v1, m]
-                        x2 = data[0, :2, t, v2, m]
-                        if (x1.sum() != 0 and x2.sum() != 0) or v1 == 1 or v2 == 1:  # noqa
-                            pose[m][i].set_xdata(data[0, 0, t, [v1, v2], m])
-                            pose[m][i].set_ydata(data[0, 1, t, [v1, v2], m])
-                            if is_3d:
-                                pose[m][i].set_3d_properties(
-                                    data[0, 2, t, [v1, v2], m])
-                fig.canvas.draw()
-                plt.pause(0.01)
+        visualize_3dskeleton_in_matplotlib(data, graph, is_3d)
 
 
 if __name__ == '__main__':
-    import os
 
-    os.environ['DISPLAY'] = 'localhost:10.0'
-    data_path = "./data/ntu/xview/val_data_joint.npy"
-    label_path = "./data/ntu/xview/val_label.pkl"
-    graph = 'graph.ntu_rgb_d.Graph'
-    test(data_path, label_path, vid='S004C001P003R001A032', graph=graph,
-         is_3d=True)
+    # import os
+    # os.environ['DISPLAY'] = 'localhost:10.0'
+
+    data_path = "./data/data/ntu_nopad/xview/val_data_joint.npy"
+    label_path = "./data/data/ntu_nopad/xview/val_label.pkl"
+    # graph = 'graph.ntu_rgb_d.Graph'
+    # test(data_path, label_path, vid='S004C001P003R001A032', graph=graph,
+    #      is_3d=True)
+
     # data_path = "../data/kinetics/val_data.npy"
     # label_path = "../data/kinetics/val_label.pkl"
     # graph = 'graph.Kinetics'
     # test(data_path, label_path, vid='UOD7oll3Kqo', graph=graph)
+
+    # s = time.time()
+    # collate_fn = None
+    # loader = FeederDataLoader(dataset='NTU60-CV').get_loader(
+    #     feeder=Feeder(data_path, label_path,
+    #                   dataset='NTU60-CV', random_rotation=True),
+    #     batch_size=1,
+    #     num_worker=1,
+    #     drop_last=False,
+    #     collate_fn=collate_fn,
+    #     worker_init_fn=init_seed
+    # )
+    # for batch_idx, (data, label, idx) in enumerate(loader):
+    #     # print("-"*80)
+    #     break
+    #     if batch_idx > 1000:
+    #         print(data.shape)
+    #         break
+    # print("No-collate", (time.time()-s) / 1000)
+
+    # s = time.time()
+    # collate_fn = FeederDataLoader(
+    #     dataset='NTU60-CV', seg=300).collate_fn_fix_train
+    # loader = FeederDataLoader(dataset='NTU60-CV').get_loader(
+    #     feeder=Feeder(data_path, label_path,
+    #                   dataset='NTU60-CV', random_rotation=False),
+    #     batch_size=1,
+    #     num_worker=1,
+    #     drop_last=False,
+    #     collate_fn=collate_fn,
+    #     worker_init_fn=init_seed
+    # )
+    # for batch_idx, (data, label, idx) in enumerate(loader):
+    #     # print("-"*80)
+    #     break
+    #     if batch_idx > 1000:
+    #         print(data.shape)
+    #         break
+    # print("---Collate", (time.time()-s) / 1000)

@@ -23,6 +23,8 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader, DistributedSampler
 from tqdm import tqdm
 
+from feeders.feeder import FeederDataLoader
+
 from sam.sam.sam import SAM
 from sam.sam.example.utility.bypass_bn import enable_running_stats
 from sam.sam.example.utility.bypass_bn import disable_running_stats
@@ -262,37 +264,33 @@ class Processor():
         if self.arg.phase == 'train':
             assert os.path.exists(self.arg.train_feeder_args['data_path'])
             assert os.path.exists(self.arg.train_feeder_args['label_path'])
-            training_set = Feeder(**self.arg.train_feeder_args)
-            train_data_sampler = DistributedSampler(
-                dataset=training_set,
-                num_replicas=self.arg.world_size,
+            data_loader = FeederDataLoader(
+                dataset=self.arg.train_feeder_args.get('dataset', None))
+            self.data_loader['train'] = data_loader.get_loader(
+                feeder=Feeder(**self.arg.train_feeder_args),
+                world_size=self.arg.world_size,
                 rank=self.rank,
-                shuffle=True
-            ) if self.arg.ddp else None
-            self.data_loader['train'] = DataLoader(
-                dataset=training_set,
+                ddp=self.arg.ddp,
+                shuffle_ds=True,
+                shuffle_dl=not self.arg.ddp,
                 batch_size=self.arg.batch_size,
-                shuffle=(train_data_sampler is None),
-                sampler=train_data_sampler,
-                num_workers=self.arg.num_worker,
+                num_worker=self.arg.num_worker,
                 drop_last=True,
-                worker_init_fn=init_seed
+                worker_init_fn=init_seed,
             )
-        testing_set = Feeder(**self.arg.test_feeder_args)
-        test_data_sampler = DistributedSampler(
-            dataset=testing_set,
-            num_replicas=self.arg.world_size,
+        data_loader = FeederDataLoader(
+            dataset=self.arg.test_feeder_args.get('dataset', None))
+        self.data_loader['test'] = data_loader.get_loader(
+            feeder=Feeder(**self.arg.test_feeder_args),
+            world_size=self.arg.world_size,
             rank=self.rank,
-            shuffle=False,
-        ) if self.arg.ddp else None
-        self.data_loader['test'] = DataLoader(
-            dataset=testing_set,
+            ddp=self.arg.ddp,
+            shuffle_ds=False,
+            shuffle_dl=False,
             batch_size=self.arg.test_batch_size,
-            shuffle=False,
-            sampler=test_data_sampler,
-            num_workers=self.arg.num_worker,
+            num_worker=self.arg.num_worker,
             drop_last=False,
-            worker_init_fn=init_seed
+            worker_init_fn=init_seed,
         )
 
     # **************************************************************************

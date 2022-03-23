@@ -1,0 +1,70 @@
+work_dir: ./data/data/ntu_result/xview/sgn/220322223001_ddp
+model_saved_name: ./data/data/ntu_result/xview/sgn/220319103001_ddp/sgn
+
+phase: train
+save_score: True
+
+seed: 1
+log_interval: 100 # iter
+save_interval: 2 # iter
+eval_interval: 5 # iter
+print_log: true
+
+# feeder
+feeder: feeders.feeder.Feeder
+num_worker: 1
+train_feeder_args:
+  #  data_path: ./data/data/ntu_stretched/xview/train_data_joint.npy
+  #  label_path: ./data/data/ntu_stretched/xview/train_label.pkl
+  data_path: ./data/data/ntu_nopad/xview/train_data_joint.npy
+  label_path: ./data/data/ntu_nopad/xview/train_label.pkl
+  debug: False
+  random_choose: False
+  random_shift: False
+  random_move: False
+  window_size: -1
+  normalization: False
+  random_zaxis_flip: False
+  random_xaxis_scale: False
+  random_yaxis_scale: False
+  random_subsample: 20
+
+test_feeder_args:
+  #  data_path: ./data/data/ntu_stretched/xview/val_data_joint.npy
+  #  label_path: ./data/data/ntu_stretched/xview/val_label.pkl
+  data_path: ./data/data/ntu_nopad/xview/val_data_joint.npy
+  label_path: ./data/data/ntu_nopad/xview/val_label.pkl
+
+# model
+model: model.sgn.SGN
+model_args:
+  num_class: 60
+  num_point: 25
+  in_channels: 3
+  seg: 20
+  bias: True
+
+# optim
+device: [0, 1]
+batch_size: 32
+test_batch_size: 32
+
+optimizer: SGD
+nesterov: True
+base_lr: 0.1
+step: [30, 40]
+weight_decay: 0.0001
+# llrd_factor: 1.0
+# scheduler: onecyclelr
+# anneal_strategy: cos
+# eps: 0.0001
+
+start_epoch: 0
+num_epoch: 50
+warm_up_epoch: 5
+
+only_train_part: False
+only_train_epoch: 5
+
+world_size: 2
+ddp: True

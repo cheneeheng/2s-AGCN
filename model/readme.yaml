@@ -1079,3 +1079,9 @@ aagcn_v37:
         - 220319103001_cossin_ddp_9l1cSE6_0bb_01lr_subsample20:
                   - 6 heads, no dim change
                   - 83.7%
+        - 220319103001_cossin_ddp_9l1cSE6_0bb_01lr_subsample100:
+                  - 89.0%
+        - 220319103001_cossin_ddp_9l1cSE6_0bb_01lr_subsample60:
+                  - 88.3%
+        - 220319103001_cossin_ddp_9l1cSE6_0bb_01lr_subsample60_randomrot:
+                  - 86.8%

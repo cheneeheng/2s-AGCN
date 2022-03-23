@@ -85,8 +85,10 @@ def get_parser():
                         default='./config/nturgbd-cross-view/test_bone.yaml',
                         help='path to the configuration file')
 
-    parser.add_argument(
-        '--seed', type=int, default=1, help='random seed for pytorch')
+    parser.add_argument('--seed',
+                        type=int,
+                        default=1,
+                        help='random seed for pytorch')
 
     # dist settings
     parser.add_argument('--world-size',
@@ -94,7 +96,7 @@ def get_parser():
                         default=1,
                         help='total number of processes')
     parser.add_argument('--ddp',
-                        type=bool,
+                        type=str2bool,
                         default=False,
                         help='whether to use DDP model')
 
@@ -112,6 +114,10 @@ def get_parser():
     parser.add_argument('--test-feeder-args',
                         default=dict(),
                         help='the arguments of data loader for test')
+    parser.add_argument('--use-sgd-dataloader',
+                        type=str2bool,
+                        default=False,
+                        help='whether to use collate_fn from SGN')
 
     # model
     parser.add_argument('--model', default=None, help='the model will be used')

@@ -176,16 +176,17 @@ def _rot(rot):
 
 # https://github.com/microsoft/SGN/blob/master/data.py
 def random_rotation(x, theta=0.5):
+    # input: C,T,V,M
+    C, T, V, M = x.shape
     # x: N,T'(m is merged into it), vc = n,t,vc
-    x = x.reshape(x.shape[:2] + (-1, 3))
-    rot = np.random.uniform(-theta, theta, (x.shape[0], 3))
-    rot = np.tile(rot, (1, x.shape[1]))
-    rot = rot.reshape((-1, x.shape[1], 3))
+    x = x.transpose(3, 1, 2, 0)
+    rot = np.random.uniform(-theta, theta, (1, 3))
+    rot = np.tile(rot, (1, T))
+    rot = rot.reshape((-1, T, 3))
     rot = _rot(rot)
     x = np.transpose(x, (0, 1, 3, 2))
     x = np.matmul(rot, x)
-    x = np.transpose(x, (0, 1, 3, 2))
-    x = x.reshape(x.shape[:2] + (-1,))
+    x = np.transpose(x, (2, 1, 3, 0))
     return x
 
 
@@ -195,11 +196,11 @@ def random_shift(data_numpy):
     data_shift = np.zeros(data_numpy.shape)
     valid_frame = (data_numpy != 0).sum(axis=3).sum(axis=2).sum(axis=0) > 0
     begin = valid_frame.argmax()
-    end = len(valid_frame) - valid_frame[::-1].argmax()
+    end = len(valid_frame) - valid_frame[:: -1].argmax()
 
     size = end - begin
     bias = random.randint(0, T - size)
-    data_shift[:, bias:bias + size, :, :] = data_numpy[:, begin:end, :, :]
+    data_shift[:, bias: bias + size, :, :] = data_numpy[:, begin: end, :, :]
 
     return data_shift
 
@@ -217,7 +218,7 @@ def random_subsample(data_numpy, freq):
 def stretch_to_maximum_length(data_numpy):
     C, T, V, M = data_numpy.shape
     t_last = T - np.where(np.flip(data_numpy.sum((0, 2, 3))) != 0.0)[0][0]
-    unpadded_data = data_numpy[:, :t_last, :, :]  # c,t,v,m
+    unpadded_data = data_numpy[:, : t_last, :, :]  # c,t,v,m
     unpadded_data = np.transpose(unpadded_data, (0, 2, 3, 1))  # c,v,m,t
     unpadded_data = unpadded_data.reshape(C*V*M, -1)
     f = interpolate.interp1d(np.arange(0, t_last), unpadded_data)
@@ -232,12 +233,12 @@ def openpose_match(data_numpy):
     assert (C == 3)
     score = data_numpy[2, :, :, :].sum(axis=1)
     # the rank of body confidence in each frame (shape: T-1, M)
-    rank = (-score[0:T - 1]).argsort(axis=1).reshape(T - 1, M)
+    rank = (-score[0: T - 1]).argsort(axis=1).reshape(T - 1, M)
 
     # data of frame 1
-    xy1 = data_numpy[0:2, 0:T - 1, :, :].reshape(2, T - 1, V, M, 1)
+    xy1 = data_numpy[0: 2, 0: T - 1, :, :].reshape(2, T - 1, V, M, 1)
     # data of frame 2
-    xy2 = data_numpy[0:2, 1:T, :, :].reshape(2, T - 1, V, 1, M)
+    xy2 = data_numpy[0: 2, 1: T, :, :].reshape(2, T - 1, V, 1, M)
     # square of distance between frame 1&2 (shape: T-1, M, M)
     distance = ((xy2 - xy1) ** 2).sum(axis=2).sum(axis=0)
 

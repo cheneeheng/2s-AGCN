@@ -23,6 +23,7 @@ from plotly import graph_objects as go
 from time import sleep
 
 from data_gen.preprocess import pre_normalization
+from utils.visualization import visualize_3dskeleton_in_matplotlib
 
 
 JOINT_COLOR = [
@@ -330,4 +331,8 @@ def update_data(n_intervals, aid):
 
 
 if __name__ == '__main__':
-    app.run_server()
+    # data : C,T,V,M
+    # app.run_server()
+    graph = 'graph.openpose_b25_j15.Graph'
+    data = data.reshape((1,) + data.shape)[:, :, :, :, 0:1]
+    visualize_3dskeleton_in_matplotlib(data, graph=graph, is_3d=True)
