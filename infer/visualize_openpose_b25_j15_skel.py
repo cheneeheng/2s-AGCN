@@ -216,29 +216,28 @@ def read_xyz(file, max_body=4, num_joint=25):
         for j in range(0, len(body_joint), 3):
             if m < max_body and j//3 < num_joint:
                 data[m, 0, j//3, :] = [body_joint[j],
-                                       body_joint[j+1],
-                                       body_joint[j+2]]
+                                       -body_joint[j+2],
+                                       -body_joint[j+1]]
             else:
                 pass
     data = np.swapaxes(data, 0, 3)/1000.0   # M, T, V, C > C, T, V, M
     return data
 
 
-# joint_file = r'/code/2s-AGCN/data/data/openpose_b25_j15_ntu/xview/val_data_joint.npy'  # noqa
-joint_file = r'/code/2s-AGCN/data/data/openpose_b25_j15_ntu/xview/val_data_joint_100.npy'  # noqa
-label_file = r'/code/2s-AGCN/data/data/openpose_b25_j15_ntu/xview/val_label.pkl'  # noqa
+# # joint_file = r'/code/2s-AGCN/data/data/openpose_b25_j15_ntu/xview/val_data_joint.npy'  # noqa
+# joint_file = r'/code/2s-AGCN/data/data/openpose_b25_j15_ntu/xview/val_data_joint_100.npy'  # noqa
+# label_file = r'/code/2s-AGCN/data/data/openpose_b25_j15_ntu/xview/val_label.pkl'  # noqa
 
-# np.where(np.array(label)==22)[0][0]
-# data: N C T V M
-with open(label_file, 'rb') as f:
-    sample_name, label = pickle.load(f, encoding='latin1')
-data = np.load(joint_file)
-# data = np.load(joint_file, mmap_mode='r')
+# # np.where(np.array(label)==22)[0][0]
+# # data: N C T V M
+# with open(label_file, 'rb') as f:
+#     sample_name, label = pickle.load(f, encoding='latin1')
+# data = np.load(joint_file)
+# # data = np.load(joint_file, mmap_mode='r')
 
 joint_path = './data/data_tmp/220317182701'
 joint_files = [os.path.join(joint_path, i)
                for i in sorted(os.listdir(joint_path))]
-
 data = []
 data_raw = []
 data_path = []
@@ -246,15 +245,30 @@ for joint_file in joint_files:
     data_i = read_xyz(joint_file, max_body=4, num_joint=25)  # C, T, V, M
     data_raw.append(np.array(data_i))
     data_i = np.expand_dims(data_i, axis=0)
-    data_i = pre_normalization(data_i, zaxis2=[8, 1], xaxis=[2, 5],
-                               verbose=False, tqdm=False)
     data.append(data_i[0])
     data_path.append(joint_file)
 data = np.concatenate(data, 1)
-# data = np.concatenate(data, 1)[:, 28:36]
-# data_raw = np.concatenate(data_raw, 1)[:, 28:36]
-# data_path = data_path[28:36]
+# np.save('./data/data_tmp/220317182701.npy', data)
 
+# data = np.load('./data/data_tmp/220317182701.npy')
+data = np.expand_dims(data, axis=0)[:, :, 1700:, :, 0:1]
+data = pre_normalization(data,
+                         zaxis=[8, 1],
+                         #  zaxis=None,
+                         #  zaxis2=None,
+                         xaxis=None,
+                         #  xaxis=[2, 5],
+                         verbose=False, tqdm=False)
+# data = pre_normalization(data,
+#                          #  zaxis=None,
+#                          zaxis2=[8, 1],
+#                          xaxis=[2, 5],
+#                          verbose=False, tqdm=False)
+# data = pre_normalization(data,
+#                          xaxis=[2, 5],
+#                          zaxis=[8, 1],
+#                          verbose=False, tqdm=False)
+data = data[0]
 
 app = dash.Dash(__name__, update_title=None)
 app.layout = html.Div(
@@ -333,6 +347,7 @@ def update_data(n_intervals, aid):
 if __name__ == '__main__':
     # data : C,T,V,M
     # app.run_server()
+    print("START")
     graph = 'graph.openpose_b25_j15.Graph'
-    data = data.reshape((1,) + data.shape)[:, :, :, :, 0:1]
+    data = data.reshape((1,) + data.shape)
     visualize_3dskeleton_in_matplotlib(data, graph=graph, is_3d=True)

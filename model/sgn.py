@@ -90,16 +90,9 @@ class SGN(nn.Module):
         return y, attn
 
     def one_hot(self, bs, spa, tem):
-
-        y = torch.arange(spa).unsqueeze(-1)
-        y_onehot = torch.FloatTensor(spa, spa)
-
-        y_onehot.zero_()
-        y_onehot.scatter_(1, y, 1)
-
+        y_onehot = torch.eye(spa, spa)
         y_onehot = y_onehot.unsqueeze(0).unsqueeze(0)
         y_onehot = y_onehot.repeat(bs, tem, 1, 1)
-
         return y_onehot
 
 
@@ -230,5 +223,5 @@ class compute_g_spa(nn.Module):
 
 if __name__ == '__main__':
     batch_size = 2
-    model = SGN(batch_size=batch_size, seg=100).cuda()
+    model = SGN(seg=100).cuda()
     model(torch.ones(batch_size, 100, 75).cuda())

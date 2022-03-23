@@ -1085,3 +1085,14 @@ aagcn_v37:
                   - 88.3%
         - 220319103001_cossin_ddp_9l1cSE6_0bb_01lr_subsample60_randomrot:
                   - 86.8%
+
+sgn:
+        - 220319103001_ddp:
+                  - 90.4%
+        - 220319103001_ddp_30epoch_adam_128bs:
+                  - 87.8%
+        - 220319103001_ddp_120epoch:
+                  - 91.8%
+        - 220319103001_ddp_120epoch_adam:
+                  - 92.0%
+        - 220319103001_ddp_120epoch_adam_64bs:

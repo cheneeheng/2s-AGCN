@@ -285,20 +285,35 @@ class Processor():
                 worker_init_fn=init_seed,
                 collate_fn=data_loader.collate_fn_fix_train if self.arg.use_sgn_dataloader else None  # noqa
             )
-        data_loader = FeederDataLoader(**self.arg.test_dataloader_args)
-        self.data_loader['test'] = data_loader.get_loader(
-            feeder=Feeder(**self.arg.test_feeder_args),
-            world_size=self.arg.world_size,
-            rank=self.rank,
-            ddp=self.arg.ddp,
-            shuffle_ds=False,
-            shuffle_dl=False,
-            batch_size=self.arg.test_batch_size,
-            num_worker=self.arg.num_worker,
-            drop_last=False,
-            worker_init_fn=init_seed,
-            collate_fn=data_loader.collate_fn_fix_val if self.arg.use_sgn_dataloader else None  # noqa
-        )
+            data_loader = FeederDataLoader(**self.arg.test_dataloader_args)
+            self.data_loader['val'] = data_loader.get_loader(
+                feeder=Feeder(**self.arg.test_feeder_args),
+                world_size=self.arg.world_size,
+                rank=self.rank,
+                ddp=self.arg.ddp,
+                shuffle_ds=False,
+                shuffle_dl=False,
+                batch_size=self.arg.test_batch_size,
+                num_worker=self.arg.num_worker,
+                drop_last=False,
+                worker_init_fn=init_seed,
+                collate_fn=data_loader.collate_fn_fix_val if self.arg.use_sgn_dataloader else None  # noqa
+            )
+        if self.arg.phase == 'test':
+            data_loader = FeederDataLoader(**self.arg.test_dataloader_args)
+            self.data_loader['test'] = data_loader.get_loader(
+                feeder=Feeder(**self.arg.test_feeder_args),
+                world_size=self.arg.world_size,
+                rank=self.rank,
+                ddp=self.arg.ddp,
+                shuffle_ds=False,
+                shuffle_dl=False,
+                batch_size=self.arg.test_batch_size,
+                num_worker=self.arg.num_worker,
+                drop_last=False,
+                worker_init_fn=init_seed,
+                collate_fn=data_loader.collate_fn_fix_test if self.arg.use_sgn_dataloader else None  # noqa
+            )
 
     # **************************************************************************
     # UTILS
@@ -526,7 +541,7 @@ class Processor():
             torch.save(weights, self.arg.model_saved_name + '-' +
                        str(epoch) + '-' + str(int(self.global_step)) + '.pt')
 
-    def eval(self, epoch, save_score=False, loader_name=['test'],
+    def eval(self, epoch, save_score=False, loader_name=['val'],
              wrong_file=None, result_file=None):
         if wrong_file is not None:
             f_w = open(wrong_file, 'w')
@@ -554,7 +569,11 @@ class Processor():
                         l1 = l1.mean()
                     else:
                         l1 = 0
-                    loss = self.loss(output, label)
+                    if self.arg.use_sgn_dataloader and self.arg.phase == 'test':
+                        output = output.view(
+                            (-1, data.size(0)//label.size(0), output.size(1)))
+                        output = output.mean(1)
+                    loss = self.loss(output, label) + l1
                     score_frag.append(output.data.cpu().numpy())
                     loss_value.append(loss.data.item())
                     _, predict_label = torch.max(output.data, 1)
@@ -642,7 +661,7 @@ class Processor():
                 # if ((epoch + 1) % self.arg.eval_interval == 0) or \
                 #         ((epoch + 1) == self.arg.num_epoch):
                 self.eval(epoch, save_score=self.arg.save_score,
-                          loader_name=['test'])
+                          loader_name=['val'])
             self.print_log(f'Best Accuracy: {self.best_acc}\n')
             self.print_log(f'Model Name: {self.arg.model_saved_name}\n')
             self.print_log('Done.\n')

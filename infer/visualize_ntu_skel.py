@@ -8,6 +8,9 @@ import numpy as np
 from plotly import graph_objects as go
 from time import sleep
 
+from utils.visualization import visualize_3dskeleton_in_matplotlib
+from data_gen.preprocess import pre_normalization
+
 
 JOINT_COLOR = [
     (255, 0, 0),
@@ -240,7 +243,7 @@ def draw_skeleton_offline(data, pause_sec=10, action=""):
 
 if __name__ == '__main__':
 
-    file_name = r'/workspaces/2s-AGCN/data/data/nturgbd_raw/nturgb+d_skeletons/S001C001P001R001A009.skeleton'  # noqa
+    file_name = r'./data/data/nturgbd_raw/nturgb+d_skeletons/S001C001P001R001A008.skeleton'  # noqa
     max_V = 25  # Number of nodes
     max_M = 2  # Number of skeletons
     with open(file_name, 'r') as fr:
@@ -258,9 +261,19 @@ if __name__ == '__main__':
                             v[0])  # A coordinate of a joint
                         data[1, frame, joint, person] = float(v[1])
                         data[2, frame, joint, person] = float(v[2])
+    data = pre_normalization(np.expand_dims(data, 0),
+                             xaxis=None,
+                             #  zaxis=None,
+                             verbose=False, tqdm=False)[0]
 
     print('read data done!')
     print(data.shape)  # C, T, V, M
+
+    graph = 'graph.ntu_rgb_d.Graph'
+    data = data.reshape((1,) + data.shape)[:, :, :, :, 0:1]
+    data = np.concatenate([data for _ in range(100)], 2)
+    visualize_3dskeleton_in_matplotlib(data, graph=graph, is_3d=True)
+
     # draw_skeleton(data)
 
     # import plotly.graph_objects as go

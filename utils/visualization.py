@@ -73,6 +73,8 @@ def visualize_3dskeleton_in_matplotlib(data, graph=None, is_3d=False):
                         ax.plot(np.zeros(2), np.zeros(2), p_type[m])[0])
             pose.append(a)
         ax.axis([-1, 1, -1, 1])
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
         if is_3d:
             ax.set_zlim3d(-1, 1)
         for t in range(T):
@@ -89,3 +91,4 @@ def visualize_3dskeleton_in_matplotlib(data, graph=None, is_3d=False):
             fig.suptitle('Frame :' + str(t), fontsize=16)
             fig.canvas.draw()
             plt.pause(0.01)
+    plt.close()
