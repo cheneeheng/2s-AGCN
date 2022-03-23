@@ -15,8 +15,7 @@ class SGN(nn.Module):
                  num_point: int = 25,
                  in_channels: int = 3,
                  seg: int = 20,
-                 bias: bool = True,
-                 batch_size: int = 32):
+                 bias: bool = True):
         super(SGN, self).__init__()
 
         self.c1 = 64
@@ -27,10 +26,13 @@ class SGN(nn.Module):
         self.joint_embed = embed(in_channels, self.c1, norm=True, bias=bias)
         self.dif_embed = embed(in_channels, self.c1, norm=True, bias=bias)
 
-        self.spa = self.one_hot(batch_size, num_point, self.seg)
-        self.spa = self.spa.permute(0, 3, 2, 1).cuda()
-        self.tem = self.one_hot(batch_size, self.seg, num_point)
-        self.tem = self.tem.permute(0, 3, 1, 2).cuda()
+        # self.spa = one_hot(num_point, self.seg, 'spa')
+        # self.tem = one_hot(self.seg, num_point, 'tem')
+
+        self.spa = self.one_hot(
+            1, num_point, self.seg).permute(0, 3, 2, 1).cuda()
+        self.tem = self.one_hot(
+            1, self.seg, num_point).permute(0, 3, 1, 2).cuda()
 
         self.tem_embed = embed(self.seg, self.c3, norm=False, bias=bias)
         self.spa_embed = embed(num_point, self.c1, norm=False, bias=bias)
@@ -64,8 +66,9 @@ class SGN(nn.Module):
         dif = torch.cat([dif.new(bs, dif.size(1), num_joints, 1).zero_(),
                          dif], dim=-1)
         pos = self.joint_embed(x)
-        tem1 = self.tem_embed(self.tem)
-        spa1 = self.spa_embed(self.spa)
+
+        tem1 = self.tem_embed(self.tem.repeat(bs, 1, 1, 1))
+        spa1 = self.spa_embed(self.spa.repeat(bs, 1, 1, 1))
         dif = self.dif_embed(dif)
         dy = pos + dif
         # Joint-level Module
@@ -100,10 +103,27 @@ class SGN(nn.Module):
         return y_onehot
 
 
+# class one_hot(nn.Module):
+#     def __init__(self, spa, tem, mode):
+#         super(one_hot, self).__init__()
+#         y = torch.arange(spa).unsqueeze(-1)
+#         y_onehot = torch.FloatTensor(spa, spa)
+#         y_onehot.zero_()
+#         y_onehot.scatter_(1, y, 1)
+#         y_onehot = y_onehot.unsqueeze(0).unsqueeze(0)
+#         y_onehot = y_onehot.repeat(1, tem, 1, 1)
+#         if mode == 'spa':
+#             self.y_onehot = y_onehot.permute(0, 3, 2, 1)
+#         elif mode == 'tem':
+#             self.y_onehot = y_onehot.permute(0, 3, 1, 2)
+
+#     def forward(self, bs):
+#         return self.y_onehot.repeat(bs, 1, 1, 1)
+
+
 class norm_data(nn.Module):
     def __init__(self, dim=64):
         super(norm_data, self).__init__()
-
         self.bn = nn.BatchNorm1d(dim * 25)
 
     def forward(self, x):

@@ -27,13 +27,23 @@ train_feeder_args:
   random_zaxis_flip: False
   random_xaxis_scale: False
   random_yaxis_scale: False
-  random_subsample: 20
+#  random_subsample: 20
+
+train_dataloader_args:
+  dataset: NTU60-CV
+  seg: 20
 
 test_feeder_args:
   #  data_path: ./data/data/ntu_stretched/xview/val_data_joint.npy
   #  label_path: ./data/data/ntu_stretched/xview/val_label.pkl
   data_path: ./data/data/ntu_nopad/xview/val_data_joint.npy
   label_path: ./data/data/ntu_nopad/xview/val_label.pkl
+
+test_dataloader_args:
+  dataset: NTU60-CV
+  seg: 20
+
+use_sgn_dataloader: True
 
 # model
 model: model.sgn.SGN
@@ -43,6 +53,7 @@ model_args:
   in_channels: 3
   seg: 20
   bias: True
+label_smoothing: 0.1
 
 # optim
 device: [0, 1]

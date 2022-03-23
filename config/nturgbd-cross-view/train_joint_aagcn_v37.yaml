@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/aagcn_v37_joint/220319103001_cossin_ddp_9l1cSE6_0bb_01lr_subsample20
-model_saved_name: ./data/data/ntu_result/xview/aagcn_v37_joint/220319103001_cossin_ddp_9l1cSE6_0bb_01lr_subsample20/ntu_cv_aagcn_joint
+work_dir: ./data/data/ntu_result/xview/aagcn_v37_joint/220319103001_cossin_ddp_9l1cSE6_0bb_01lr_subsample60_randomrot
+model_saved_name: ./data/data/ntu_result/xview/aagcn_v37_joint/220319103001_cossin_ddp_9l1cSE6_0bb_01lr_subsample60_randomrot/ntu_cv_aagcn_joint
 
 phase: train
 save_score: True
@@ -27,13 +27,15 @@ train_feeder_args:
   random_zaxis_flip: False
   random_xaxis_scale: False
   random_yaxis_scale: False
-  random_subsample: 20
+  random_subsample: 60
+  random_rotation: True
 
 test_feeder_args:
   #  data_path: ./data/data/ntu_stretched/xview/val_data_joint.npy
   #  label_path: ./data/data/ntu_stretched/xview/val_label.pkl
   data_path: ./data/data/ntu_nopad/xview/val_data_joint.npy
   label_path: ./data/data/ntu_nopad/xview/val_label.pkl
+  random_subsample: 60
 
 # model
 model: model.aagcn_v37.Model
@@ -65,11 +67,11 @@ model_args:
     length: 101
     pos_emb: rel-shared
   s_trans_cfg:
-    dim: 120 # mtc
+    dim: 360 # mtc
     depth: 1
     heads: 6
-    dim_head: 20
-    mlp_dim: 360
+    dim_head: 60
+    mlp_dim: 1440
     dropout: 0.2
     num_layers: 9
     length: 26
@@ -80,9 +82,9 @@ model_args:
     sm_heads: 6
     sm_dim_head: 25
     sm_dropout: 0.2
-    lg_dim: 120
+    lg_dim: 360
     lg_heads: 6
-    lg_dim_head: 20
+    lg_dim_head: 60
     lg_dropout: 0.2
     num_layers: 1
   trans_mode: None
