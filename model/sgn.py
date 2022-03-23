@@ -206,3 +206,9 @@ class compute_g_spa(nn.Module):
         g3 = g1.matmul(g2)
         g = self.softmax(g3)
         return g
+
+
+if __name__ == '__main__':
+    batch_size = 2
+    model = SGN(batch_size=batch_size, seg=100).cuda()
+    model(torch.ones(batch_size, 100, 75).cuda())
