@@ -277,6 +277,7 @@ class Processor():
                 num_worker=self.arg.num_worker,
                 drop_last=True,
                 worker_init_fn=init_seed,
+                collate_fn=data_loader.collate_fn_fix_train if self.arg.use_sgn_dataloader else None  # noqa
             )
         data_loader = FeederDataLoader(
             dataset=self.arg.test_feeder_args.get('dataset', None))
@@ -291,6 +292,7 @@ class Processor():
             num_worker=self.arg.num_worker,
             drop_last=False,
             worker_init_fn=init_seed,
+            collate_fn=data_loader.collate_fn_fix_val if self.arg.use_sgn_dataloader else None  # noqa
         )
 
     # **************************************************************************

@@ -114,7 +114,7 @@ def get_parser():
     parser.add_argument('--test-feeder-args',
                         default=dict(),
                         help='the arguments of data loader for test')
-    parser.add_argument('--use-sgd-dataloader',
+    parser.add_argument('--use-sgn-dataloader',
                         type=str2bool,
                         default=False,
                         help='whether to use collate_fn from SGN')
