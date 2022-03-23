@@ -15,7 +15,8 @@ class SGN(nn.Module):
                  num_point: int = 25,
                  in_channels: int = 3,
                  seg: int = 20,
-                 bias: bool = True):
+                 bias: bool = True,
+                 batch_size: int = 32):
         super(SGN, self).__init__()
 
         self.c1 = 64
@@ -26,9 +27,9 @@ class SGN(nn.Module):
         self.joint_embed = embed(in_channels, self.c1, norm=True, bias=bias)
         self.dif_embed = embed(in_channels, self.c1, norm=True, bias=bias)
 
-        self.spa = self.one_hot(-1, num_point, self.seg)
+        self.spa = self.one_hot(batch_size, num_point, self.seg)
         self.spa = self.spa.permute(0, 3, 2, 1).cuda()
-        self.tem = self.one_hot(-1, self.seg, num_point)
+        self.tem = self.one_hot(batch_size, self.seg, num_point)
         self.tem = self.tem.permute(0, 3, 1, 2).cuda()
 
         self.tem_embed = embed(self.seg, self.c3, norm=False, bias=bias)
