@@ -266,7 +266,7 @@ class Processor():
             assert os.path.exists(self.arg.train_feeder_args['label_path'])
             data_loader = FeederDataLoader(
                 dataset=self.arg.train_feeder_args.get('dataset', None),
-                dataset=self.arg.train_feeder_args.get('seg', 0))
+                seg=self.arg.train_feeder_args.get('seg', 0))
             self.data_loader['train'] = data_loader.get_loader(
                 feeder=Feeder(**self.arg.train_feeder_args),
                 world_size=self.arg.world_size,
@@ -282,7 +282,7 @@ class Processor():
             )
         data_loader = FeederDataLoader(
             dataset=self.arg.test_feeder_args.get('dataset', None),
-            dataset=self.arg.test_feeder_args.get('seg', 0))
+            seg=self.arg.test_feeder_args.get('seg', 0))
         self.data_loader['test'] = data_loader.get_loader(
             feeder=Feeder(**self.arg.test_feeder_args),
             world_size=self.arg.world_size,
