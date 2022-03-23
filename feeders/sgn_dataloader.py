@@ -21,7 +21,7 @@ class NTUDataset(Dataset):
 
 
 class NTUDataLoaders(object):
-    def __init__(self, dataset='NTU', case=0, aug=1, seg=30):
+    def __init__(self, dataset='NTU', case=0, aug=1, seg=30, multi_test=5):
         self.dataset = dataset
         self.case = case
         self.aug = aug
@@ -31,6 +31,7 @@ class NTUDataLoaders(object):
         # self.val_set = NTUDataset(self.val_X, self.val_Y)
         # self.test_set = NTUDataset(self.test_X, self.test_Y)
         self.train_set, self.val_set, self.test_set = None, None, None
+        self.multi_test = multi_test
 
     def get_train_loader(self, batch_size, num_workers):
         if self.aug == 0:
@@ -146,7 +147,7 @@ class NTUDataLoaders(object):
         """
         x, y, _ = zip(*batch)
         x = [i.transpose(1, 3, 2, 0).reshape(x[0].shape[1], -1) for i in x]
-        x, labels = self.Tolist_fix(x, y, train=2)  # 5 new subsampled seq
+        x, labels = self.Tolist_fix(x, y, train=self.multi_test)
         idx = range(len(x))
         y = np.array(y)
         x = torch.stack([torch.from_numpy(x[i]) for i in idx], 0)
@@ -182,35 +183,12 @@ class NTUDataLoaders(object):
 
         ave_duration = seq.shape[0] // group
 
-        if train == 1:
-            offsets = np.multiply(
-                list(range(group)), ave_duration) + \
-                np.random.randint(ave_duration, size=group)
-            seq = seq[offsets]
-            seqs.append(seq)
-
-        elif train == 2:
-            offsets1 = np.multiply(
-                list(range(group)), ave_duration) + \
-                np.random.randint(ave_duration, size=group)
-            offsets2 = np.multiply(
-                list(range(group)), ave_duration) + \
-                np.random.randint(ave_duration, size=group)
-            offsets3 = np.multiply(
-                list(range(group)), ave_duration) + \
-                np.random.randint(ave_duration, size=group)
-            offsets4 = np.multiply(
-                list(range(group)), ave_duration) + \
-                np.random.randint(ave_duration, size=group)
-            offsets5 = np.multiply(
-                list(range(group)), ave_duration) + \
-                np.random.randint(ave_duration, size=group)
-
-            seqs.append(seq[offsets1])
-            seqs.append(seq[offsets2])
-            seqs.append(seq[offsets3])
-            seqs.append(seq[offsets4])
-            seqs.append(seq[offsets5])
+        if train >= 1:
+            for _ in range(train):
+                offsets = np.multiply(
+                    list(range(group)), ave_duration) + \
+                    np.random.randint(ave_duration, size=group)
+                seqs.append(seq[offsets])
 
         return seqs
 

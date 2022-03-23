@@ -290,7 +290,7 @@ class Processor():
                 collate_fn=data_loader.collate_fn_fix_train if self.arg.use_sgn_dataloader else None  # noqa
             )
         data_loader = FeederDataLoader(**self.arg.test_dataloader_args)
-        if self.arg.multi_prediction_test > 1:
+        if self.arg.test_dataloader_args['multi_test'] > 1:
             self.data_loader['val'] = data_loader.get_loader(
                 **kwargs,
                 feeder=Feeder(**self.arg.test_feeder_args),
@@ -559,7 +559,7 @@ class Processor():
                         l1 = l1.mean()
                     else:
                         l1 = 0
-                    if self.arg.use_sgn_dataloader and self.arg.multi_prediction_test > 1:  # noqa
+                    if self.arg.use_sgn_dataloader and self.arg.test_dataloader_args['multi_test'] > 1:  # noqa
                         output = output.view(
                             (-1, data.size(0)//label.size(0), output.size(1)))
                         output = output.mean(1)

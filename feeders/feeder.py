@@ -152,14 +152,15 @@ class Feeder(Dataset):
 
 
 class FeederDataLoader(NTUDataLoaders):
-    def __init__(self, dataset='NTU60-CV', aug=1, seg=30):
+    def __init__(self, dataset='NTU60-CV', aug=1, seg=30, multi_test=5):
         if 'CS' in dataset:
             case = 0
         elif 'CV' in dataset:
             case = 1
         else:
             case = -1
-        super(FeederDataLoader, self).__init__(dataset, case, aug, seg)
+        super(FeederDataLoader, self).__init__(
+            dataset, case, aug, seg, multi_test)
 
     def get_loader(self,
                    feeder: Dataset,
