@@ -139,6 +139,7 @@ def get_parser():
                         default=[],
                         nargs='+',
                         help='the name of weights which will be ignored in the initialization')  # noqa
+    parser.add_argument('--label-smoothing', default=0.0)
 
     # optim
     parser.add_argument('--start-epoch',

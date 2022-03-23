@@ -25,6 +25,8 @@ from tqdm import tqdm
 
 from feeders.feeder import FeederDataLoader
 
+from model.module.loss import LabelSmoothingLoss
+
 from sam.sam.sam import SAM
 from sam.sam.example.utility.bypass_bn import enable_running_stats
 from sam.sam.example.utility.bypass_bn import disable_running_stats
@@ -105,7 +107,12 @@ class Processor():
             self.model = nn.SyncBatchNorm.convert_sync_batchnorm(self.model)
             self.model = DDP(self.model, device_ids=[self.rank])
         # print(self.model)
-        self.loss = nn.CrossEntropyLoss().cuda(self.output_device)
+        if self.arg.label_smoothing > 0.0:
+            self.loss = LabelSmoothingLoss(
+                classes=self.arg.model_args.get('num_class', None),
+                smoothing=self.arg.label_smoothing).cuda(self.output_device)
+        else:
+            self.loss = nn.CrossEntropyLoss().cuda(self.output_device)
 
         if self.arg.weights:
             self.global_step = int(self.arg.weights[:-3].split('-')[-1])

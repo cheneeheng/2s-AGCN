@@ -99,7 +99,6 @@ class NTUDataLoaders(object):
         """
         # c,t,v,m
         x, y, _ = zip(*batch)  # (30, 41, 10, 41, 55, 4, 15, 23)
-
         x = [i.transpose(1, 3, 2, 0).reshape(x[0].shape[1], -1) for i in x]
 
         if 'kinetics' in self.dataset:
@@ -134,6 +133,7 @@ class NTUDataLoaders(object):
         """Puts each data field into a tensor with outer dimension batch size
         """
         x, y, _ = zip(*batch)
+        x = [i.transpose(1, 3, 2, 0).reshape(x[0].shape[1], -1) for i in x]
         x, y = self.Tolist_fix(x, y, train=1)  # 1 new subsampled seq
         idx = range(len(x))
         y = np.array(y)
@@ -145,6 +145,7 @@ class NTUDataLoaders(object):
         """Puts each data field into a tensor with outer dimension batch size
         """
         x, y, _ = zip(*batch)
+        x = [i.transpose(1, 3, 2, 0).reshape(x[0].shape[1], -1) for i in x]
         x, labels = self.Tolist_fix(x, y, train=2)  # 5 new subsampled seq
         idx = range(len(x))
         y = np.array(y)
