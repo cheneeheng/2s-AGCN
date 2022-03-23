@@ -124,6 +124,10 @@ def get_parser():
                         type=str2bool,
                         default=False,
                         help='whether to use collate_fn from SGN')
+    parser.add_argument('--multi-prediction-test',
+                        type=int,
+                        default=5,
+                        help='multiprediction testing')
 
     # model
     parser.add_argument('--model', default=None, help='the model will be used')

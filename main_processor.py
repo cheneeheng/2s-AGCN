@@ -266,6 +266,14 @@ class Processor():
         self.print_log(f'using warm up, epoch: {self.arg.warm_up_epoch}')
 
     def load_data(self):
+        kwargs = dict(
+            world_size=self.arg.world_size,
+            rank=self.rank,
+            ddp=self.arg.ddp,
+            num_worker=self.arg.num_worker,
+            worker_init_fn=init_seed,
+        )
+
         Feeder = import_class(self.arg.feeder)
         self.data_loader = dict()
         if self.arg.phase == 'train':
@@ -273,46 +281,28 @@ class Processor():
             assert os.path.exists(self.arg.train_feeder_args['label_path'])
             data_loader = FeederDataLoader(**self.arg.train_dataloader_args)
             self.data_loader['train'] = data_loader.get_loader(
+                **kwargs,
                 feeder=Feeder(**self.arg.train_feeder_args),
-                world_size=self.arg.world_size,
-                rank=self.rank,
-                ddp=self.arg.ddp,
                 shuffle_ds=True,
                 shuffle_dl=not self.arg.ddp,
                 batch_size=self.arg.batch_size,
-                num_worker=self.arg.num_worker,
                 drop_last=True,
-                worker_init_fn=init_seed,
                 collate_fn=data_loader.collate_fn_fix_train if self.arg.use_sgn_dataloader else None  # noqa
             )
-            data_loader = FeederDataLoader(**self.arg.test_dataloader_args)
+        data_loader = FeederDataLoader(**self.arg.test_dataloader_args)
+        if self.arg.multi_prediction_test > 1:
             self.data_loader['val'] = data_loader.get_loader(
+                **kwargs,
                 feeder=Feeder(**self.arg.test_feeder_args),
-                world_size=self.arg.world_size,
-                rank=self.rank,
-                ddp=self.arg.ddp,
-                shuffle_ds=False,
-                shuffle_dl=False,
                 batch_size=self.arg.test_batch_size,
-                num_worker=self.arg.num_worker,
-                drop_last=False,
-                worker_init_fn=init_seed,
-                collate_fn=data_loader.collate_fn_fix_val if self.arg.use_sgn_dataloader else None  # noqa
-            )
-        if self.arg.phase == 'test':
-            data_loader = FeederDataLoader(**self.arg.test_dataloader_args)
-            self.data_loader['test'] = data_loader.get_loader(
-                feeder=Feeder(**self.arg.test_feeder_args),
-                world_size=self.arg.world_size,
-                rank=self.rank,
-                ddp=self.arg.ddp,
-                shuffle_ds=False,
-                shuffle_dl=False,
-                batch_size=self.arg.test_batch_size,
-                num_worker=self.arg.num_worker,
-                drop_last=False,
-                worker_init_fn=init_seed,
                 collate_fn=data_loader.collate_fn_fix_test if self.arg.use_sgn_dataloader else None  # noqa
+            )
+        else:
+            self.data_loader['val'] = data_loader.get_loader(
+                **kwargs,
+                feeder=Feeder(**self.arg.test_feeder_args),
+                batch_size=self.arg.test_batch_size,
+                collate_fn=data_loader.collate_fn_fix_val if self.arg.use_sgn_dataloader else None  # noqa
             )
 
     # **************************************************************************
@@ -569,7 +559,7 @@ class Processor():
                         l1 = l1.mean()
                     else:
                         l1 = 0
-                    if self.arg.use_sgn_dataloader and self.arg.phase == 'test':
+                    if self.arg.use_sgn_dataloader and self.arg.multi_prediction_test > 1:  # noqa
                         output = output.view(
                             (-1, data.size(0)//label.size(0), output.size(1)))
                         output = output.mean(1)
@@ -678,5 +668,5 @@ class Processor():
             self.print_log(f'Model:   {self.arg.model}')
             self.print_log(f'Weights: {self.arg.weights}')
             self.eval(epoch=0, save_score=self.arg.save_score,
-                      loader_name=['test'], wrong_file=wf, result_file=rf)
+                      loader_name=['val'], wrong_file=wf, result_file=rf)
             self.print_log('Done.\n')
