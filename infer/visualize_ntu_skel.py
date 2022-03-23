@@ -262,12 +262,14 @@ if __name__ == '__main__':
                         data[1, frame, joint, person] = float(v[1])
                         data[2, frame, joint, person] = float(v[2])
     data = pre_normalization(np.expand_dims(data, 0),
-                             xaxis=None,
+                             #  xaxis=None,
                              #  zaxis=None,
-                             verbose=False, tqdm=False)[0]
+                             verbose=False,
+                             tqdm=False)[0]
 
     print('read data done!')
     print(data.shape)  # C, T, V, M
+    exit()
 
     graph = 'graph.ntu_rgb_d.Graph'
     data = data.reshape((1,) + data.shape)[:, :, :, :, 0:1]

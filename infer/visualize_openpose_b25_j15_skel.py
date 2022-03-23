@@ -215,8 +215,8 @@ def read_xyz(file, max_body=4, num_joint=25):
     for m, body_joint in enumerate(skel_data):
         for j in range(0, len(body_joint), 3):
             if m < max_body and j//3 < num_joint:
-                data[m, 0, j//3, :] = [body_joint[j],
-                                       -body_joint[j+2],
+                data[m, 0, j//3, :] = [-body_joint[j],
+                                       body_joint[j+2],
                                        -body_joint[j+1]]
             else:
                 pass
@@ -256,18 +256,21 @@ data = pre_normalization(data,
                          zaxis=[8, 1],
                          #  zaxis=None,
                          #  zaxis2=None,
-                         xaxis=None,
-                         #  xaxis=[2, 5],
-                         verbose=False, tqdm=False)
+                         #  xaxis=None,
+                         xaxis=[2, 5],
+                         verbose=False,
+                         tqdm=False)
 # data = pre_normalization(data,
 #                          #  zaxis=None,
 #                          zaxis2=[8, 1],
 #                          xaxis=[2, 5],
-#                          verbose=False, tqdm=False)
+#                          verbose=False,
+#                          tqdm=False)
 # data = pre_normalization(data,
 #                          xaxis=[2, 5],
 #                          zaxis=[8, 1],
-#                          verbose=False, tqdm=False)
+#                          verbose=False,
+#                          tqdm=False)
 data = data[0]
 
 app = dash.Dash(__name__, update_title=None)

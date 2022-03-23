@@ -60,6 +60,8 @@ def pre_normalization(data,
             joint_top = skeleton[0, 0, zaxis[1]]
             axis = np.cross(joint_top - joint_bottom, [0, 0, 1])
             angle = angle_between(joint_top - joint_bottom, [0, 0, 1])
+            print(f"z-axis angle : {angle}")
+            print(f"spine vec : {(joint_top - joint_bottom)/np.linalg.norm(joint_top - joint_bottom)}")
             matrix_z = rotation_matrix(axis, angle)
             for i_p, person in enumerate(skeleton):
                 if person.sum() == 0:
@@ -79,6 +81,8 @@ def pre_normalization(data,
             joint_lshoulder = skeleton[0, 0, xaxis[1]]
             axis = np.cross(joint_rshoulder - joint_lshoulder, [1, 0, 0])
             angle = angle_between(joint_rshoulder - joint_lshoulder, [1, 0, 0])
+            print(f"x-axis angle : {angle}")
+            print(f"shoulder vec : {(joint_rshoulder - joint_lshoulder)/np.linalg.norm(joint_rshoulder - joint_lshoulder)}")
             matrix_x = rotation_matrix(axis, angle)
             for i_p, person in enumerate(skeleton):
                 if person.sum() == 0:
