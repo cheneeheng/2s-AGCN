@@ -18,8 +18,10 @@
                             - 93.9%
                   - 220315183001_ddp_syncbn_epochupdate_01lr:
                             - 94.6%
-                  - 220315183001_ddp_syncbn_epochupdate_01lr_coslr
-                    - 94.4%
+                  - 220315183001_ddp_syncbn_epochupdate_01lr_coslr:
+                            - 94.4%
+                  - 220323223001_ddp_nopad_norot:
+                            - 92.6%
         - 10 layers:
                   - original, old dataset generation:
                             - 94.7%
@@ -1096,3 +1098,6 @@ sgn:
         - 220319103001_ddp_120epoch_adam:
                   - 92.0%
         - 220319103001_ddp_120epoch_adam_64bs:
+                  - 91.9%
+        - 220319103001_ddp_120epoch_adam_64bs_5test:
+                  - 92.9%
