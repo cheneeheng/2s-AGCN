@@ -1101,3 +1101,5 @@ sgn:
                   - 91.9%
         - 220319103001_ddp_120epoch_adam_64bs_5test:
                   - 92.9%
+        - 220319103001_ddp_120epoch_adam_64bs_nopad_norot:
+                  - 91.8%

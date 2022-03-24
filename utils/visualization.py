@@ -10,7 +10,11 @@ def import_class(name):
     return mod
 
 
-def visualize_3dskeleton_in_matplotlib(data, graph=None, is_3d=False):
+def visualize_3dskeleton_in_matplotlib(data,
+                                       graph=None,
+                                       is_3d=False,
+                                       speed=0.01,
+                                       text_per_t: list = None):
     '''
     vis the samples using matplotlib
     :param data_path:
@@ -44,7 +48,7 @@ def visualize_3dskeleton_in_matplotlib(data, graph=None, is_3d=False):
                 pose[m].set_xdata(data[0, 0, t, :, m])
                 pose[m].set_ydata(data[0, 1, t, :, m])
             fig.canvas.draw()
-            plt.pause(0.001)
+            plt.pause(speed)
     else:
         p_type = ['b-', 'g-', 'r-', 'c-',
                   'm-', 'y-', 'k-', 'k-', 'k-', 'k-']
@@ -88,7 +92,11 @@ def visualize_3dskeleton_in_matplotlib(data, graph=None, is_3d=False):
                         if is_3d:
                             pose[m][i].set_3d_properties(
                                 data[0, 2, t, [v1, v2], m])
-            fig.suptitle('Frame :' + str(t), fontsize=16)
+            if text_per_t is not None:
+                fig.suptitle(
+                    f'Frame : {t} >>> Action : {text_per_t[t]}', fontsize=16)
+            else:
+                fig.suptitle(f'Frame : {t}', fontsize=16)
             fig.canvas.draw()
-            plt.pause(0.01)
+            plt.pause(speed)
     plt.close()

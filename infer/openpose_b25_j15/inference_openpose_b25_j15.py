@@ -49,24 +49,13 @@ def read_xyz(file, max_body=4, num_joint=25):
     for m, body_joint in enumerate(skel_data):
         for j in range(0, len(body_joint), 3):
             if m < max_body and j//3 < num_joint:
-                data[m, 0, j//3, :] = [body_joint[j],
+                data[m, 0, j//3, :] = [-body_joint[j],
                                        -body_joint[j+2],
                                        -body_joint[j+1]]
             else:
                 pass
     data = np.swapaxes(data, 0, 3)/1000.0   # M, T, V, C > C, T, V, M
     return data
-
-
-def prepare_model(arg):
-    Model = import_class(arg.model)
-    AAGCN = Model(**arg.model_args)
-    AAGCN.eval()
-    weight_file = [i for i in os.listdir(arg.weight_path) if '.pt' in i]
-    weight_file = os.path.join(arg.weight_path, weight_file[0])
-    weights = torch.load(weight_file)
-    AAGCN.load_state_dict(weights)
-    return AAGCN
 
 
 def predict(preprocessor: DataPreprocessor,
@@ -139,7 +128,7 @@ if __name__ == '__main__':
         MAPPING = {int(i): j for i, j in json.load(f).items()}
 
     # LOAD DATA ----------------------------------------------------------------
-    joint_path = './data/data_tmp/220317182701'
+    joint_path = './data/data_tmp/220314100001'
     joint_files = [os.path.join(joint_path, i)
                    for i in sorted(os.listdir(joint_path))]
     data = []
@@ -154,19 +143,30 @@ if __name__ == '__main__':
         data_i = np.swapaxes(data_i[0], 0, 3)  # C, T, V, M > M, T, V, C
         data.append(data_i)
         data_path.append(joint_file)
-    data = np.concatenate(data, 1)[:, 1700:, :, 0:1]  # C, T, V, M
+    data = np.concatenate(data, 1)[:, 0:, :, :]  # C, T, V, M
 
     # Data processor -----------------------------------------------------------
-    preprocess_fn = partial(pre_normalization, zaxis=[8, 1], xaxis=None,
-                            verbose=False, tqdm=False)
+    preprocess_fn = partial(pre_normalization,
+                            zaxis=[8, 1],
+                            xaxis=[2, 5],
+                            verbose=False,
+                            tqdm=False)
 
     DataProc = DataPreprocessor(num_joint=arg.num_joint,
-                                max_seq_length=arg.max_frame,
-                                max_person=arg.max_num_skeleton,
+                                max_seq_length=100,
+                                # max_seq_length=arg.max_frame,
+                                max_person=2,  # arg.max_num_skeleton,
+                                moving_avg=5,
                                 preprocess_fn=preprocess_fn)
 
     # Prepare model ------------------------------------------------------------
-    AAGCN = prepare_model(arg)
+    Model = import_class(arg.model)
+    AAGCN = Model(**arg.model_args)
+    AAGCN.eval()
+    weight_file = [i for i in os.listdir(arg.weight_path) if '.pt' in i]
+    weight_file = os.path.join(arg.weight_path, weight_file[0])
+    weights = torch.load(weight_file)
+    AAGCN.load_state_dict(weights)
     if arg.gpu:
         AAGCN = AAGCN.cuda(0)
     print("Model loaded...")
@@ -179,25 +179,60 @@ if __name__ == '__main__':
     last_skel_file = None
 
     c = 0
-    lag = 1
 
-    print("Start loop...")
-    while True:
+    with open('result_220314100001_ma5_100pads.txt', 'w') as f:
 
-        for _ in range(lag):
+        print("Start loop...")
+        while True:
+
             # 1. Read raw frames. ----------------------------------------------
             # M, T, V, C
-            DataProc.append_data(data[:, c:c+1, :, :])
+            DataProc.append_data(data[:1, c:c+1, :, :])
+
             # 2. Batch frames to fixed length. ---------------------------------
             # 3. Normalization. ------------------------------------------------
             # 4. Inference. ----------------------------------------------------
-            logits, pred = predict(preprocessor=DataProc,
-                                   model=AAGCN,
-                                   num_skels=arg.max_num_skeleton_true)
+
+            # Normalization.
+            input_data = DataProc.select_skeletons_and_normalize_data(
+                arg.max_num_skeleton_true)
+            input_data = np.transpose(
+                input_data, [0, 4, 2, 3, 1])  # N, C, T, V, M
+            # zeros = np.zeros((*input_data.shape[0:2],
+            #                   arg.max_frame,
+            #                   *input_data.shape[3:]))
+            # zeros[:, :, :100, :, :] = input_data
+            # input_data = zeros
+            input_data = np.concatenate(
+                [input_data, input_data, input_data], axis=2)
+
+            # Inference.
+            with torch.no_grad():
+                if next(AAGCN.parameters()).is_cuda:
+                    output, _ = AAGCN(torch.Tensor(input_data).cuda(0))
+                    _, predict_label = torch.max(output, 1)
+                    output = output.data.cpu()
+                    predict_label = predict_label.data.cpu()
+
+                else:
+                    output, _ = AAGCN(torch.Tensor(input_data))
+                    _, predict_label = torch.max(output, 1)
+
+            logits, pred = output.tolist(), predict_label.item()
+
             logits = softmax(logits[0])
             pred_i = np.argmax(logits)
             assert pred == pred_i
 
-            print(f'frame: {c}  ::  pred : {pred}  ::  logit : {logits[pred]}')
+            if c % 1 == 0:
+                print(MAPPING[pred+1])
+                print(MAPPING[pred+1], file=f)
+                # print(f'frame : {c}  ::  '
+                #       f'pred  : {pred+1}  ::  '
+                #       f'logit : {logits[pred]:.4f}  ::  '
+                #       f'pred  : {MAPPING[pred+1]}  ::  '
+                #       )
 
-        c += 1
+            c += 1
+            if c > data.shape[1]:
+                break

@@ -269,7 +269,6 @@ if __name__ == '__main__':
 
     print('read data done!')
     print(data.shape)  # C, T, V, M
-    exit()
 
     graph = 'graph.ntu_rgb_d.Graph'
     data = data.reshape((1,) + data.shape)[:, :, :, :, 0:1]

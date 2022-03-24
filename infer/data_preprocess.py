@@ -9,13 +9,15 @@ class DataPreprocessor(object):
                  num_joint: int = 25,
                  max_seq_length: int = 300,
                  max_person: int = 4,
+                 moving_avg: int = 1,
                  preprocess_fn=None) -> None:
         super().__init__()
         self.num_joint = num_joint
         self.max_seq_length = max_seq_length
         self.data = None
-        self.data_counter = 0
+        self.counter = 0
         self.max_person = max_person
+        self.moving_avg = moving_avg
         self.clear_data_array()
         self.preprocess_fn = preprocess_fn
 
@@ -29,7 +31,7 @@ class DataPreprocessor(object):
                               self.num_joint,
                               3),
                              dtype=np.float32)
-        self.data_counter = 0
+        self.counter = 0
 
     def append_data(self, data: np.ndarray) -> None:
         """Append data.
@@ -37,12 +39,19 @@ class DataPreprocessor(object):
         Args:
             data (np.ndarray): (M, 1, V, C)
         """
-        if self.data_counter < self.max_seq_length:
-            self.data[:, self.data_counter:self.data_counter+1, :, :] = data
-            self.data_counter += 1
+        M, T, V, C = data.shape
+        if self.counter < self.max_seq_length:
+            self.data[:M, self.counter:self.counter+1, :V, :C] = data
+            self.counter += 1
+            if self.moving_avg > 1 and self.counter > self.moving_avg - 1:
+                data_i = np.mean(self.data[:, self.counter-self.moving_avg:self.counter, :, :], axis=1, keepdims=True)  # noqa
+                self.data[:, self.counter-1:self.counter, :, :] = data_i
         else:
             self.data[:, 0:-1, :, :] = self.data[:, 1:, :, :]
-            self.data[:, -1:, :, :] = data
+            self.data[:M, -1:, :V, :C] = data
+            if self.moving_avg > 1:
+                data_i = np.mean(self.data[:, -self.moving_avg:, :, :], axis=1, keepdims=True)  # noqa
+                self.data[:, -1:, :, :] = data_i
 
     def select_skeletons(self, num_skels: int = 2) -> np.ndarray:
         """Select the `num_skels` most active skeletons. """

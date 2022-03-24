@@ -25,9 +25,10 @@ def pre_normalization(data,
     N, C, T, V, M = data.shape
     s = np.transpose(data, [0, 4, 2, 3, 1])  # N, C, T, V, M  to  N, M, T, V, C
 
-    for i_s, skeleton in enumerate(s):
-        if skeleton.sum() == 0:
-            print(f'Seq {i_s} has no skeleton')
+    if verbose:
+        for i_s, skeleton in enumerate(s):
+            if skeleton.sum() == 0:
+                print(f'Seq {i_s} has no skeleton')
 
     if pad:
         s_list = __verbose(s, out='pad the null frames with the previous frames', verbose=verbose)  # noqa
@@ -92,6 +93,7 @@ def pre_normalization(data,
             axis = np.cross(joint_top - joint_bottom, [0, 0, 1])
             angle = angle_between(joint_top - joint_bottom, [0, 0, 1])
             matrix_z = rotation_matrix(axis, angle)
+            # print(f"z angle {angle}")
             for i_p, person in enumerate(skeleton):
                 if person.sum() == 0:
                     continue
@@ -111,6 +113,7 @@ def pre_normalization(data,
             axis = np.cross(joint_rshoulder - joint_lshoulder, [1, 0, 0])
             angle = angle_between(joint_rshoulder - joint_lshoulder, [1, 0, 0])
             matrix_x = rotation_matrix(axis, angle)
+            # print(f"x angle {angle}")
             for i_p, person in enumerate(skeleton):
                 if person.sum() == 0:
                     continue
