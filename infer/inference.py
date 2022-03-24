@@ -33,14 +33,18 @@ def read_xyz(file, max_body=4, num_joint=25):
     for m, body_joint in enumerate(skel_data):
         for j in range(0, len(body_joint), 3):
             if m < max_body and j//3 < num_joint:
+                # ntu
                 # data[m, 0, j//3, :] = [body_joint[j],
                 #                        body_joint[j+1],
                 #                        body_joint[j+2]]
+                # openpose
                 data[m, 0, j//3, :] = [-body_joint[j],
                                        -body_joint[j+2],
                                        -body_joint[j+1]]
             else:
                 pass
+    # openpose
+    data /= 1000.0
     return data  # M, T, V, C
 
 
@@ -98,6 +102,7 @@ if __name__ == '__main__':
     DataProc = DataPreprocessor(num_joint=arg.num_joint,
                                 max_seq_length=arg.max_frame,
                                 max_person=arg.max_num_skeleton,
+                                moving_avg=5,
                                 preprocess_fn=preprocess_fn)
 
     # Prepare model ------------------------------------------------------------
@@ -138,7 +143,8 @@ if __name__ == '__main__':
                 skel_files = skel_files[skel_files.index(last_skel_file)+1:]
             except ValueError:
                 skel_files = skel_files[:]
-        last_skel_file = skel_files[-1]
+        if len(skel_files) != 0:
+            last_skel_file = skel_files[-1]
 
         infer_flag = True
 

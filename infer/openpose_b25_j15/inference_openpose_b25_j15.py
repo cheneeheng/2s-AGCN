@@ -128,7 +128,7 @@ if __name__ == '__main__':
         MAPPING = {int(i): j for i, j in json.load(f).items()}
 
     # LOAD DATA ----------------------------------------------------------------
-    joint_path = './data/data_tmp/220314100001'
+    joint_path = './data/data_tmp/220324153743'
     joint_files = [os.path.join(joint_path, i)
                    for i in sorted(os.listdir(joint_path))]
     data = []
@@ -180,7 +180,7 @@ if __name__ == '__main__':
 
     c = 0
 
-    with open('result_220314100001_ma5_100pads.txt', 'w') as f:
+    with open(f'infer/openpose_b25_j15/result_{joint_path.split("/")[-1]}_ma5_100pads.txt', 'w') as f:  # noqa
 
         print("Start loop...")
         while True:

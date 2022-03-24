@@ -45,7 +45,7 @@ if __name__ == '__main__':
     # data : C,T,V,M
     print("START")
 
-    joint_path = './data/data_tmp/220317182701'
+    joint_path = './data/data_tmp/220324153743'
     joint_files = [os.path.join(joint_path, i)
                    for i in sorted(os.listdir(joint_path))]
     data = []
@@ -72,11 +72,13 @@ if __name__ == '__main__':
     # np.save('./data/data_tmp/220317182701.npy', data)
     # data = np.load('./data/data_tmp/220317182701.npy')
 
-    data = data[:, 0:, :, :2]  # c,t,v,m
+    data = data[:, 100:, :, :2]  # c,t,v,m
     data = pre_normalization(
         np.expand_dims(data, axis=0),
         zaxis=[8, 1],
         xaxis=[2, 5],
+        # xaxis=None,
+        # zaxis=None,
         verbose=False,
         tqdm=False
     )[0]
@@ -104,7 +106,7 @@ if __name__ == '__main__':
     #     )
     #     print(f"Idx : {i}")
 
-    with open("result_220314100001_ma5_100pads.txt", "r") as f:
+    with open(f'infer/openpose_b25_j15/result_{joint_path.split("/")[-1]}_ma5_100pads.txt', "r") as f:  # noqa
         text = f.readlines()
 
     graph = 'graph.openpose_b25_j15.Graph'
