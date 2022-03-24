@@ -69,26 +69,47 @@ class Feeder(Dataset):
 
     def load_data(self):
         # data: N C V T M
-        try:
-            with open(self.label_path) as f:
-                self.sample_name, self.label = pickle.load(f)
-        except UnicodeDecodeError:
-            # for pickle file from python2
-            with open(self.label_path, 'rb') as f:
-                self.sample_name, self.label = pickle.load(
-                    f, encoding='latin1')
-        else:
-            raise ValueError("label data cannot be opened...")
+        if 'SGN' in self.dataset:
+            if 'train' in self.data_path:
+                with open(self.label_path, 'rb') as f:
+                    label1 = pickle.load(f)
+                with open(self.data_path, 'rb') as f:
+                    data1 = pickle.load(f)
+                with open(self.label_path, 'rb') as f:
+                    label2 = pickle.load(f)
+                with open(self.data_path, 'rb') as f:
+                    data2 = pickle.load(f)
+                self.label = np.concatenate([label1, label2], axis=0)
+                self.data = np.concatenate([data1, data2], axis=0)
+            else:
+                with open(self.label_path, 'rb') as f:
+                    self.label = pickle.load(f)
+                with open(self.data_path, 'rb') as f:
+                    self.data = pickle.load(f)
+            self.data = self.data.reshape(self.data.shape[0],
+                                          self.data.shape[1], 2, 25, 3)  # NTU
+            self.data = self.data.transpose((0, 4, 3, 1, 2))
 
-        # load data
-        if self.use_mmap:
-            self.data = np.load(self.data_path, mmap_mode='r')
         else:
-            self.data = np.load(self.data_path)
-        if self.debug:
-            self.label = self.label[0:100]
-            self.data = self.data[0:100]
-            self.sample_name = self.sample_name[0:100]
+            try:
+                with open(self.label_path) as f:
+                    self.sample_name, self.label = pickle.load(f)
+            except UnicodeDecodeError:
+                # for pickle file from python2
+                with open(self.label_path, 'rb') as f:
+                    self.sample_name, self.label = pickle.load(
+                        f, encoding='latin1')
+            else:
+                raise ValueError("label data cannot be opened...")
+            # load data
+            if self.use_mmap:
+                self.data = np.load(self.data_path, mmap_mode='r')
+            else:
+                self.data = np.load(self.data_path)
+            if self.debug:
+                self.label = self.label[0:100]
+                self.data = self.data[0:100]
+                self.sample_name = self.sample_name[0:100]
 
     def get_mean_map(self):
         data = self.data
