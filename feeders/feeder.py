@@ -68,16 +68,16 @@ class Feeder(Dataset):
             self.get_mean_map()
 
     def load_data(self):
-        # data: N C V T M
+        # data: N C T V M
         if 'SGN' in self.dataset:
             if 'train' in self.data_path:
                 with open(self.label_path, 'rb') as f:
                     label1 = pickle.load(f)
                 with open(self.data_path, 'rb') as f:
                     data1 = pickle.load(f)
-                with open(self.label_path, 'rb') as f:
+                with open(self.label_path.replace('train', 'val'), 'rb') as f:
                     label2 = pickle.load(f)
-                with open(self.data_path, 'rb') as f:
+                with open(self.data_path.replace('train', 'val'), 'rb') as f:
                     data2 = pickle.load(f)
                 self.label = np.concatenate([label1, label2], axis=0)
                 self.data = np.concatenate([data1, data2], axis=0)
@@ -88,7 +88,8 @@ class Feeder(Dataset):
                     self.data = pickle.load(f)
             self.data = self.data.reshape(self.data.shape[0],
                                           self.data.shape[1], 2, 25, 3)  # NTU
-            self.data = self.data.transpose((0, 4, 3, 1, 2))
+            self.data = self.data.transpose((0, 4, 1, 3, 2))
+            self.sample_name = self.label
 
         else:
             try:
