@@ -251,9 +251,9 @@ def _rot(rot):
 
 def _transform(x, theta):
     x = x.contiguous().view(x.size()[:2] + (-1, 3))
-    # rot = x.new(x.size()[0], 3).uniform_(-theta, theta)
-    rot = np.float32(np.random.uniform(-theta, theta, (1, 3)))
-    rot = torch.from_numpy(rot)
+    rot = x.new(x.size()[0], 3).uniform_(-theta, theta)
+    # rot = np.float32(np.random.uniform(-theta, theta, (1, 3)))
+    # rot = torch.from_numpy(rot)
     rot = rot.repeat(1, x.size()[1])
     rot = rot.contiguous().view((-1, x.size()[1], 3))
     rot = _rot(rot)

@@ -15,7 +15,9 @@ class SGN(nn.Module):
                  num_point: int = 25,
                  in_channels: int = 3,
                  seg: int = 20,
-                 bias: bool = True):
+                 bias: bool = True,
+                 gcn_tcn_kernel: int = 1,
+                 tcn_kernel: int = 3):
         super(SGN, self).__init__()
 
         self.c1 = 64
@@ -38,11 +40,15 @@ class SGN(nn.Module):
         self.spa_embed = embed(num_point, self.c1, norm=False, bias=bias)
 
         self.compute_g1 = compute_g_spa(self.c2, self.c3, bias=bias)
-        self.gcn1 = gcn_spa(self.c2, self.c2, bias=bias)
-        self.gcn2 = gcn_spa(self.c2, self.c3, bias=bias)
-        self.gcn3 = gcn_spa(self.c3, self.c3, bias=bias)
+        self.gcn1 = gcn_spa(self.c2, self.c2, bias=bias,
+                            gcn_tcn_kernel=gcn_tcn_kernel)
+        self.gcn2 = gcn_spa(self.c2, self.c3, bias=bias,
+                            gcn_tcn_kernel=gcn_tcn_kernel)
+        self.gcn3 = gcn_spa(self.c3, self.c3, bias=bias,
+                            gcn_tcn_kernel=gcn_tcn_kernel)
 
-        self.cnn = local(self.c3, self.c3 * 2, bias=bias, num_point=num_point)
+        self.cnn = local(self.c3, self.c3 * 2, bias=bias, num_point=num_point,
+                         tcn_kernel=tcn_kernel)
         self.maxpool = nn.AdaptiveMaxPool2d((1, 1))
         self.fc = nn.Linear(self.c3 * 2, num_class)
 
@@ -96,6 +102,24 @@ class SGN(nn.Module):
         return y_onehot
 
 
+# class one_hot(nn.Module):
+#     def __init__(self, spa, tem, mode):
+#         super(one_hot, self).__init__()
+#         y = torch.arange(spa).unsqueeze(-1)
+#         y_onehot = torch.FloatTensor(spa, spa)
+#         y_onehot.zero_()
+#         y_onehot.scatter_(1, y, 1)
+#         y_onehot = y_onehot.unsqueeze(0).unsqueeze(0)
+#         y_onehot = y_onehot.repeat(1, tem, 1, 1)
+#         if mode == 'spa':
+#             self.y_onehot = y_onehot.permute(0, 3, 2, 1)
+#         elif mode == 'tem':
+#             self.y_onehot = y_onehot.permute(0, 3, 1, 2)
+
+#     def forward(self, bs):
+#         return self.y_onehot.repeat(bs, 1, 1, 1)
+
+
 class norm_data(nn.Module):
     def __init__(self, dim=64):
         super(norm_data, self).__init__()
@@ -144,12 +168,27 @@ class cnn1x1(nn.Module):
         return x
 
 
+class cnn1xn(nn.Module):
+    def __init__(self, dim1=3, dim2=3, bias=True, kernel=3):
+        super(cnn1x1, self).__init__()
+        self.cnn = nn.Conv2d(dim1, dim2,
+                             kernel_size=(1, kernel),
+                             padding=(0, kernel//2),
+                             bias=bias)
+
+    def forward(self, x):
+        x = self.cnn(x)
+        return x
+
+
 class local(nn.Module):
-    def __init__(self, dim1=3, dim2=3, bias=False, seg: int = 20):
+    def __init__(self, dim1=3, dim2=3, bias=False, num_point: int = 20,
+                 tcn_kernel: int = 3):
         super(local, self).__init__()
-        self.maxpool = nn.AdaptiveMaxPool2d((1, seg))
+        self.maxpool = nn.AdaptiveMaxPool2d((1, num_point))
         self.cnn1 = nn.Conv2d(dim1, dim1,
-                              kernel_size=(1, 3), padding=(0, 1), bias=bias)
+                              kernel_size=(1, tcn_kernel),
+                              padding=(0, tcn_kernel//2), bias=bias)
         self.bn1 = nn.BatchNorm2d(dim1)
         self.relu = nn.ReLU()
         self.cnn2 = nn.Conv2d(dim1, dim2, kernel_size=1, bias=bias)
@@ -170,7 +209,7 @@ class local(nn.Module):
 
 
 class gcn_spa(nn.Module):
-    def __init__(self, in_feature, out_feature, bias=False):
+    def __init__(self, in_feature, out_feature, bias=False, gcn_tcn_kernel=1):
         super(gcn_spa, self).__init__()
         self.bn = nn.BatchNorm2d(out_feature)
         self.relu = nn.ReLU()

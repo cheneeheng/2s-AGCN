@@ -1109,6 +1109,17 @@ sgn:
                   - 93.7%
         - 220324163001_120epoch_adam_64bs_nopad_norot_centerff_5test:
                   - 92.8%
+        - 220324163001_ori:
+                  - with data processed from original repo
+                  - 93.2% (best acc)
+        - 220324163001_ori_1337:
+                  - 93.3% (best acc)
+        - 220324163001_ori_1337_rerun:
+                  - 93.3% (best acc)
+        - 220324163001_ori_1337_rerun_noworkerinit:
+                  - 92.9% (best acc)
+
 sgn-code:
+        - original sgn repo code
         - 220324170001:
                   - 94.5%
