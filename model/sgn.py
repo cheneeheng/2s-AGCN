@@ -42,7 +42,7 @@ class SGN(nn.Module):
         self.gcn2 = gcn_spa(self.c2, self.c3, bias=bias)
         self.gcn3 = gcn_spa(self.c3, self.c3, bias=bias)
 
-        self.cnn = local(self.c3, self.c3 * 2, bias=bias, num_point=num_point)
+        self.cnn = local(self.c3, self.c3 * 2, bias=bias, seg=seg)
         self.maxpool = nn.AdaptiveMaxPool2d((1, 1))
         self.fc = nn.Linear(self.c3 * 2, num_class)
 
