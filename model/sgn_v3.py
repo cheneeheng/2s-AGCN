@@ -7,18 +7,16 @@
 # Code base on:
 # An efficient self‑attention network for skeleton‑based action recognition
 
-from torch import nn
 import torch
-import math
+from torch import nn
 
-from model.sgn_v2 import Module
 from model.sgn_v2 import SGN as SGNBase
 from model.sgn_v2 import embed
 from model.sgn_v2 import gcn_spa
 
 
 class SGN(SGNBase):
-    def __init__(self, gcn_t_kernel: int = 3, **kwargs):
+    def __init__(self, gcn_t_kernel: int = 3, dropout: float = 0.2, **kwargs):
         super(SGN, self).__init__(**kwargs)
 
         self.tem_embed = embed(self.seg,
@@ -42,6 +40,7 @@ class SGN(SGNBase):
                             bias=self.bias,
                             kernel_size=gcn_t_kernel,
                             padding=gcn_t_kernel//2)
+        self.dropout = nn.Dropout(dropout)
         self.fc = nn.Linear(self.c4, self.num_class)
 
         del self.cnn
@@ -79,6 +78,8 @@ class SGN(SGNBase):
         x = self.smp(x)
         y = self.tmp(x)
         y = torch.flatten(y, 1)
+        if hasattr(self, 'dropout'):
+            y = self.dropout(y)
         y = self.fc(y)
 
         return y, g
