@@ -1140,6 +1140,16 @@ sgn_v2:
         - 220327213001_1337:
                   - 94.4% (best acc)
 
+sgn_v3:
+        - 220328170001_t3_gpshared:
+                  - 92.9%
+        - 220328170001_gpshared:
+                  - 92.3%
+        - 220328170001_t3:
+                  - 93.2%
+        - 220328170001_t3_gpshared_dropout:
+                  - 92.9%
+
 sgn-code:
         - original sgn repo code
         - 220324170001:

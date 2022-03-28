@@ -27,6 +27,12 @@ class Module(nn.Module):
 
 
 class SGN(nn.Module):
+
+    c1 = 64  # pos,vel,joint embed
+    c2 = 128  # G,gcn
+    c3 = 256  # gcn
+    c4 = 512  # final conv
+
     def __init__(self,
                  num_class: int = 60,
                  num_point: int = 25,
@@ -42,11 +48,6 @@ class SGN(nn.Module):
         self.seg = seg
         self.bias = bias
         self.g_proj_shared = g_proj_shared
-
-        self.c1 = 64
-        self.c2 = 128
-        self.c3 = 256
-        self.c4 = 512
 
         self.pos_embed = embed(in_channels,
                                self.c1,

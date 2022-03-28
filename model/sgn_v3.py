@@ -16,7 +16,18 @@ from model.sgn_v2 import gcn_spa
 
 
 class SGN(SGNBase):
-    def __init__(self, gcn_t_kernel: int = 3, dropout: float = 0.2, **kwargs):
+
+    def __init__(self,
+                 gcn_t_kernel: int = 3,
+                 dropout: float = 0.2,
+                 c_multiplier: float = 1.0,
+                 **kwargs):
+
+        self.c1 *= c_multiplier  # pos,vel,joint embed
+        self.c2 *= c_multiplier  # G,gcn
+        self.c3 *= c_multiplier  # gcn
+        self.c4 *= c_multiplier  # gcn
+
         super(SGN, self).__init__(**kwargs)
 
         self.tem_embed = embed(self.seg,
@@ -87,5 +98,5 @@ class SGN(SGNBase):
 
 if __name__ == '__main__':
     batch_size = 2
-    model = SGN(seg=100)
+    model = SGN(seg=100, c_multiplier=3)
     model(torch.ones(batch_size, 100, 75))
