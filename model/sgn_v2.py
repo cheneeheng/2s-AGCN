@@ -28,8 +28,8 @@ class Module(nn.Module):
 
 class SGN(nn.Module):
     def __init__(self,
-                 num_classes: int = 60,
-                 num_joints: int = 25,
+                 num_class: int = 60,
+                 num_point: int = 25,
                  in_channels: int = 3,
                  seg: int = 20,
                  bias: bool = True):
@@ -42,29 +42,29 @@ class SGN(nn.Module):
         self.joint_embed = embed(in_channels,
                                  self.c1,
                                  inter_channels=self.c1,
-                                 num_joints=num_joints,
+                                 num_point=num_point,
                                  norm=True,
                                  bias=bias)
         self.dif_embed = embed(in_channels,
                                self.c1,
                                inter_channels=self.c1,
-                               num_joints=num_joints,
+                               num_point=num_point,
                                norm=True,
                                bias=bias)
 
-        self.spa = one_hot(num_joints, seg, mode=0)
-        self.tem = one_hot(seg, num_joints, mode=1)
+        self.spa = one_hot(num_point, seg, mode=0)
+        self.tem = one_hot(seg, num_point, mode=1)
 
         self.tem_embed = embed(seg,
                                self.c3,
                                inter_channels=self.c1,
-                               num_joints=num_joints,
+                               num_point=num_point,
                                norm=False,
                                bias=bias)
-        self.spa_embed = embed(num_joints,
+        self.spa_embed = embed(num_point,
                                self.c1,
                                inter_channels=self.c1,
-                               num_joints=num_joints,
+                               num_point=num_point,
                                norm=False,
                                bias=bias)
 
@@ -76,7 +76,7 @@ class SGN(nn.Module):
         self.smp = nn.AdaptiveMaxPool2d((1, seg))
         self.cnn = local(self.c3, self.c3 * 2, bias=bias)
         self.tmp = nn.AdaptiveMaxPool2d((1, 1))
-        self.fc = nn.Linear(self.c3 * 2, num_classes)
+        self.fc = nn.Linear(self.c3 * 2, num_class)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -92,8 +92,8 @@ class SGN(nn.Module):
         assert dim % 3 == 0, "Only support input of xyz coordinates only."
 
         # Dynamic Representation
-        num_joints = dim // 3
-        x = x.view((bs, step, num_joints, 3))  # n,t,v,c
+        num_point = dim // 3
+        x = x.view((bs, step, num_point, 3))  # n,t,v,c
         x = x.permute(0, 3, 2, 1).contiguous()  # n,c,v,t
         dif = x[:, :, :, 1:] - x[:, :, :, 0:-1]  # n,c,v,t-1
         dif = torch.cat([dif.new(*dif.shape[:-1], 1).zero_(), dif], dim=-1)
@@ -147,13 +147,13 @@ class one_hot(nn.Module):
 class norm_data(nn.Module):
     def __init__(self, dim: int):
         super(norm_data, self).__init__()
-        self.bn = nn.BatchNorm1d(dim)  # channel dim * num_joints
+        self.bn = nn.BatchNorm1d(dim)  # channel dim * num_point
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        bs, _, num_joints, step = x.shape
+        bs, _, num_point, step = x.shape
         x = x.view(bs, -1, step)
         x = self.bn(x)
-        x = x.view(bs, -1, num_joints, step).contiguous()
+        x = x.view(bs, -1, num_point, step).contiguous()
         return x
 
 
@@ -162,11 +162,11 @@ class embed(Module):
                  *args,
                  norm: bool = False,
                  inter_channels: int = 0,
-                 num_joints: int = 25,
+                 num_point: int = 25,
                  **kwargs):
         super(embed, self).__init__(*args, **kwargs)
         if norm:
-            self.norm = norm_data(self.in_channels * num_joints)
+            self.norm = norm_data(self.in_channels * num_point)
         else:
             self.norm = lambda x: x
         self.cnn1 = cnn1x1(self.in_channels, inter_channels, bias=self.bias)
