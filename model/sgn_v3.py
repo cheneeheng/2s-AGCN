@@ -39,13 +39,13 @@ class SGN(nn.Module):
         self.c2 = 128
         self.c3 = 256
 
-        self.joint_embed = embed(in_channels,
-                                 self.c1,
-                                 inter_channels=self.c1,
-                                 num_joints=num_joints,
-                                 norm=True,
-                                 bias=bias)
-        self.dif_embed = embed(in_channels,
+        self.pos_embed = embed(in_channels,
+                               self.c1,
+                               inter_channels=self.c1,
+                               num_joints=num_joints,
+                               norm=True,
+                               bias=bias)
+        self.vel_embed = embed(in_channels,
                                self.c1,
                                inter_channels=self.c1,
                                num_joints=num_joints,
@@ -97,8 +97,8 @@ class SGN(nn.Module):
         x = x.permute(0, 3, 2, 1).contiguous()  # n,c,v,t
         dif = x[:, :, :, 1:] - x[:, :, :, 0:-1]  # n,c,v,t-1
         dif = torch.cat([dif.new(*dif.shape[:-1], 1).zero_(), dif], dim=-1)
-        pos = self.joint_embed(x)
-        dif = self.dif_embed(dif)
+        pos = self.pos_embed(x)
+        dif = self.vel_embed(dif)
         dy = pos + dif
 
         # Joint and frame embeddings

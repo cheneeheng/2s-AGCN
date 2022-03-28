@@ -1118,8 +1118,37 @@ sgn:
                   - 93.3% (best acc)
         - 220324163001_ori_1337_rerun_noworkerinit:
                   - 92.9% (best acc)
+        - 220324163001_ori_1337_rerun_noworkerinit_pinmem:
+                  - RUNS BEFORE HAS NUMPY NORMAL DISTRIBUTION
+                  - 94.2% (best acc)
+        - 220327213001_1337_noworkerinit_pinmem_rerun1:
+                  - 94.2% (best acc)
+        - 220327213001_1337_noworkerinit_pinmem_rerun2:
+                  - 94.2% (best acc)
+        - 220327213001_1337_noworkerinit_pinmem_rerun3:
+                  - 94.2% (best acc)
+        - 220327213001_1337_noworkerinit_rerun1:
+                  - 94.2% (best acc)
+        - 220327213001_1337_noworkerinit_rerun2:
+                  - 94.2% (best acc)
+        - 220327213001_1337_noworkerinit_rerun3:
+                  - 94.2% (best acc)
+        - 220327213001_1337:
+                  - 93.8% (best acc)
 
 sgn-code:
         - original sgn repo code
         - 220324170001:
+                  - 94.5%
+        - 220324170001_rerun:
+                  - 94.2%
+        - 220324170001_rerun2:
+                  - 94.2%
+        - 220324170001_rerun3:
+                  - 94.2%
+        - 220324170001_rerun4:
+                  - 94.2%
+        - 220324170001_rerun5:
+                  - 94.2%
+        - 220324170001_rerun6_16workers:
                   - 94.5%

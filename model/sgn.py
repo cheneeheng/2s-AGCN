@@ -4,6 +4,8 @@
 # Taken from :
 # https://github.com/microsoft/SGN/blob/master/model.py
 
+# Original code with slight style/naming/argument refractoring
+
 from torch import nn
 import torch
 import math
