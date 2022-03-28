@@ -1136,6 +1136,10 @@ sgn:
         - 220327213001_1337:
                   - 93.8% (best acc)
 
+sgn_v2:
+        - 220327213001_1337:
+                  - 94.4% (best acc)
+
 sgn-code:
         - original sgn repo code
         - 220324170001:

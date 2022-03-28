@@ -32,20 +32,29 @@ class SGN(nn.Module):
                  num_point: int = 25,
                  in_channels: int = 3,
                  seg: int = 20,
-                 bias: bool = True):
+                 bias: bool = True,
+                 g_proj_shared: bool = False):
         super(SGN, self).__init__()
+
+        self.num_class = num_class
+        self.num_point = num_point
+        self.in_channels = in_channels
+        self.seg = seg
+        self.bias = bias
+        self.g_proj_shared = g_proj_shared
 
         self.c1 = 64
         self.c2 = 128
         self.c3 = 256
+        self.c4 = 512
 
-        self.joint_embed = embed(in_channels,
-                                 self.c1,
-                                 inter_channels=self.c1,
-                                 num_point=num_point,
-                                 norm=True,
-                                 bias=bias)
-        self.dif_embed = embed(in_channels,
+        self.pos_embed = embed(in_channels,
+                               self.c1,
+                               inter_channels=self.c1,
+                               num_point=num_point,
+                               norm=True,
+                               bias=bias)
+        self.vel_embed = embed(in_channels,
                                self.c1,
                                inter_channels=self.c1,
                                num_point=num_point,
@@ -68,16 +77,20 @@ class SGN(nn.Module):
                                norm=False,
                                bias=bias)
 
-        self.compute_g1 = compute_g_spa(self.c2, self.c3, bias=bias)
+        self.compute_g1 = compute_g_spa(self.c2, self.c3, bias=bias,
+                                        g_proj_shared=g_proj_shared)
         self.gcn1 = gcn_spa(self.c2, self.c2, bias=bias)
         self.gcn2 = gcn_spa(self.c2, self.c3, bias=bias)
         self.gcn3 = gcn_spa(self.c3, self.c3, bias=bias)
 
         self.smp = nn.AdaptiveMaxPool2d((1, seg))
-        self.cnn = local(self.c3, self.c3 * 2, bias=bias)
+        self.cnn = local(self.c3, self.c4, bias=bias)
         self.tmp = nn.AdaptiveMaxPool2d((1, 1))
-        self.fc = nn.Linear(self.c3 * 2, num_class)
+        self.fc = nn.Linear(self.c4, num_class)
 
+        self.init()
+
+    def init(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
@@ -97,16 +110,16 @@ class SGN(nn.Module):
         x = x.permute(0, 3, 2, 1).contiguous()  # n,c,v,t
         dif = x[:, :, :, 1:] - x[:, :, :, 0:-1]  # n,c,v,t-1
         dif = torch.cat([dif.new(*dif.shape[:-1], 1).zero_(), dif], dim=-1)
-        pos = self.joint_embed(x)
-        dif = self.dif_embed(dif)
-        dy = pos + dif
+        pos = self.pos_embed(x)
+        dif = self.vel_embed(dif)
+        dy = pos + dif  # n,c,v,t
 
         # Joint and frame embeddings
         tem1 = self.tem_embed(self.tem(bs))
         spa1 = self.spa_embed(self.spa(bs))
 
         # Joint-level Module
-        x = torch.cat([dy, spa1], 1)
+        x = torch.cat([dy, spa1], 1)  # n,c,v,t
         g = self.compute_g1(x)
         x = self.gcn1(x, g)
         x = self.gcn2(x, g)
@@ -215,10 +228,9 @@ class local(Module):
                            bias=self.bias)
         self.bn1 = nn.BatchNorm2d(self.in_channels)
         self.relu = nn.ReLU()
-        self.cnn2 = nn.Conv2d(self.in_channels,
-                              self.out_channels,
-                              kernel_size=1,
-                              bias=self.bias)
+        self.cnn2 = cnn1x1(self.in_channels,
+                           self.out_channels,
+                           bias=self.bias)
         self.bn2 = nn.BatchNorm2d(self.out_channels)
         self.dropout = nn.Dropout2d(0.2)
 
@@ -239,12 +251,13 @@ class gcn_spa(Module):
         self.bn = nn.BatchNorm2d(self.out_channels)
         self.relu = nn.ReLU()
         self.w1 = cnn1x1(self.in_channels, self.out_channels, bias=self.bias)
-        self.w2 = cnn1x1(self.in_channels, self.out_channels, bias=self.bias)
+        self.w2 = cnn1xn(self.in_channels, self.out_channels, bias=self.bias,
+                         kernel_size=self.kernel_size, padding=self.padding)
 
     def forward(self, x: torch.Tensor, g: torch.Tensor) -> torch.Tensor:
-        x1 = x.permute(0, 3, 2, 1).contiguous()
+        x1 = x.permute(0, 3, 2, 1).contiguous()  # n,t,v,c
         x1 = g.matmul(x1)
-        x1 = x1.permute(0, 3, 2, 1).contiguous()
+        x1 = x1.permute(0, 3, 2, 1).contiguous()  # n,c,v,t
         x1 = self.w1(x1) + self.w2(x)  # z + residual
         x1 = self.bn(x1)
         x1 = self.relu(x1)
@@ -252,18 +265,23 @@ class gcn_spa(Module):
 
 
 class compute_g_spa(Module):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, g_proj_shared: bool = False, **kwargs):
         super(compute_g_spa, self).__init__(*args, **kwargs)
         self.g1 = cnn1x1(self.in_channels, self.out_channels, bias=self.bias)
-        self.g2 = cnn1x1(self.in_channels, self.out_channels, bias=self.bias)
+        if g_proj_shared:
+            self.g2 = self.g1
+        else:
+            self.g2 = cnn1x1(self.in_channels,
+                             self.out_channels,
+                             bias=self.bias)
         self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        g1 = self.g1(x).permute(0, 3, 2, 1).contiguous()
-        g2 = self.g2(x).permute(0, 3, 1, 2).contiguous()
-        g3 = g1.matmul(g2)
-        g = self.softmax(g3)
-        return g
+        g1 = self.g1(x).permute(0, 3, 2, 1).contiguous()  # n,t,v,c
+        g2 = self.g2(x).permute(0, 3, 1, 2).contiguous()  # n,t,c,v
+        g3 = g1.matmul(g2)  # n,t,v,v
+        g4 = self.softmax(g3)
+        return g4
 
 
 if __name__ == '__main__':

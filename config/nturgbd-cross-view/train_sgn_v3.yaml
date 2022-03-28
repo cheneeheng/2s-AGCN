@@ -1,0 +1,75 @@
+work_dir: ./data/data/ntu_result/xview/sgn/220328170001_t3_gpshared
+model_saved_name: ./data/data/ntu_result/xview/sgn/220328170001_t3_gpshared/sgn
+
+phase: train
+save_score: True
+
+seed: 1337
+log_interval: 100 # iter
+save_interval: 2 # iter
+eval_interval: 5 # iter
+print_log: true
+
+# feeder
+feeder: feeders.feeder.Feeder
+num_worker: 8
+train_feeder_args:
+  data_path: ./data/data/ntu_sgn/processed_data/NTU_CV_train.pkl
+  label_path: ./data/data/ntu_sgn/processed_data/NTU_CV_train_label.pkl
+  debug: False
+  dataset: NTU60-CV-SGN
+
+train_dataloader_args:
+  dataset: NTU60-CV-SGN
+  seg: 20
+  multi_test: 1
+
+test_feeder_args:
+  data_path: ./data/data/ntu_sgn/processed_data/NTU_CV_test.pkl
+  label_path: ./data/data/ntu_sgn/processed_data/NTU_CV_test_label.pkl
+  dataset: NTU60-CV-SGN
+  debug: True
+
+test_dataloader_args:
+  dataset: NTU60-CV-SGN
+  seg: 20
+  multi_test: 5
+
+use_sgn_dataloader: True
+
+# model
+model: model.sgn_v3.SGN
+model_args:
+  num_class: 60
+  num_point: 25
+  in_channels: 3
+  seg: 20
+  bias: True
+  g_proj_shared: True
+  gcn_t_kernel: 3
+label_smoothing: 0.1
+
+# optim
+device: [0]
+batch_size: 64
+test_batch_size: 4
+
+optimizer: Adam
+nesterov: True
+base_lr: 0.001
+step: [60, 90, 110]
+weight_decay: 0.0001
+# llrd_factor: 1.0
+# scheduler: onecyclelr
+# anneal_strategy: cos
+# eps: 0.0001
+
+start_epoch: 0
+num_epoch: 120
+warm_up_epoch: 0
+
+only_train_part: False
+only_train_epoch: 5
+
+world_size: 1
+ddp: False
