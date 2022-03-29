@@ -20,7 +20,7 @@ class SGN(SGNBase):
     def __init__(self,
                  gcn_t_kernel: int = 3,
                  dropout: float = 0.2,
-                 c_multiplier: float = 1.0,
+                 c_multiplier: int = 1,
                  **kwargs):
 
         self.c1 *= c_multiplier  # pos,vel,joint embed
@@ -98,5 +98,13 @@ class SGN(SGNBase):
 
 if __name__ == '__main__':
     batch_size = 2
-    model = SGN(seg=100, c_multiplier=3)
-    model(torch.ones(batch_size, 100, 75))
+    model = SGN(num_class=60,
+                num_point=25,
+                in_channels=3,
+                seg=20,
+                bias=True,
+                g_proj_shared=False,
+                gcn_t_kernel=3,
+                dropout=0.0,
+                c_multiplier=2).cuda()
+    model(torch.ones(batch_size, 20, 75).cuda())
