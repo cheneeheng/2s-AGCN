@@ -177,8 +177,9 @@ class SGN(nn.Module):
         self.init()
 
         if self.part:
-            self.parts_3points = torch.tensor(self.parts_3points,
-                                              dtype=torch.int).reshape(-1)
+            self.register_buffer('parts_3points_vec',
+                                 torch.tensor(self.parts_3points,
+                                              dtype=torch.int).reshape(-1))
 
     def init(self):
         for m in self.modules():
@@ -208,7 +209,7 @@ class SGN(nn.Module):
         dy1 = pos + dif  # n,c,v,t
 
         if self.part:
-            par = torch.index_select(x1, 2, self.parts_3points)  # n,t,v+,c
+            par = torch.index_select(x1, 2, self.parts_3points_vec)  # n,t,v+,c
             par = par.view((bs, step, -1, 3, self.in_channels))  # n,t,v+,3,c
             mid = par.mean(dim=-2, keepdim=True)  # n,t,v+,1,c
             par = par - mid  # n,t,v+,3,c
@@ -413,11 +414,12 @@ class atrous_spatial_pyramid_pooling(Module):
                  dilations: list = [1, 3, 5, 7],
                  **kwargs):
         super(atrous_spatial_pyramid_pooling, self).__init__(*args, **kwargs)
-        self.aspp = []
+        self.aspp = torch.nn.ModuleDict()
 
         self.pool = 0 in dilations
         if self.pool:
-            self.aspp.append(
+            self.aspp.update({
+                'aspp_pool':
                 nn.Sequential(
                     OrderedDict([
                         (f'avg_pool', nn.AdaptiveAvgPool2d(1)),
@@ -427,11 +429,12 @@ class atrous_spatial_pyramid_pooling(Module):
                         (f'relu_pool', nn.ReLU()),
                     ])
                 )
-            )
+            })
             dilations.pop(0)
 
         for dil in dilations:
-            self.aspp.append(
+            self.aspp.update({
+                f'aspp_{dil}':
                 nn.Sequential(
                     OrderedDict([
                         (f'conv_{dil}', cnn1xn(self.in_channels,
@@ -444,7 +447,7 @@ class atrous_spatial_pyramid_pooling(Module):
                         (f'relu_{dil}', nn.ReLU()),
                     ])
                 )
-            )
+            })
 
         branches = len(dilations) + 1 if self.pool else len(dilations)
         self.proj = cnn1x1(self.out_channels * branches,
@@ -456,7 +459,7 @@ class atrous_spatial_pyramid_pooling(Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: n,c,v,t
         res = []
-        for block in self.aspp:
+        for _, block in self.aspp.items():
             res.append(block(x))
         if self.pool:
             res[0] = F.interpolate(res[0],
@@ -472,6 +475,6 @@ class atrous_spatial_pyramid_pooling(Module):
 
 if __name__ == '__main__':
     batch_size = 2
-    model = SGN(seg=20, part=True, motion=True, aspp=[0, 1, 5, 9])
-    model(torch.ones(batch_size, 20, 75))
+    model = SGN(seg=20, part=True, motion=True, aspp=[0, 1, 2]).cuda()
+    model(torch.ones(batch_size, 20, 75).cuda())
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))
