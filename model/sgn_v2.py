@@ -160,14 +160,14 @@ class SGN(nn.Module):
         self.gcn2 = gcn_spa(self.c2, self.c3, bias=bias)
         self.gcn3 = gcn_spa(self.c3, self.c3, bias=bias)
 
-        if aspp is not None:
+        if aspp is None or len(aspp) == 0:
+            self.aspp = lambda x: x
+        else:
             self.aspp = atrous_spatial_pyramid_pooling(
                 self.c3,
                 self.c3,
                 bias=bias,
                 dilations=aspp)
-        else:
-            self.aspp = lambda x: x
 
         self.smp = nn.AdaptiveMaxPool2d((1, seg))
         self.cnn = local(self.c3, self.c4, bias=bias)

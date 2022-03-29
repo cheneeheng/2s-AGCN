@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/sgn_v3/220328170001_t3_gpshared
-model_saved_name: ./data/data/ntu_result/xview/sgn_v3/220328170001_t3_gpshared/sgn
+work_dir: ./data/data/ntu_result/xview/sgn_v2/220328170001_t3_gpshared
+model_saved_name: ./data/data/ntu_result/xview/sgn_v2/220328170001_t3_gpshared/sgn
 
 phase: train
 save_score: True
@@ -38,7 +38,7 @@ test_dataloader_args:
 use_sgn_dataloader: True
 
 # model
-model: model.sgn_v3.SGN
+model: model.sgn_v2.SGN
 model_args:
   num_class: 60
   num_point: 25
@@ -46,7 +46,9 @@ model_args:
   seg: 20
   bias: True
   g_proj_shared: True
-  gcn_t_kernel: 3
+  part: False
+  motion: False
+  aspp: [0, 1, 5, 9]
 label_smoothing: 0.1
 
 # optim
