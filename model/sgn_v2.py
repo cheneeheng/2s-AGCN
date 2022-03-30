@@ -9,10 +9,13 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
+from torch.profiler import profile, record_function, ProfilerActivity
+
 
 import math
-import copy
+import time
 from collections import OrderedDict
+from tqdm import tqdm
 
 
 class Module(nn.Module):
@@ -474,7 +477,44 @@ class atrous_spatial_pyramid_pooling(Module):
 
 
 if __name__ == '__main__':
-    batch_size = 2
-    model = SGN(seg=20, part=True, motion=True, aspp=[0, 1, 2]).cuda()
-    model(torch.ones(batch_size, 20, 75).cuda())
-    print(sum(p.numel() for p in model.parameters() if p.requires_grad))
+
+    batch_size = 64
+
+    # model = SGN(seg=20, part=True, motion=True, aspp=[0, 1, 5, 9]).cuda()
+    # for i in tqdm(range(100)):
+    #     inputs = torch.ones(batch_size, 20, 75).cuda()
+    #     model(inputs)
+
+    model = SGN(seg=20, part=True, motion=True, aspp=[0, 1, 5, 9]).cuda()
+    inputs = torch.ones(batch_size, 20, 75).cuda()
+    # with torch.autograd.profiler.profile() as prof:
+    #     with torch.autograd.profiler.record_function("model_inference"):
+    with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+                 record_shapes=True) as prof:
+        # with record_function("model_inference"):
+        model(inputs)
+    # print(prof.key_averages(group_by_input_shape=True).table(
+    #     sort_by="cpu_time_total", row_limit=10))
+    print(prof.key_averages().table(sort_by="self_cpu_time_total"))
+    # print(prof.key_averages().table())
+
+    # model = SGN(seg=20, part=True, motion=True, aspp=[0, 1, 5, 9]).cuda()
+    # print(model)
+    # s = time.time()
+    # for i in tqdm(range(100)):
+    #     model(torch.ones(batch_size, 20, 75).cuda())
+    # print("Time :", time.time()-s)
+
+    # model = SGN(seg=20, part=True, motion=True, aspp=[]).cuda()
+    # s = time.time()
+    # for i in tqdm(range(100)):
+    #     model(torch.ones(batch_size, 20, 75).cuda())
+    # print("Time :", time.time()-s)
+
+    # model = SGN(seg=20, part=True, motion=True, aspp=[0, 1, 5, 9]).cuda()
+    # s = time.time()
+    # for i in tqdm(range(100)):
+    #     model(torch.ones(batch_size, 20, 75).cuda())
+    # print("Time :", time.time()-s)
+
+    # print(sum(p.numel() for p in model.parameters() if p.requires_grad))
