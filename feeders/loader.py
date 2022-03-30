@@ -3,10 +3,14 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
+from torch.utils.data import DataLoader
+from torch.utils.data import DistributedSampler
 
 import numpy as np
-from typing import Tuple, Callable
+from typing import Tuple
+
+from feeders import tools
 
 
 COLLATE_OUT_TYPE = Tuple[Tuple[torch.Tensor, torch.Tensor], torch.Tensor, None]
@@ -138,7 +142,7 @@ class NTUDataLoaders(object):
             theta = 0.3
         else:
             raise ValueError("unknown dataset name")
-        x = _transform(x, theta)
+        x = tools.torch_transform(x, theta)
         return (x, x1), y, None
 
     def collate_fn_fix_val(self, batch: list) -> COLLATE_OUT_TYPE:
@@ -183,7 +187,7 @@ class NTUDataLoaders(object):
                 if (skeleton_seq[i, :] == np.zeros((1, 150))).all():
                     zero_row.append(i)
             skeleton_seq = np.delete(skeleton_seq, zero_row, axis=0)
-            skeleton_seq, subject_seq = turn_two_to_one(skeleton_seq)
+            skeleton_seq, subject_seq = self.turn_two_to_one(skeleton_seq)
             skeleton_seq, subject_seq = self.pad_sequence(
                 skeleton_seq=skeleton_seq,
                 subject_seq=subject_seq
@@ -229,60 +233,65 @@ class NTUDataLoaders(object):
             x = np.concatenate([x, pad], axis=0)
         return x
 
+    def turn_two_to_one(self,
+                        skeleton_seq: np.ndarray
+                        ) -> Tuple[np.ndarray, np.ndarray]:
+        new_skeleton_seq = []
+        subject_seq = []
+        for _, skel in enumerate(skeleton_seq):
+            if (skel[0:75] == np.zeros((1, 75))).all():
+                new_skeleton_seq.append(skel[75:])
+                subject_seq.append([1.0])
+            elif (skel[75:] == np.zeros((1, 75))).all():
+                new_skeleton_seq.append(skel[0:75])
+                subject_seq.append([0.0])
+            else:
+                new_skeleton_seq.append(skel[0:75])
+                new_skeleton_seq.append(skel[75:])
+                subject_seq.append([0.0])
+                subject_seq.append([1.0])
+        assert len(new_skeleton_seq) == len(subject_seq)
+        return np.array(new_skeleton_seq), np.array(subject_seq)
 
-def turn_two_to_one(skeleton_seq: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-    new_skeleton_seq = []
-    subject_seq = []
-    for _, skel in enumerate(skeleton_seq):
-        if (skel[0:75] == np.zeros((1, 75))).all():
-            new_skeleton_seq.append(skel[75:])
-            subject_seq.append([1.0])
-        elif (skel[75:] == np.zeros((1, 75))).all():
-            new_skeleton_seq.append(skel[0:75])
-            subject_seq.append([0.0])
+
+class FeederDataLoader(NTUDataLoaders):
+    def __init__(self, dataset='NTU60-CV', aug=1, seg=30, multi_test=5):
+        if 'CS' in dataset:
+            case = 0
+        elif 'CV' in dataset:
+            case = 1
         else:
-            new_skeleton_seq.append(skel[0:75])
-            new_skeleton_seq.append(skel[75:])
-            subject_seq.append([0.0])
-            subject_seq.append([1.0])
-    assert len(new_skeleton_seq) == len(subject_seq)
-    return np.array(new_skeleton_seq), np.array(subject_seq)
+            case = -1
+        super(FeederDataLoader, self).__init__(
+            dataset, case, aug, seg, multi_test)
 
-
-def _rot(rot: torch.Tensor) -> torch.Tensor:
-    cos_r, sin_r = rot.cos(), rot.sin()
-    zeros = rot.new(rot.size()[:2] + (1,)).zero_()
-    ones = rot.new(rot.size()[:2] + (1,)).fill_(1)
-
-    r1 = torch.stack((ones, zeros, zeros), dim=-1)
-    rx2 = torch.stack((zeros, cos_r[:, :, 0:1], sin_r[:, :, 0:1]), dim=-1)
-    rx3 = torch.stack((zeros, -sin_r[:, :, 0:1], cos_r[:, :, 0:1]), dim=-1)
-    rx = torch.cat((r1, rx2, rx3), dim=2)
-
-    ry1 = torch.stack((cos_r[:, :, 1:2], zeros, -sin_r[:, :, 1:2]), dim=-1)
-    r2 = torch.stack((zeros, ones, zeros), dim=-1)
-    ry3 = torch.stack((sin_r[:, :, 1:2], zeros, cos_r[:, :, 1:2]), dim=-1)
-    ry = torch.cat((ry1, r2, ry3), dim=2)
-
-    rz1 = torch.stack((cos_r[:, :, 2:3], sin_r[:, :, 2:3], zeros), dim=-1)
-    r3 = torch.stack((zeros, zeros, ones), dim=-1)
-    rz2 = torch.stack((-sin_r[:, :, 2:3], cos_r[:, :, 2:3], zeros), dim=-1)
-    rz = torch.cat((rz1, rz2, r3), dim=2)
-
-    rot = rz.matmul(ry).matmul(rx)
-    return rot
-
-
-def _transform(x: torch.Tensor, theta: float) -> torch.Tensor:
-    x = x.contiguous().view(x.size()[:2] + (-1, 3))
-    rot = x.new(x.size()[0], 3).uniform_(-theta, theta)
-    # rot = np.float32(np.random.uniform(-theta, theta, (1, 3)))
-    # rot = torch.from_numpy(rot)
-    rot = rot.repeat(1, x.size()[1])
-    rot = rot.contiguous().view((-1, x.size()[1], 3))
-    rot = _rot(rot)
-    x = torch.transpose(x, 2, 3)
-    x = torch.matmul(rot, x)
-    x = torch.transpose(x, 2, 3)
-    x = x.contiguous().view(x.size()[:2] + (-1,))
-    return x
+    def get_loader(self,
+                   feeder: Dataset,
+                   world_size: int = 1,
+                   rank: int = 0,
+                   ddp: bool = False,
+                   shuffle_ds: bool = False,
+                   shuffle_dl: bool = False,
+                   batch_size: int = 1,
+                   num_worker: int = 1,
+                   drop_last: bool = False,
+                   worker_init_fn=None,
+                   collate_fn: str = None
+                   ):
+        data_sampler = DistributedSampler(
+            dataset=feeder,
+            num_replicas=world_size,
+            rank=rank,
+            shuffle=shuffle_ds
+        ) if ddp else None
+        data_loader = DataLoader(
+            dataset=feeder,
+            batch_size=batch_size,
+            shuffle=shuffle_dl,
+            sampler=data_sampler,
+            num_workers=num_worker,
+            drop_last=drop_last,
+            worker_init_fn=worker_init_fn,
+            collate_fn=collate_fn
+        )
+        return data_loader

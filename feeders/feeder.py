@@ -7,7 +7,6 @@ import torch
 from torch.utils.data import Dataset, DataLoader, DistributedSampler
 
 from feeders import tools
-from feeders.sgn_dataloader import NTUDataLoaders, _transform
 
 from main_utils import init_seed
 
@@ -179,49 +178,6 @@ class Feeder(Dataset):
         rank = score.argsort()
         hit_top_k = [l in rank[i, -top_k:] for i, l in enumerate(self.label)]
         return sum(hit_top_k) * 1.0 / len(hit_top_k)
-
-
-class FeederDataLoader(NTUDataLoaders):
-    def __init__(self, dataset='NTU60-CV', aug=1, seg=30, multi_test=5):
-        if 'CS' in dataset:
-            case = 0
-        elif 'CV' in dataset:
-            case = 1
-        else:
-            case = -1
-        super(FeederDataLoader, self).__init__(
-            dataset, case, aug, seg, multi_test)
-
-    def get_loader(self,
-                   feeder: Dataset,
-                   world_size: int = 1,
-                   rank: int = 0,
-                   ddp: bool = False,
-                   shuffle_ds: bool = False,
-                   shuffle_dl: bool = False,
-                   batch_size: int = 1,
-                   num_worker: int = 1,
-                   drop_last: bool = False,
-                   worker_init_fn=None,
-                   collate_fn: str = None
-                   ):
-        data_sampler = DistributedSampler(
-            dataset=feeder,
-            num_replicas=world_size,
-            rank=rank,
-            shuffle=shuffle_ds
-        ) if ddp else None
-        data_loader = DataLoader(
-            dataset=feeder,
-            batch_size=batch_size,
-            shuffle=shuffle_dl,
-            sampler=data_sampler,
-            num_workers=num_worker,
-            drop_last=drop_last,
-            worker_init_fn=worker_init_fn,
-            collate_fn=collate_fn
-        )
-        return data_loader
 
 
 def import_class(name):

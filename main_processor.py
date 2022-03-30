@@ -21,10 +21,9 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 
 from torch.profiler import profile, schedule, tensorboard_trace_handler
 from torch.utils.tensorboard import SummaryWriter
-from torch.utils.data import DataLoader, DistributedSampler
 from tqdm import tqdm
 
-from feeders.feeder import FeederDataLoader
+from feeders.loader import FeederDataLoader
 
 from model.module.loss import LabelSmoothingLoss
 
