@@ -2,10 +2,14 @@
 
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
-from torch.utils.data import Dataset, DataLoader
 import torch
+from torch.utils.data import Dataset, DataLoader
+
 import numpy as np
-# import h5py
+from typing import Tuple, Callable
+
+
+COLLATE_OUT_TYPE = Tuple[Tuple[torch.Tensor, torch.Tensor], torch.Tensor, None]
 
 
 class NTUDataset(Dataset):
@@ -72,34 +76,22 @@ class NTUDataLoaders(object):
     def get_test_size(self):
         return len(self.test_Y)
 
-    # def create_datasets(self):
-    #     if self.dataset == 'NTU':
-    #         if self.case == 0:
-    #             self.metric = 'CS'
-    #         elif self.case == 1:
-    #             self.metric = 'CV'
-    #         path = osp.join('./data/ntu', 'NTU_' + self.metric + '.h5')
+    def collate_fn_fix(self,
+                       batch: list,
+                       sampling_frequency: int,
+                       sort_data: bool,
+                       ) -> COLLATE_OUT_TYPE:
+        """Puts each data field into a tensor with outer dimension batch size.
 
-    #     f = h5py.File(path, 'r')
-    #     self.train_X = f['x'][:]
-    #     self.train_Y = np.argmax(f['y'][:], -1)
-    #     self.val_X = f['valid_x'][:]
-    #     self.val_Y = np.argmax(f['valid_y'][:], -1)
-    #     self.test_X = f['test_x'][:]
-    #     self.test_Y = np.argmax(f['test_y'][:], -1)
-    #     f.close()
+        Args:
+            batch (list): A mini-batch list of data tuples from dataset.
+            sampling_frequency (int): sub-sampling frequency.
+            sort_data (bool): Whether to sort data based on valid length.
 
-    #     # Combine the training data and validation data togehter as ST-GCN
-    #     self.train_X = np.concatenate([self.train_X, self.val_X], axis=0)
-    #     self.train_Y = np.concatenate([self.train_Y, self.val_Y], axis=0)
-    #     self.val_X = self.test_X
-    #     self.val_Y = self.test_Y
-
-    def collate_fn_fix_train(self, batch):
-        """Puts each data field into a tensor with outer dimension batch size
+        Returns:
+            COLLATE_OUT_TYPE: tuple of data, label, None
         """
-        # c,t,v,m
-        x, y, _ = zip(*batch)  # (30, 41, 10, 41, 55, 4, 15, 23)
+        x, y, _ = zip(*batch)
         x = [i.transpose(1, 3, 2, 0).reshape(x[0].shape[1], -1) for i in x]
 
         if 'kinetics' in self.dataset:
@@ -108,13 +100,35 @@ class NTUDataLoaders(object):
             x = x.reshape(-1, x.shape[1] * x.shape[2], x.shape[3]*x.shape[4])
             x = list(x)
 
-        x, y = self.Tolist_fix(x, y, train=1)  # 1 new subsampled seq
-        lens = np.array([x_.shape[0] for x_ in x], dtype=np.int)
-        # sort sequence by valid length in descending order
-        idx = lens.argsort()[::-1]
-        y = np.array(y)[idx]
-        x = torch.stack([torch.from_numpy(x[i]) for i in idx], 0)
+        x, s, y = self.to_fix_length(x, y, sampling_frequency)
 
+        if sort_data:
+            # sort sequence by valid length in descending order
+            lens = np.array([x_.shape[0] for x_ in x], dtype=np.int)
+            idx = lens.argsort()[::-1]
+            y = np.array(y)[idx]
+        else:
+            idx = range(len(x))
+
+        x = torch.stack([torch.from_numpy(x[i]) for i in idx], 0)
+        s = torch.stack([torch.from_numpy(s[i]) for i in idx], 0)
+        y = torch.LongTensor(y)
+        return (x, s), y, None
+
+    def collate_fn_fix_train(self, batch: list) -> COLLATE_OUT_TYPE:
+        """Puts each data field into a tensor with outer dimension batch size
+        for training.
+
+        Args:
+            batch (list): A mini-batch list of data tuples from dataset.
+
+        Returns:
+            COLLATE_OUT_TYPE: tuple of data, label, None
+        """
+        (x, x1), y, _ = self.collate_fn_fix(batch,
+                                            sampling_frequency=1,
+                                            sort_data=True)
+        # data augmentation
         if 'NTU60' in self.dataset:
             if self.case == 0:
                 theta = 0.3
@@ -122,110 +136,120 @@ class NTUDataLoaders(object):
                 theta = 0.5
         elif 'NTU120' in self.dataset:
             theta = 0.3
-
-        # data augmentation
-        x = _transform(x, theta)
-        # data augmentation
-        y = torch.LongTensor(y)
-
-        return x, y, None
-
-    def collate_fn_fix_val(self, batch):
-        """Puts each data field into a tensor with outer dimension batch size
-        """
-        x, y, _ = zip(*batch)
-        x = [i.transpose(1, 3, 2, 0).reshape(x[0].shape[1], -1) for i in x]
-        x, y = self.Tolist_fix(x, y, train=1)  # 1 new subsampled seq
-        idx = range(len(x))
-        y = np.array(y)
-        x = torch.stack([torch.from_numpy(x[i]) for i in idx], 0)
-        y = torch.LongTensor(y)
-        return x, y, None
-
-    def collate_fn_fix_test(self, batch):
-        """Puts each data field into a tensor with outer dimension batch size
-        """
-        x, y, _ = zip(*batch)
-        x = [i.transpose(1, 3, 2, 0).reshape(x[0].shape[1], -1) for i in x]
-        x, labels = self.Tolist_fix(x, y, train=self.multi_test)
-        idx = range(len(x))
-        y = np.array(y)
-        x = torch.stack([torch.from_numpy(x[i]) for i in idx], 0)
-        y = torch.LongTensor(y)
-        return x, y, None
-
-    def Tolist_fix(self, joints, y, train=1):
-        seqs = []
-
-        for idx, seq in enumerate(joints):
-            zero_row = []
-            for i in range(len(seq)):
-                if (seq[i, :] == np.zeros((1, 150))).all():
-                    zero_row.append(i)
-
-            seq = np.delete(seq, zero_row, axis=0)
-
-            seq = turn_two_to_one(seq)
-            seqs = self.sub_seq(seqs, seq, train=train)
-
-        return seqs, y
-
-    def sub_seq(self, seqs, seq, train=1):
-        group = self.seg
-
-        if 'SYSU' in self.dataset:
-            seq = seq[::2, :]
-
-        if seq.shape[0] < self.seg:
-            pad = np.zeros(
-                (self.seg - seq.shape[0], seq.shape[1])).astype(np.float32)
-            seq = np.concatenate([seq, pad], axis=0)
-
-        ave_duration = seq.shape[0] // group
-
-        if train >= 1:
-            for _ in range(train):
-                offsets = np.multiply(
-                    list(range(group)), ave_duration) + \
-                    np.random.randint(ave_duration, size=group)
-                seqs.append(seq[offsets])
-
-        return seqs
-
-
-class AverageMeter(object):
-    """Computes and stores the average and current value"""
-
-    def __init__(self):
-        self.reset()
-
-    def reset(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
-
-    def update(self, val, n=1):
-        self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count
-
-
-def turn_two_to_one(seq):
-    new_seq = list()
-    for idx, ske in enumerate(seq):
-        if (ske[0:75] == np.zeros((1, 75))).all():
-            new_seq.append(ske[75:])
-        elif (ske[75:] == np.zeros((1, 75))).all():
-            new_seq.append(ske[0:75])
         else:
-            new_seq.append(ske[0:75])
-            new_seq.append(ske[75:])
-    return np.array(new_seq)
+            raise ValueError("unknown dataset name")
+        x = _transform(x, theta)
+        return (x, x1), y, None
+
+    def collate_fn_fix_val(self, batch: list) -> COLLATE_OUT_TYPE:
+        """Puts each data field into a tensor with outer dimension batch size
+        for validation.
+
+        Args:
+            batch (list): A mini-batch list of data tuples from dataset.
+
+        Returns:
+            COLLATE_OUT_TYPE: tuple of data, label, None
+        """
+        return self.collate_fn_fix(batch,
+                                   sampling_frequency=1,
+                                   sort_data=False)
+
+    def collate_fn_fix_test(self, batch: list) -> COLLATE_OUT_TYPE:
+        """Puts each data field into a tensor with outer dimension batch size
+        for testing.
+
+        Args:
+            batch (list): A mini-batch list of data tuples from dataset.
+
+        Returns:
+            COLLATE_OUT_TYPE: tuple of data, label, None
+        """
+        return self.collate_fn_fix(batch,
+                                   sampling_frequency=self.multi_test,
+                                   sort_data=False)
+
+    def to_fix_length(self,
+                      skeleton_seqs: list,
+                      labels: list,
+                      sampling_frequency: int = 1) -> Tuple[list, list, list]:
+        # skeleton_seqs: n,t,mvc
+        # labels: n
+        new_skeleton_seqs = []
+        subject_seqs = []
+        for _, skeleton_seq in enumerate(skeleton_seqs):
+            zero_row = []
+            for i in range(len(skeleton_seq)):
+                if (skeleton_seq[i, :] == np.zeros((1, 150))).all():
+                    zero_row.append(i)
+            skeleton_seq = np.delete(skeleton_seq, zero_row, axis=0)
+            skeleton_seq, subject_seq = turn_two_to_one(skeleton_seq)
+            skeleton_seq, subject_seq = self.pad_sequence(
+                skeleton_seq=skeleton_seq,
+                subject_seq=subject_seq
+            )
+            skeleton_seqs, subject_seqs = self.subsample_sequence(
+                skeleton_seq=skeleton_seq,
+                subject_seq=subject_seq,
+                skeleton_seqs=new_skeleton_seqs,
+                subject_seqs=subject_seqs,
+                sampling_frequency=sampling_frequency
+            )
+        return new_skeleton_seqs, subject_seqs, labels
+
+    def subsample_sequence(self,
+                           skeleton_seq: np.ndarray,
+                           subject_seq: np.ndarray,
+                           skeleton_seqs: list,
+                           subject_seqs: list,
+                           sampling_frequency: int = 1) -> Tuple[list, list]:
+        ave_duration = skeleton_seq.shape[0] // self.seg
+        assert sampling_frequency >= 1
+        for _ in range(sampling_frequency):
+            offsets = np.multiply(list(range(self.seg)), ave_duration)
+            offsets += np.random.randint(ave_duration, size=self.seg)
+            skeleton_seqs.append(skeleton_seq[offsets])
+            subject_seqs.append(subject_seq[offsets])
+        return skeleton_seqs, subject_seqs
+
+    def pad_sequence(self,
+                     skeleton_seq: np.ndarray,
+                     subject_seq: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        if 'SYSU' in self.dataset:
+            skeleton_seq = skeleton_seq[::2, :]
+            subject_seq = subject_seq[::2, :]
+        skeleton_seq = self.pad_to_segment_length(skeleton_seq)
+        subject_seq = self.pad_to_segment_length(subject_seq)
+        return skeleton_seq, subject_seq
+
+    def pad_to_segment_length(self, x: np.ndarray) -> np.ndarray:
+        if x.shape[0] < self.seg:
+            shape = (self.seg - x.shape[0], x.shape[1])
+            pad = np.zeros(shape, dtype=np.float32)
+            x = np.concatenate([x, pad], axis=0)
+        return x
 
 
-def _rot(rot):
+def turn_two_to_one(skeleton_seq: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    new_skeleton_seq = []
+    subject_seq = []
+    for _, skel in enumerate(skeleton_seq):
+        if (skel[0:75] == np.zeros((1, 75))).all():
+            new_skeleton_seq.append(skel[75:])
+            subject_seq.append([1.0])
+        elif (skel[75:] == np.zeros((1, 75))).all():
+            new_skeleton_seq.append(skel[0:75])
+            subject_seq.append([0.0])
+        else:
+            new_skeleton_seq.append(skel[0:75])
+            new_skeleton_seq.append(skel[75:])
+            subject_seq.append([0.0])
+            subject_seq.append([1.0])
+    assert len(new_skeleton_seq) == len(subject_seq)
+    return np.array(new_skeleton_seq), np.array(subject_seq)
+
+
+def _rot(rot: torch.Tensor) -> torch.Tensor:
     cos_r, sin_r = rot.cos(), rot.sin()
     zeros = rot.new(rot.size()[:2] + (1,)).zero_()
     ones = rot.new(rot.size()[:2] + (1,)).fill_(1)
@@ -249,7 +273,7 @@ def _rot(rot):
     return rot
 
 
-def _transform(x, theta):
+def _transform(x: torch.Tensor, theta: float) -> torch.Tensor:
     x = x.contiguous().view(x.size()[:2] + (-1, 3))
     rot = x.new(x.size()[0], 3).uniform_(-theta, theta)
     # rot = np.float32(np.random.uniform(-theta, theta, (1, 3)))
@@ -260,6 +284,5 @@ def _transform(x, theta):
     x = torch.transpose(x, 2, 3)
     x = torch.matmul(rot, x)
     x = torch.transpose(x, 2, 3)
-
     x = x.contiguous().view(x.size()[:2] + (-1,))
     return x

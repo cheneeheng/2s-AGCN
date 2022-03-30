@@ -357,6 +357,12 @@ class Processor():
         else:
             raise ValueError()
 
+    def to_float_cuda(self, x: torch.Tensor) -> torch.Tensor:
+        return x.float().cuda(self.output_device, non_blocking=True)
+
+    def to_long_cuda(self, x: torch.Tensor) -> torch.Tensor:
+        return x.long().cuda(self.output_device, non_blocking=True)
+
     # **************************************************************************
     # TRAIN AND EVAL
     # **************************************************************************
@@ -430,15 +436,15 @@ class Processor():
             self.global_step += 1
 
             # 5.1. get data
-            data = data.float().cuda(self.output_device, non_blocking=True)
-            label = label.long().cuda(self.output_device, non_blocking=True)
+            data = tuple(self.to_float_cuda(i) for i in data)
+            label = self.to_long_cuda(label)
             timer['dataloader'] += self.split_time()
 
             # 5.2. forward + backward + optimize
             if self.arg.optimizer == 'SAM_SGD':
                 # 1. first forward-backward pass
                 enable_running_stats(self.model)
-                output, _ = self.model(data)
+                output, _ = self.model(*data)
                 if isinstance(output, tuple):
                     output, l1 = output
                     l1 = l1.mean()
@@ -556,8 +562,10 @@ class Processor():
             f_w = open(wrong_file, 'w')
         if result_file is not None:
             f_r = open(result_file, 'w')
+
         self.model.eval()
         self.print_log(f'Eval epoch: {epoch + 1}')
+
         for ln in loader_name:
             loss_value = []
             score_frag = []
@@ -568,24 +576,32 @@ class Processor():
                                position=self.rank)
             else:
                 process = self.data_loader[ln]
+
             for batch_idx, (data, label, index) in enumerate(process):
+
                 with torch.no_grad():
-                    data = data.float().cuda(self.output_device)
-                    label = label.long().cuda(self.output_device)
-                    output, _ = self.model(data)
+
+                    data = tuple(self.to_float_cuda(i) for i in data)
+                    label = self.to_long_cuda(label)
+
+                    output, _ = self.model(*data)
+
                     if isinstance(output, tuple):
                         output, l1 = output
                         l1 = l1.mean()
                     else:
                         l1 = 0
+
                     if self.arg.use_sgn_dataloader and self.arg.test_dataloader_args['multi_test'] > 1:  # noqa
                         output = output.view(
                             (-1, data.size(0)//label.size(0), output.size(1)))
                         output = output.mean(1)
+
                     loss = self.loss(output, label) + l1
                     score_frag.append(output.data.cpu().numpy())
                     loss_value.append(loss.data.item())
                     _, predict_label = torch.max(output.data, 1)
+
                     step += 1
 
                 if wrong_file is not None or result_file is not None:

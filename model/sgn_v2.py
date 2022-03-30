@@ -197,7 +197,7 @@ class SGN(nn.Module):
     def pad_zeros(self, x: torch.Tensor) -> torch.Tensor:
         return torch.cat([x.new(*x.shape[:-1], 1).zero_(), x], dim=-1)
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor, x1: torch.Tensor):
         bs, step, dim = x.shape
         assert dim % 3 == 0, "Only support input of xyz coordinates only."
 
