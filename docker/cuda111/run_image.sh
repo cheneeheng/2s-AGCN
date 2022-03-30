@@ -1,6 +1,6 @@
 #! /bin/sh
 
-IMAGE_NAME="2s-agcn:cuda11.5.1-cudnn8-devel-ubuntu20.04"
+IMAGE_NAME="2s-agcn:cuda11.1.1-cudnn8-devel-ubuntu20.04"
 
 CODE_PATH="/home/dhm/workspace/demo_event/code/2s-AGCN"
 DATA_PATH="/home/dhm/workspace/demo_event/data/2s-agcn"

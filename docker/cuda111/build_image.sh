@@ -1,6 +1,6 @@
 #! /bin/sh
 
-IMAGE_NAME="2s-agcn:cuda11.5.1-cudnn8-devel-ubuntu20.04"
+IMAGE_NAME="2s-agcn:cuda11.1.1-cudnn8-devel-ubuntu20.04"
 
 echo "Building image : ${IMAGE_NAME}"
 DOCKER_BUILDKIT=1 docker build \

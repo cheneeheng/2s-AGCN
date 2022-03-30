@@ -1,5 +1,5 @@
 # For more information, please refer to https://aka.ms/vscode-docker-python
-FROM nvidia/cuda:11.5.1-cudnn8-devel-ubuntu20.04
+FROM nvidia/cuda:11.1.1-cudnn8-devel-ubuntu20.04
 
 ENV LANG en_US.UTF-8
 
@@ -29,7 +29,7 @@ ENV PYTHONUNBUFFERED=1
 
 # ------------------------------------------------------------------------------
 # pytorch
-RUN pip install torch==1.11.0+cu115 torchvision==0.12.0+cu115 -f https://download.pytorch.org/whl/cu115/torch_stable.html
+RUN pip install torch==1.9.1+cu111 torchvision==0.10.1+cu111 -f https://download.pytorch.org/whl/cu111/torch_stable.html
 
 # ------------------------------------------------------------------------------
 # pip
