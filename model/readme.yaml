@@ -1142,8 +1142,10 @@ sgn_v2:
         - 220329160001_part:
                   - 94.0%
         - 220329160001_part_motion:
-        - 220329160001_part_motion_aspp:
                   - 94.3%
+        - 220329160001_part_motion_aspp:
+                  - stopped halfway, very slow
+                  - 93.8% at epoch ~70
 
 sgn_v3:
         - 220328170001_t3_gpshared:

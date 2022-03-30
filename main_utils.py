@@ -90,6 +90,10 @@ def get_parser():
                         default=1,
                         help='random seed for pytorch')
 
+    parser.add_argument('--profiler',
+                        type=str2bool,
+                        default=False)
+
     # dist settings
     parser.add_argument('--world-size',
                         type=int,

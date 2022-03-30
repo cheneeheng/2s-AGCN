@@ -19,6 +19,7 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel as DDP
 
+from torch.profiler import profile, schedule, tensorboard_trace_handler
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader, DistributedSampler
 from tqdm import tqdm
@@ -409,7 +410,22 @@ class Processor():
             process = loader
 
         # 5. Main loop
+        if self.arg.profiler:
+            prof = profile(
+                schedule=schedule(wait=1, warmup=1, active=5, repeat=1),  # noqa
+                on_trace_ready=tensorboard_trace_handler(self.arg.work_dir + '/trace'),  # noqa
+                record_shapes=True,
+                profile_memory=True,
+                with_stack=True
+            )
+            prof.start()
+            prof_flag = True
+
         for batch_idx, (data, label, index) in enumerate(process):
+
+            if batch_idx >= (1 + 1 + 5) * 1 and prof_flag:
+                prof_flag = False
+                prof.stop()
 
             self.global_step += 1
 
@@ -510,6 +526,9 @@ class Processor():
             #         '\tBatch({}/{}) done. Loss: {:.4f}  lr:{:.6f}'.format(
             #             batch_idx, len(loader), loss.data[0], lr))
             timer['statistics'] += self.split_time()
+
+            if prof_flag:
+                prof.step()
 
         # 6. Statistics of time consumption and loss
         proportion = {

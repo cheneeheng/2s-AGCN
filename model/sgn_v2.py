@@ -319,7 +319,7 @@ class embed(Module):
 
 
 class cnn1xn(Module):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, deterministic=True, **kwargs):
         super(cnn1xn, self).__init__(*args, **kwargs)
         assert isinstance(self.kernel_size, int)
         assert isinstance(self.padding, int)
@@ -330,9 +330,16 @@ class cnn1xn(Module):
                              padding=(0, self.padding),
                              dilation=self.dilation,
                              bias=self.bias)
+        self.deterministic = deterministic
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if not self.deterministic:
+            torch.backends.cudnn.deterministic = False
+            # torch.backends.cudnn.benchmark = True
         x = self.cnn(x)
+        if not self.deterministic:
+            torch.backends.cudnn.deterministic = True
+            # torch.backends.cudnn.benchmark = True
         return x
 
 
@@ -445,7 +452,8 @@ class atrous_spatial_pyramid_pooling(Module):
                                                kernel_size=3,
                                                padding=dil,
                                                dilation=dil,
-                                               bias=self.bias)),
+                                               bias=self.bias,
+                                               deterministic=False)),
                         (f'bn_{dil}', nn.BatchNorm2d(self.out_channels)),
                         (f'relu_{dil}', nn.ReLU()),
                     ])

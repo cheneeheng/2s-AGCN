@@ -86,6 +86,14 @@ class Feeder(Dataset):
                     self.label = pickle.load(f)
                 with open(self.data_path, 'rb') as f:
                     self.data = pickle.load(f)
+
+            # path = './data/data/ntu_sgn/processed_data/NTU_CV_val_label.pkl'
+            # with open(path, 'rb') as f:
+            #     self.label = pickle.load(f)
+            # path = './data/data/ntu_sgn/processed_data/NTU_CV_val.pkl'
+            # with open(path, 'rb') as f:
+            #     self.data = pickle.load(f)
+
             self.data = self.data.reshape(self.data.shape[0],
                                           self.data.shape[1], 2, 25, 3)  # NTU
             self.data = self.data.transpose((0, 4, 1, 3, 2))
