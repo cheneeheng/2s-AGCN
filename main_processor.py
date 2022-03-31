@@ -364,7 +364,7 @@ class Processor():
                 data: tuple,
                 label: Optional[torch.Tensor]
                 ) -> Tuple[tuple, Optional[torch.Tensor]]:
-        num_of_inputs = len(inspect.signature(self.model.forward))
+        num_of_inputs = len(inspect.signature(self.model.forward).parameters)
         data = tuple(self.to_float_cuda(data[i]) for i in range(num_of_inputs))
         if label is not None:
             label = self.to_long_cuda(label)
@@ -524,7 +524,7 @@ class Processor():
             if self.rank == 0:
                 self.train_writer.add_scalar('acc', acc, self.global_step)
                 self.train_writer.add_scalar('loss', _loss, self.global_step)
-                self.train_writer.add_scalar('loss_l1', l1, self.global_step)
+                # self.train_writer.add_scalar('loss_l1', l1, self.global_step)
                 # self.train_writer.add_scalar('batch_time', process.iterable.last_duration, self.global_step)  # noqa
 
             # 5.5. Statistics
