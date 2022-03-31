@@ -1,7 +1,7 @@
-work_dir: ./data/data/ntu_result/xview/sgn_v2/220329160001_part_motion_asppnodeterminitic_0135_rerun
-model_saved_name: ./data/data/ntu_result/xview/sgn_v2/220329160001_part_motion_asppnodeterminitic_0135_rerun/sgn
+work_dir: ./data/data/ntu_result/xview/sgn_v2/220329160001_part_motion_asppnodeterminitic_0135_rerun_delme
+model_saved_name: ./data/data/ntu_result/xview/sgn_v2/220329160001_part_motion_asppnodeterminitic_0135_rerun_delme/sgn
 
-phase: train
+phase: test
 save_score: True
 
 seed: 1337
@@ -50,6 +50,8 @@ model_args:
   motion: True
   aspp: [0, 1, 3, 5]
 label_smoothing: 0.1
+
+weights: ./data/data/ntu_result/xview/sgn_v2/220327213001_1337/sgn-119-70560.pt
 
 # optim
 device: [0]

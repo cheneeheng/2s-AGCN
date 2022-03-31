@@ -19,7 +19,7 @@ from data_gen.ntu_gendata import (
 from infer.data_preprocess import DataPreprocessor
 from data_gen.preprocess import pre_normalization
 from data_gen.ntu_gendata import read_xyz as reader
-from main_utils import get_parser, import_class, init_seed
+from utils.utils import get_parser, import_class, init_seed
 
 
 def softmax(x):

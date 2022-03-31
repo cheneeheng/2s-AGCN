@@ -11,7 +11,7 @@ from functools import partial
 from data_gen.preprocess import pre_normalization
 from feeders.loader import NTUDataLoaders
 from infer.data_preprocess import DataPreprocessor
-from main_utils import get_parser, import_class, init_seed
+from utils.utils import get_parser, import_class, init_seed
 
 
 def arg_parser(parser):

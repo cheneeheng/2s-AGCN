@@ -8,7 +8,7 @@ from torch.utils.data import Dataset, DataLoader, DistributedSampler
 
 from feeders import tools
 
-from main_utils import init_seed
+from utils.utils import init_seed
 
 from utils.visualization import visualize_3dskeleton_in_matplotlib
 

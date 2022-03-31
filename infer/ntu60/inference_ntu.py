@@ -19,7 +19,7 @@ from data_gen.ntu_gendata import (
 from infer.data_preprocess import DataPreprocessor
 from infer.inference import prepare_model, arg_parser, append_data_and_predict
 
-from main_utils import get_parser, init_seed
+from utils.utils import get_parser, init_seed
 
 
 def get_datasplit_and_labels(

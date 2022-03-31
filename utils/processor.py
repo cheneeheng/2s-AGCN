@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # from __future__ import print_function
 
+import argparse
 import inspect
 import json
 import numpy as np
@@ -17,7 +18,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.distributed as dist
-import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.profiler import profile, schedule, tensorboard_trace_handler
 from torch.utils.tensorboard import SummaryWriter
@@ -29,46 +29,32 @@ from sam.sam.sam import SAM
 from sam.sam.example.utility.bypass_bn import enable_running_stats
 from sam.sam.example.utility.bypass_bn import disable_running_stats
 
-from main_utils import *
+from utils.utils import *
 
 
 __all__ = ['Processor']
 
 
-class Processor():
+class Processor(object):
     """Processor for Skeleton-based Action Recognition """
 
-    def __init__(self, arg, rank=0, save_arg=True):
+    def __init__(self,
+                 arg: argparse.Namespace,
+                 rank: int = 0,
+                 save_arg: bool = True):
         self.rank = rank
         self.arg = arg
         if save_arg:
             self.save_arg()
         if self.rank == 0:
             if arg.phase == 'train':
-                if not arg.train_feeder_args['debug']:
-                    if os.path.isdir(arg.model_saved_name):
-                        if self.arg.weights is None:
-                            raise ValueError(f'log_dir: {arg.model_saved_name} already exist')  # noqa
-                        # print('log_dir: ', arg.model_saved_name, 'already exist')  # noqa
-                        # answer = input('delete it? y/n:')
-                        # if answer == 'y':
-                        #     shutil.rmtree(arg.model_saved_name)
-                        #     print('Dir removed: ', arg.model_saved_name)
-                        #     input('Refresh the website of tensorboard by pressing any keys')  # noqa
-                        # else:
-                        #     print('Dir not removed: ', arg.model_saved_name)
-                    self.train_writer = SummaryWriter(
-                        os.path.join(arg.model_saved_name, 'train'), 'train')
-                    self.val_writer = SummaryWriter(
-                        os.path.join(arg.model_saved_name, 'val'), 'val')
-                else:
-                    self.train_writer = self.val_writer = SummaryWriter(
-                        os.path.join(arg.model_saved_name, 'test'), 'test')
+                self.create_folder_and_writer()
         self.global_step = 0
+        self.best_acc = 0
         self.load_data()
         self.load_model()
         self.load_optimizer()
-        self.best_acc = 0
+        self.load_scheduler()
 
     def save_arg(self):
         # save arg
@@ -85,26 +71,180 @@ class Processor():
             else:
                 raise ValueError("Unknown config format...")
 
-    # **************************************************************************
-    # LOADERS
-    # **************************************************************************
+    # --------------------------------------------------------------------------
+    # UTILS
+    # --------------------------------------------------------------------------
 
-    def load_model(self):
+    def create_folder_and_writer(self):
+        def _join(x): return os.path.join(self.arg.model_saved_name, x)
+        if not self.arg.train_feeder_args['debug']:
+            if os.path.isdir(self.arg.model_saved_name):
+                if self.arg.weights is None:
+                    msg = f'log_dir: {self.arg.model_saved_name} already exist'
+                    raise ValueError(msg)
+            self.train_writer = SummaryWriter(_join('train'), 'train')
+            self.val_writer = SummaryWriter(_join('val'), 'val')
+        else:
+            self.train_writer = SummaryWriter(_join('test'), 'test')
+            self.val_writer = self.train_writer
+
+    def print_time(self):
+        localtime = time.asctime(time.localtime(time.time()))
+        self.print_log("Local current time :  " + localtime)
+
+    def print_log(self, msg: str, print_time: bool = True):
+        if self.rank == 0:
+            if print_time:
+                localtime = time.asctime(time.localtime(time.time()))
+                msg = "[ " + localtime + ' ] ' + msg
+            print(msg)
+            if self.arg.print_log:
+                with open(f'{self.arg.work_dir}/log.txt', 'a') as f:
+                    print(msg, file=f)
+
+    def record_time(self) -> float:
+        self.cur_time = time.time()
+        return self.cur_time
+
+    def split_time(self) -> float:
+        split_time = time.time() - self.cur_time
+        self.record_time()
+        return split_time
+
+    def to_float_cuda(self, x: torch.Tensor) -> torch.Tensor:
+        return x.float().cuda(self.output_device, non_blocking=True)
+
+    def to_long_cuda(self, x: torch.Tensor) -> torch.Tensor:
+        return x.long().cuda(self.output_device, non_blocking=True)
+
+    def to_cuda(self,
+                data: tuple,
+                label: Optional[torch.Tensor]
+                ) -> Tuple[tuple, Optional[torch.Tensor]]:
+        num_of_inputs = len(inspect.signature(self.model.forward).parameters)
+        data = tuple(self.to_float_cuda(data[i]) for i in range(num_of_inputs))
+        if label is not None:
+            label = self.to_long_cuda(label)
+        return data, label
+
+    def tensor_to_value(self, x: torch.Tensor) -> float:
+        if self.arg.ddp:
+            dist.all_reduce(x, op=dist.ReduceOp.SUM)
+            return x.data.item() / self.arg.world_size
+        else:
+            return x.data.item()
+
+    # --------------------------------------------------------------------------
+    # WRITERS
+    # --------------------------------------------------------------------------
+
+    def load_profilers(self):
+        self.prof = profile(
+            schedule=schedule(wait=1, warmup=1, active=5, repeat=1),  # noqa
+            on_trace_ready=tensorboard_trace_handler(self.arg.work_dir + '/trace'),  # noqa
+            record_shapes=True,
+            profile_memory=True,
+            with_stack=True
+        )
+        self.prof.start()
+
+    def save_scores(self, epoch: int, loader_name: str, score: np.ndarray):
+        sample_name = self.data_loader[loader_name].dataset.sample_name
+        score_dict = dict(zip(sample_name, score))
+        if self.arg.ddp:
+            dist_tmp = [None for _ in range(self.arg.world_size)]
+            dist.all_gather_object(dist_tmp, score_dict)
+            score_dict = {k: v for d in dist_tmp for k, v in d.items()}
+        path = f'{self.arg.work_dir}/epoch{epoch + 1}_{loader_name}_score.pkl'
+        with open(path, 'wb') as f:
+            pickle.dump(score_dict, f)
+
+    def writer(self, mode: str, acc: float, loss: float):
+        if mode == 'train':
+            self.train_writer.add_scalar('acc', acc, self.global_step)
+            self.train_writer.add_scalar('loss', loss, self.global_step)
+            # self.train_writer.add_scalar('loss_l1', l1, self.global_step)
+            # self.train_writer.add_scalar('batch_time', process.iterable.last_duration, self.global_step)  # noqa
+            _lr = self.optimizer.param_groups[0]['lr']
+            self.train_writer.add_scalar('lr', _lr, self.global_step)
+        elif mode == 'val':
+            self.val_writer.add_scalar('loss', loss, self.global_step)
+            self.val_writer.add_scalar('acc', acc, self.global_step)
+
+    # --------------------------------------------------------------------------
+    # WEIGHTS
+    # --------------------------------------------------------------------------
+
+    def save_weights(self, epoch: int):
+        state_dict = self.model.state_dict()
+        weights = OrderedDict([[k.split('module.')[-1], v.cpu()]
+                               for k, v in state_dict.items()])
+        torch.save(weights, self.arg.model_saved_name + '-' +
+                   str(epoch) + '-' + str(int(self.global_step)) + '.pt')
+
+    def load_weights(self):
+        self.global_step = int(self.arg.weights[:-3].split('-')[-1])
+        self.print_log(f'Load weights from {self.arg.weights}')
+        if '.pkl' in self.arg.weights:
+            with open(self.arg.weights, 'r') as f:
+                weights = pickle.load(f)
+        else:
+            weights = torch.load(self.arg.weights)
+        # dpp default scope naming is different
+        if not self.arg.ddp:
+            weights = OrderedDict(
+                [[k.split('module.')[-1],
+                    v.cuda(self.output_device)] for k, v in weights.items()])
+        else:
+            weights = OrderedDict(
+                [[k if k[:7] == 'module.' else 'module.'+k,
+                    v.cuda(self.output_device)] for k, v in weights.items()])
+        # weights to ignore
+        keys = list(weights.keys())
+        for w in self.arg.ignore_weights:
+            for key in keys:
+                if w in key:
+                    if weights.pop(key, None) is not None:
+                        self.print_log(
+                            f'Sucessfully Remove Weights: {key}')
+                    else:
+                        self.print_log(f'Can Not Remove Weights: {key}')
+        # load weights
+        try:
+            self.model.load_state_dict(weights)
+        except:  # noqa
+            state = self.model.state_dict()
+            diff = list(set(state.keys()).difference(set(weights.keys())))
+            print('Can not find these weights:')
+            for d in diff:
+                print('  ' + d)
+            state.update(weights)
+            self.model.load_state_dict(state)
+
+    # --------------------------------------------------------------------------
+    # MODEL
+    # --------------------------------------------------------------------------
+
+    def get_output_device(self):
         if self.arg.ddp:
             self.output_device = self.rank
         else:
-            output_device = self.arg.device[0] if type(
-                self.arg.device) is list else self.arg.device
+            if type(self.arg.device) is list:
+                output_device = self.arg.device[0]
+            else:
+                output_device = self.arg.device
             self.output_device = output_device
+
+    def get_model(self):
         Model = import_class(self.arg.model)
         if self.rank == 0:
             shutil.copy2(inspect.getfile(Model), self.arg.work_dir)
-        # print(Model)
         self.model = Model(**self.arg.model_args).cuda(self.output_device)
         if self.arg.ddp:
             self.model = nn.SyncBatchNorm.convert_sync_batchnorm(self.model)
             self.model = DDP(self.model, device_ids=[self.rank])
-        # print(self.model)
+
+    def get_loss(self):
         if self.arg.label_smoothing > 0.0:
             self.loss = LabelSmoothingLoss(
                 classes=self.arg.model_args.get('num_class', None),
@@ -112,54 +252,51 @@ class Processor():
         else:
             self.loss = nn.CrossEntropyLoss().cuda(self.output_device)
 
+    def load_model(self):
+        self.get_output_device()
+        self.get_model()
+        self.get_loss()
         if self.arg.weights:
-            self.global_step = int(self.arg.weights[:-3].split('-')[-1])
-            self.print_log(f'Load weights from {self.arg.weights}')
-            if '.pkl' in self.arg.weights:
-                with open(self.arg.weights, 'r') as f:
-                    weights = pickle.load(f)
-            else:
-                weights = torch.load(self.arg.weights)
-
-            if not self.arg.ddp:
-                weights = OrderedDict(
-                    [[k.split('module.')[-1],
-                      v.cuda(self.output_device)] for k, v in weights.items()])
-            else:
-                weights = OrderedDict(
-                    [[k if k[:7] == 'module.' else 'module.'+k,
-                      v.cuda(self.output_device)] for k, v in weights.items()])
-
-            keys = list(weights.keys())
-            for w in self.arg.ignore_weights:
-                for key in keys:
-                    if w in key:
-                        if weights.pop(key, None) is not None:
-                            self.print_log(
-                                f'Sucessfully Remove Weights: {key}')
-                        else:
-                            self.print_log(f'Can Not Remove Weights: {key}')
-
-            try:
-                self.model.load_state_dict(weights)
-            except:  # noqa
-                state = self.model.state_dict()
-                diff = list(set(state.keys()).difference(set(weights.keys())))
-                print('Can not find these weights:')
-                for d in diff:
-                    print('  ' + d)
-                state.update(weights)
-                self.model.load_state_dict(state)
-
+            self.load_weights()
+        # non ddp multigpu
         if not self.arg.ddp:
-            if type(self.arg.device) is list:
+            if isinstance(self.arg.device, list):
                 if len(self.arg.device) > 1:
                     self.model = nn.DataParallel(
                         self.model,
                         device_ids=self.arg.device,
-                        output_device=self.output_device)
+                        output_device=self.output_device
+                    )
 
-    def load_optimizer(self):
+    # --------------------------------------------------------------------------
+    # OPTIMIZER, SCHEDULER
+    # --------------------------------------------------------------------------
+
+    def adjust_learning_rate(self, epoch: int):
+        opts1 = ['SGD', 'SAM_SGD', 'Adam', 'AdamW']
+        opts2 = ['SGD-LLRD', 'AdamW-LLRD']
+        if self.arg.optimizer in opts1:
+            if epoch < self.arg.warm_up_epoch:
+                lr = self.arg.base_lr * (epoch + 1) / self.arg.warm_up_epoch
+            else:
+                lr = self.arg.base_lr * (
+                    0.1 ** np.sum(epoch >= np.array(self.arg.step)))
+            for param_group in self.optimizer.param_groups:
+                param_group['lr'] = lr
+            return lr
+        elif self.arg.optimizer in opts2:
+            for param_group in self.optimizer.param_groups:
+                if epoch < self.arg.warm_up_epoch:
+                    lr = param_group['base_lr'] * \
+                        (epoch + 1) / self.arg.warm_up_epoch
+                else:
+                    lr = param_group['base_lr'] * (
+                        0.1 ** np.sum(epoch >= np.array(self.arg.step)))
+                param_group['lr'] = lr
+        else:
+            raise ValueError()
+
+    def get_params_lists(self):
         if 'LLRD' in self.arg.optimizer:
             params_dict = {}
             for (k, v) in self.model.named_parameters():
@@ -177,9 +314,14 @@ class Processor():
                 else:
                     lr = self.arg.base_lr * self.arg.llrd_factor**idx
                     params_list.append({'params': v, 'lr': lr, 'base_lr': lr})
+        else:
+            params_list = self.model.parameters()
+        return params_list
 
+    def load_optimizer(self):
+        params_list = self.get_params_lists()
         if self.arg.optimizer == 'SGD':
-            self.optimizer = optim.SGD(self.model.parameters(),
+            self.optimizer = optim.SGD(params_list,
                                        lr=self.arg.base_lr,
                                        momentum=0.9,
                                        nesterov=self.arg.nesterov,
@@ -191,11 +333,11 @@ class Processor():
                                        nesterov=self.arg.nesterov,
                                        weight_decay=self.arg.weight_decay)
         elif self.arg.optimizer == 'Adam':
-            self.optimizer = optim.Adam(self.model.parameters(),
+            self.optimizer = optim.Adam(params_list,
                                         lr=self.arg.base_lr,
                                         weight_decay=self.arg.weight_decay)
         elif self.arg.optimizer == 'AdamW':
-            self.optimizer = optim.AdamW(self.model.parameters(),
+            self.optimizer = optim.AdamW(params_list,
                                          lr=self.arg.base_lr,
                                          weight_decay=self.arg.weight_decay,
                                          eps=self.arg.eps)
@@ -204,15 +346,16 @@ class Processor():
                                          lr=self.arg.base_lr,
                                          weight_decay=self.arg.weight_decay)
         elif self.arg.optimizer == 'SAM_SGD':
-            self.optimizer = SAM(self.model.parameters(),
+            self.optimizer = SAM(params_list,
                                  base_optimizer=optim.SGD,
                                  lr=self.arg.base_lr,
                                  momentum=0.9,
                                  nesterov=self.arg.nesterov,
                                  weight_decay=self.arg.weight_decay)
         else:
-            raise ValueError()
+            raise ValueError("Unknown optimizer")
 
+    def load_scheduler(self):
         if self.arg.scheduler == 'cycliclr':
             step_size_up = len(self.data_loader['train'])//2
             step_size_down = len(self.data_loader['train']) - step_size_up
@@ -253,15 +396,11 @@ class Processor():
                 ))
         else:
             self.scheduler = (None, None)
-
-        # lr_scheduler_post = optim.lr_scheduler.MultiStepLR(
-        #     self.optimizer, milestones=self.arg.step, gamma=0.1)
-        # self.lr_scheduler = GradualWarmupScheduler(
-        #     self.optimizer,
-        #     total_epoch=self.arg.warm_up_epoch,
-        #     after_scheduler=lr_scheduler_post)
-
         self.print_log(f'using warm up, epoch: {self.arg.warm_up_epoch}')
+
+    # --------------------------------------------------------------------------
+    # DATA
+    # --------------------------------------------------------------------------
 
     def load_data(self):
         kwargs = dict(
@@ -271,7 +410,6 @@ class Processor():
             num_worker=self.arg.num_worker,
             worker_init_fn=init_seed,
         )
-
         Feeder = import_class(self.arg.feeder)
         self.data_loader = dict()
         if self.arg.phase == 'train':
@@ -303,84 +441,30 @@ class Processor():
                 collate_fn=data_loader.collate_fn_fix_val if self.arg.use_sgn_dataloader else None  # noqa
             )
 
-    # **************************************************************************
-    # UTILS
-    # **************************************************************************
-
-    def print_time(self):
-        localtime = time.asctime(time.localtime(time.time()))
-        self.print_log("Local current time :  " + localtime)
-
-    def print_log(self, str, print_time=True):
+    def get_data_iterator(self, epoch: int, loader_name: str):
+        loader = self.data_loader[loader_name]
+        if self.arg.ddp:
+            loader.sampler.set_epoch(epoch)
         if self.rank == 0:
-            if print_time:
-                localtime = time.asctime(time.localtime(time.time()))
-                str = "[ " + localtime + ' ] ' + str
-            print(str)
-            if self.arg.print_log:
-                with open(f'{self.arg.work_dir}/log.txt', 'a') as f:
-                    print(str, file=f)
-
-    def record_time(self):
-        self.cur_time = time.time()
-        return self.cur_time
-
-    def split_time(self):
-        split_time = time.time() - self.cur_time
-        self.record_time()
-        return split_time
-
-    def adjust_learning_rate(self, epoch):
-        opts1 = ['SGD', 'SAM_SGD', 'Adam', 'AdamW']
-        opts2 = ['SGD-LLRD', 'AdamW-LLRD']
-        if self.arg.optimizer in opts1:
-            if epoch < self.arg.warm_up_epoch:
-                lr = self.arg.base_lr * (epoch + 1) / self.arg.warm_up_epoch
-            else:
-                lr = self.arg.base_lr * (
-                    0.1 ** np.sum(epoch >= np.array(self.arg.step)))
-            for param_group in self.optimizer.param_groups:
-                param_group['lr'] = lr
-            return lr
-        elif self.arg.optimizer in opts2:
-            for param_group in self.optimizer.param_groups:
-                if epoch < self.arg.warm_up_epoch:
-                    lr = param_group['base_lr'] * \
-                        (epoch + 1) / self.arg.warm_up_epoch
-                else:
-                    lr = param_group['base_lr'] * (
-                        0.1 ** np.sum(epoch >= np.array(self.arg.step)))
-                param_group['lr'] = lr
+            return tqdm(self.data_loader[loader_name],
+                        desc=f"Device {self.rank}",
+                        position=self.rank)
         else:
-            raise ValueError()
+            return self.data_loader[loader_name]
 
-    def to_float_cuda(self, x: torch.Tensor) -> torch.Tensor:
-        return x.float().cuda(self.output_device, non_blocking=True)
-
-    def to_long_cuda(self, x: torch.Tensor) -> torch.Tensor:
-        return x.long().cuda(self.output_device, non_blocking=True)
-
-    def to_cuda(self,
-                data: tuple,
-                label: Optional[torch.Tensor]
-                ) -> Tuple[tuple, Optional[torch.Tensor]]:
-        num_of_inputs = len(inspect.signature(self.model.forward).parameters)
-        data = tuple(self.to_float_cuda(data[i]) for i in range(num_of_inputs))
-        if label is not None:
-            label = self.to_long_cuda(label)
-        return data, label
-
-    # **************************************************************************
-    # TRAIN AND EVAL
-    # **************************************************************************
+    # --------------------------------------------------------------------------
+    # TRAINING
+    # --------------------------------------------------------------------------
 
     def forward_pass(self,
                      data: tuple,
                      label: Optional[torch.Tensor]
                      ) -> Tuple[tuple, Optional[torch.Tensor]]:
         output, _ = self.model(*data)
-        # if batch_idx == 0 and epoch == 0:
-        #     self.train_writer.add_graph(self.model, output)
+        if not self.model.training:
+            freq = self.arg.test_dataloader_args['multi_test']
+            if self.arg.use_sgn_dataloader and freq > 1:
+                output = output.view((-1, freq, output.size(1))).mean(1)
         if isinstance(output, tuple):
             output, l1 = output
             l1 = l1.mean()
@@ -426,30 +510,14 @@ class Processor():
         #     self.train_writer.add_histogram(name, param.clone().cpu().data.numpy(), epoch)  # noqa
         if self.rank == 0:
             self.train_writer.add_scalar('epoch', epoch, self.global_step)
-        loss_value = []
+        loss_values = []
 
         # 4. Loader
-        loader = self.data_loader['train']
-        if self.arg.ddp:
-            loader.sampler.set_epoch(epoch)
-
-        if self.rank == 0:
-            process = tqdm(loader,
-                           desc=f"Device {self.rank}",
-                           position=self.rank)
-        else:
-            process = loader
+        process = self.get_data_iterator(epoch, 'train')
 
         # 5. Main loop
         if self.arg.profiler:
-            prof = profile(
-                schedule=schedule(wait=1, warmup=1, active=5, repeat=1),  # noqa
-                on_trace_ready=tensorboard_trace_handler(self.arg.work_dir + '/trace'),  # noqa
-                record_shapes=True,
-                profile_memory=True,
-                with_stack=True
-            )
-            prof.start()
+            self.load_profiler()
             prof_flag = True
 
         for batch_idx, (data, label, index) in enumerate(process):
@@ -457,12 +525,13 @@ class Processor():
             if self.arg.profiler:
                 if batch_idx >= (1 + 1 + 5) * 1 and prof_flag:
                     prof_flag = False
-                    prof.stop()
+                    self.prof.stop()
 
             self.global_step += 1
 
             # 5.1. get data
             data, label = self.to_cuda(data, label)
+
             timer['dataloader'] += self.split_time()
 
             # 5.2. forward + backward + optimize
@@ -483,6 +552,8 @@ class Processor():
             else:
                 # forward
                 output, loss = self.forward_pass(data, label)
+                if batch_idx == 0 and epoch == 0:
+                    self.train_writer.add_graph(self.model, output)
                 # backward
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -497,49 +568,24 @@ class Processor():
             if self.scheduler[0] == 'BATCH':
                 self.scheduler[1].step()
 
-            # 5.4. logging
             timer['model'] += self.split_time()
 
-            if self.arg.ddp:
-                # dist_tmp = [None for _ in range(self.arg.world_size)]
-                # dist.all_gather_object(dist_tmp, _loss)
-                # _loss = np.mean(dist_tmp)
-                dist.all_reduce(loss, op=dist.ReduceOp.SUM)
-                _loss = loss.data.item() / self.arg.world_size
-            else:
-                _loss = loss.data.item()
-            loss_value.append(_loss)
+            # 5.4. logging
+            loss_value = self.tensor_to_value(loss)
+            loss_values.append(loss_value)
 
             value, predict_label = torch.max(output.data, 1)
             acc = torch.mean((predict_label == label.data).float())
-            if self.arg.ddp:
-                # dist_tmp = [None for _ in range(self.arg.world_size)]
-                # dist.all_gather_object(dist_tmp, acc)
-                # acc = np.mean(dist_tmp)
-                dist.all_reduce(acc, op=dist.ReduceOp.SUM)
-                acc = acc.data.item() / self.arg.world_size
-            else:
-                acc = acc.data.item()
+            acc = self.tensor_to_value(acc)
 
             if self.rank == 0:
-                self.train_writer.add_scalar('acc', acc, self.global_step)
-                self.train_writer.add_scalar('loss', _loss, self.global_step)
-                # self.train_writer.add_scalar('loss_l1', l1, self.global_step)
-                # self.train_writer.add_scalar('batch_time', process.iterable.last_duration, self.global_step)  # noqa
+                self.writer(mode='train', acc=acc, loss=loss_value)
 
-            # 5.5. Statistics
-            if self.rank == 0:
-                _lr = self.optimizer.param_groups[0]['lr']
-                self.train_writer.add_scalar('lr', _lr, self.global_step)
-            # if self.global_step % self.arg.log_interval == 0:
-            #     self.print_log(
-            #         '\tBatch({}/{}) done. Loss: {:.4f}  lr:{:.6f}'.format(
-            #             batch_idx, len(loader), loss.data[0], lr))
             timer['statistics'] += self.split_time()
 
             if self.arg.profiler:
                 if prof_flag:
-                    prof.step()
+                    self.prof.step()
 
         # 6. Statistics of time consumption and loss
         proportion = {
@@ -547,68 +593,56 @@ class Processor():
             for k, v in timer.items()
         }
         self.print_log(
-            f'\tMean training loss: {np.mean(loss_value):.4f}.'.format())
+            f'\tMean training loss: {np.mean(loss_values):.4f}.'.format()
+        )
         self.print_log(
             f'\tTime consumption: '
             f'[Data]{proportion["dataloader"]}, '
-            f'[Network]{proportion["model"]}')
+            f'[Network]{proportion["model"]}'
+        )
 
         if save_model and self.rank == 0:
-            state_dict = self.model.state_dict()
-            weights = OrderedDict([[k.split('module.')[-1],
-                                    v.cpu()] for k, v in state_dict.items()])
+            self.save_weights(epoch)
 
-            torch.save(weights, self.arg.model_saved_name + '-' +
-                       str(epoch) + '-' + str(int(self.global_step)) + '.pt')
+    # --------------------------------------------------------------------------
+    # EVALUATION
+    # --------------------------------------------------------------------------
 
-    def eval(self, epoch, save_score=False, loader_name=['val'],
-             wrong_file=None, result_file=None):
+    def eval(self,
+             epoch: int,
+             save_score: bool = False,
+             loader_name: list = ['val'],
+             wrong_file: Optional[str] = None,
+             result_file: Optional[str] = None):
+
         if wrong_file is not None:
             f_w = open(wrong_file, 'w')
         if result_file is not None:
             f_r = open(result_file, 'w')
 
+        # 1. model eval
         self.model.eval()
         self.print_log(f'Eval epoch: {epoch + 1}')
 
+        # 2. loop through data loaders
         for ln in loader_name:
-            loss_value = []
+            loss_values = []
             score_frag = []
             step = 0
-            if self.rank == 0:
-                process = tqdm(self.data_loader[ln],
-                               desc=f"Device {self.rank}",
-                               position=self.rank)
-            else:
-                process = self.data_loader[ln]
+            process = self.get_data_iterator(epoch, 'train')
 
+            # 3. main loop
             for batch_idx, (data, label, index) in enumerate(process):
 
+                # 3. forward pass
                 with torch.no_grad():
-
                     data, label = self.to_cuda(data, label)
-                    output, _ = self.model(*data)
-
-                    if isinstance(output, tuple):
-                        output, l1 = output
-                        l1 = l1.mean()
-                    else:
-                        l1 = 0
-
-                    if self.arg.use_sgn_dataloader and self.arg.test_dataloader_args['multi_test'] > 1:  # noqa
-                        output = output.view(
-                            (-1,
-                             data[0].size(0)//label.size(0),
-                             output.size(1))
-                        )
-                        output = output.mean(1)
-
-                    loss = self.loss(output, label) + l1
+                    output, loss = self.forward_pass(data, label)
                     score_frag.append(output.data.cpu().numpy())
-                    loss_value.append(loss.data.item())
+                    loss_values.append(self.tensor_to_value(loss))
                     _, predict_label = torch.max(output.data, 1)
 
-                    step += 1
+                step += 1
 
                 if wrong_file is not None or result_file is not None:
                     predict = list(predict_label.cpu().numpy())
@@ -620,58 +654,46 @@ class Processor():
                             f_w.write(str(index[i]) + ',' +
                                       str(x) + ',' + str(true[i]) + '\n')
 
-            loss = np.mean(loss_value)
-            if self.arg.ddp:
-                dist_tmp = [None for _ in range(self.arg.world_size)]
-                dist.all_gather_object(dist_tmp, loss)
-                loss = np.mean(dist_tmp)
+            # 4. loss
+            loss_value = np.mean(loss_values)
 
+            # 5. logits
             score = np.concatenate(score_frag)
             if self.arg.ddp:
                 dist_tmp = [None for _ in range(self.arg.world_size)]
                 dist.all_gather_object(dist_tmp, score)
                 score = np.concatenate(dist_tmp)
                 for idx, val in enumerate(dist_tmp):
-                    score[idx::len(dist_tmp)] = val
+                    score[idx::self.arg.world_size] = val
 
+            # 6. accuracy
             accuracy = self.data_loader[ln].dataset.top_k(score, 1)
-
             if accuracy > self.best_acc:
                 self.best_acc = accuracy
-            self.print_log(f'Accuracy: {accuracy:.4f}')
-            self.print_log(f'Model: {self.arg.model_saved_name}')
 
+            # 7. logging
             if self.rank == 0:
                 if self.arg.phase == 'train':
-                    self.val_writer.add_scalar('loss', loss, self.global_step)
-                    self.val_writer.add_scalar('loss_l1', l1, self.global_step)
-                    self.val_writer.add_scalar(
-                        'acc', accuracy, self.global_step)
+                    self.writer(mode='val', acc=accuracy, loss=loss_value)
 
+            self.print_log(f'Accuracy: {accuracy:.4f}')
+            self.print_log(f'Model: {self.arg.model_saved_name}')
             self.print_log(f'\tMean {ln} '
                            f'loss of {len(self.data_loader[ln])} '
-                           f'batches: {np.mean(loss_value):.4f}')
+                           f'batches: {loss_value:.4f}')
 
             for k in self.arg.show_topk:
                 top_k = 100 * self.data_loader[ln].dataset.top_k(score, k)
                 self.print_log(f'\tTop{k}: {top_k:.2f}%')
 
-            score_dict = dict(
-                zip(self.data_loader[ln].dataset.sample_name, score))
-            if self.arg.ddp:
-                dist_tmp = [None for _ in range(self.arg.world_size)]
-                dist.all_gather_object(dist_tmp, score_dict)
-                score_dict = {k: v for d in dist_tmp for k, v in d.items()}
             if save_score and self.rank == 0:
-                s_path = f'{self.arg.work_dir}/epoch{epoch + 1}_{ln}_score.pkl'
-                with open(s_path, 'wb') as f:
-                    pickle.dump(score_dict, f)
+                self.save_scores(epoch, ln, score)
 
             self.print_log('-'*51)
 
-    # **************************************************************************
+    # --------------------------------------------------------------------------
     # MAIN
-    # **************************************************************************
+    # --------------------------------------------------------------------------
 
     def start(self):
         if self.arg.phase == 'train':

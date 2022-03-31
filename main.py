@@ -14,8 +14,9 @@ from torch.utils import tensorboard
 import torch.distributed as dist
 import torch.multiprocessing as mp
 
-from main_processor import *
-from main_utils import *
+from utils.parser import *
+from utils.processor import *
+from utils.utils import *
 
 # os.environ["TORCH_DISTRIBUTED_DEBUG"] = "INFO"
 
