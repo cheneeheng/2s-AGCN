@@ -15,22 +15,22 @@ from utils.visualization import visualize_3dskeleton_in_matplotlib
 
 class Feeder(Dataset):
     def __init__(self,
-                 data_path,
-                 label_path,
-                 dataset='NTU60-CV',
-                 random_choose=False,
-                 random_shift=False,
-                 random_move=False,
-                 window_size=-1,
-                 normalization=False,
-                 random_zaxis_flip=False,
-                 random_xaxis_scale=False,
-                 random_yaxis_scale=False,
-                 random_subsample=None,
-                 random_rotation=False,
-                 stretch=False,
-                 debug=False,
-                 use_mmap=True):
+                 data_path: str,
+                 label_path: str,
+                 dataset: str = 'NTU60-CV',
+                 random_choose: bool = False,
+                 random_shift: bool = False,
+                 random_move: bool = False,
+                 window_size: int = -1,
+                 normalization: bool = False,
+                 random_zaxis_flip: bool = False,
+                 random_xaxis_scale: bool = False,
+                 random_yaxis_scale: bool = False,
+                 random_subsample: int = None,
+                 random_rotation: bool = False,
+                 stretch: bool = False,
+                 debug: bool = False,
+                 use_mmap: bool = True):
         """
         :param data_path:
         :param label_path:
@@ -174,7 +174,7 @@ class Feeder(Dataset):
 
         return data_numpy, label, index
 
-    def top_k(self, score, top_k):
+    def top_k(self, score: np.ndarray, top_k: int) -> float:
         rank = score.argsort()
         hit_top_k = [l in rank[i, -top_k:] for i, l in enumerate(self.label)]
         return sum(hit_top_k) * 1.0 / len(hit_top_k)

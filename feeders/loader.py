@@ -34,10 +34,6 @@ class NTUDataLoaders(object):
         self.case = case
         self.aug = aug
         self.seg = seg
-        # self.create_datasets()
-        # self.train_set = NTUDataset(self.train_X, self.train_Y)
-        # self.val_set = NTUDataset(self.val_X, self.val_Y)
-        # self.test_set = NTUDataset(self.test_X, self.test_Y)
         self.train_set, self.val_set, self.test_set = None, None, None
         self.multi_test = multi_test
 
@@ -277,7 +273,7 @@ class FeederDataLoader(NTUDataLoaders):
                    drop_last: bool = False,
                    worker_init_fn=None,
                    collate_fn: str = None
-                   ):
+                   ) -> DataLoader:
         data_sampler = DistributedSampler(
             dataset=feeder,
             num_replicas=world_size,

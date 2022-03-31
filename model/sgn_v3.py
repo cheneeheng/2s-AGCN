@@ -19,14 +19,7 @@ class SGN(SGNBase):
 
     def __init__(self,
                  gcn_t_kernel: int = 3,
-                 dropout: float = 0.2,
-                 c_multiplier: int = 1,
                  **kwargs):
-
-        self.c1 *= c_multiplier  # pos,vel,joint embed
-        self.c2 *= c_multiplier  # G,gcn
-        self.c3 *= c_multiplier  # gcn
-        self.c4 *= c_multiplier  # gcn
 
         super(SGN, self).__init__(**kwargs)
 
@@ -51,7 +44,6 @@ class SGN(SGNBase):
                             bias=self.bias,
                             kernel_size=gcn_t_kernel,
                             padding=gcn_t_kernel//2)
-        self.dropout = nn.Dropout(dropout)
         self.fc = nn.Linear(self.c4, self.num_class)
 
         del self.cnn

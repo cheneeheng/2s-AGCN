@@ -428,9 +428,10 @@ class Processor():
 
         for batch_idx, (data, label, index) in enumerate(process):
 
-            if batch_idx >= (1 + 1 + 5) * 1 and prof_flag:
-                prof_flag = False
-                prof.stop()
+            if self.arg.profiler:
+                if batch_idx >= (1 + 1 + 5) * 1 and prof_flag:
+                    prof_flag = False
+                    prof.stop()
 
             self.global_step += 1
 
@@ -532,8 +533,9 @@ class Processor():
             #             batch_idx, len(loader), loss.data[0], lr))
             timer['statistics'] += self.split_time()
 
-            if prof_flag:
-                prof.step()
+            if self.arg.profiler:
+                if prof_flag:
+                    prof.step()
 
         # 6. Statistics of time consumption and loss
         proportion = {

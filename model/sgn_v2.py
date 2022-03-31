@@ -90,8 +90,16 @@ class SGN(nn.Module):
                  g_proj_shared: bool = False,
                  part: bool = False,
                  motion: bool = False,
-                 aspp: list = None):
+                 aspp: list = None,
+                 c_multiplier: int = 1,
+                 dropout: float = 0.0,
+                 ):
         super(SGN, self).__init__()
+
+        self.c1 *= c_multiplier  # pos,vel,joint embed
+        self.c2 *= c_multiplier  # G,gcn
+        self.c3 *= c_multiplier  # gcn
+        self.c4 *= c_multiplier  # gcn
 
         self.num_class = num_class
         self.num_point = num_point
@@ -175,6 +183,7 @@ class SGN(nn.Module):
         self.smp = nn.AdaptiveMaxPool2d((1, seg))
         self.cnn = local(self.c3, self.c4, bias=bias)
         self.tmp = nn.AdaptiveMaxPool2d((1, 1))
+        self.do = nn.Dropout(dropout)
         self.fc = nn.Linear(self.c4, num_class)
 
         self.init()
@@ -255,6 +264,7 @@ class SGN(nn.Module):
         # Classification
         y = self.tmp(x)
         y = torch.flatten(y, 1)
+        y = self.so(y)
         y = self.fc(y)
 
         return y, g
