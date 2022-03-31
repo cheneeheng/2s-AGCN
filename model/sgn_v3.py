@@ -50,7 +50,7 @@ class SGN(SGNBase):
 
         self.init()
 
-    def forward(self, x: torch.Tensor, x1: torch.Tensor):
+    def forward(self, x: torch.Tensor):
         bs, step, dim = x.shape
         assert dim % 3 == 0, "Only support input of xyz coordinates only."
 

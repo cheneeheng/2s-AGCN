@@ -6,6 +6,7 @@
 
 # Code refractored
 
+from typing import Tuple, Optional
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -91,6 +92,7 @@ class SGN(nn.Module):
                  part: bool = False,
                  motion: bool = False,
                  aspp: list = None,
+                 subject: bool = False,
                  c_multiplier: int = 1,
                  dropout: float = 0.0,
                  ):
@@ -109,6 +111,7 @@ class SGN(nn.Module):
         self.g_proj_shared = g_proj_shared
         self.part = part
         self.motion = motion
+        self.subject = subject
 
         self.pos_embed = embed(in_channels,
                                self.c1,
@@ -137,6 +140,14 @@ class SGN(nn.Module):
                                        num_point=len(self.parts_3points),
                                        norm=True,
                                        bias=bias)
+
+        if self.subject:
+            self.sub_embed = embed(1,
+                                   self.c3,
+                                   inter_channels=self.c1,
+                                   num_point=1,
+                                   norm=True,
+                                   bias=bias)
 
         self.spa = one_hot(num_point, seg, mode=0)
         self.tem = one_hot(seg, num_point, mode=1)
@@ -206,7 +217,20 @@ class SGN(nn.Module):
     def pad_zeros(self, x: torch.Tensor) -> torch.Tensor:
         return torch.cat([x.new(*x.shape[:-1], 1).zero_(), x], dim=-1)
 
-    def forward(self, x: torch.Tensor, x1: torch.Tensor):
+    def forward(self,
+                x: torch.Tensor,
+                s: Optional[torch.Tensor] = None
+                ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Model forward pass.
+
+        Args:
+            x (torch.Tensor): 3D joint position of a sequence of skeletons.
+            s (torch.Tensor): Subject id for each frame.
+
+        Returns:
+            y (torch.Tensor): logits.
+            g (torch.Tensor): Attention matrix for GCN.
+        """
         bs, step, dim = x.shape
         assert dim % 3 == 0, "Only support input of xyz coordinates only."
 
@@ -242,14 +266,16 @@ class SGN(nn.Module):
         spa1 = self.spa_embed(self.spa(bs))
         if self.part:
             gro1 = self.gro_embed(self.gro(bs))
+        if self.subject:
+            s = s.view((bs, step, 1, 1))  # n,t,v,c
+            s = s.permute(0, 3, 2, 1).contiguous()  # n,c,v,t
+            sub1 = self.sub_embed(s)
 
         # Joint-level Module
+        x = torch.cat([dy1, spa1], 1)  # n,c,v,t
         if self.part:
-            x1 = torch.cat([dy1, spa1], 1)  # n,c,v,t
-            x2 = torch.cat([dy2, gro1], 1)  # n,c,v',t
-            x = torch.cat([x1, x2], 2)  # n,c,v'+v,t
-        else:
-            x = torch.cat([dy1, spa1], 1)  # n,c,v,t
+            x1 = torch.cat([dy2, gro1], 1)  # n,c,v',t
+            x = torch.cat([x, x1], 2)  # n,c,v'+v,t
         g = self.compute_g1(x)
         x = self.gcn1(x, g)
         x = self.gcn2(x, g)
@@ -257,6 +283,8 @@ class SGN(nn.Module):
 
         # Frame-level Module
         x = x + tem1
+        if self.subject:
+            x = x + sub1
         x = self.smp(x)
         x = self.aspp(x)
         x = self.cnn(x)
@@ -503,14 +531,18 @@ if __name__ == '__main__':
     #     inputs = torch.ones(batch_size, 20, 75).cuda()
     #     model(inputs)
 
-    model = SGN(seg=20, part=True, motion=True, aspp=[0, 1, 5, 9]).cuda()
+    model = SGN(seg=20, part=True, motion=True,
+                subject=True, aspp=[0, 1, 5, 9]).cuda()
     inputs = torch.ones(batch_size, 20, 75).cuda()
+    subjects = torch.ones(batch_size, 20, 1).cuda()
+    # subjects = None
+    model(inputs, subjects)
     # with torch.autograd.profiler.profile() as prof:
     #     with torch.autograd.profiler.record_function("model_inference"):
     with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
                  record_shapes=True) as prof:
         # with record_function("model_inference"):
-        model(inputs)
+        model(inputs, subjects)
     # print(prof.key_averages(group_by_input_shape=True).table(
     #     sort_by="cpu_time_total", row_limit=10))
     print(prof.key_averages().table(sort_by="self_cpu_time_total"))
