@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/sgn_v3/220328170001_t3_gpshared
-model_saved_name: ./data/data/ntu_result/xview/sgn_v3/220328170001_t3_gpshared/sgn
+work_dir: ./data/data/ntu_result/xview/sgn_v3/220328170001_t3_x4dim
+model_saved_name: ./data/data/ntu_result/xview/sgn_v3/220328170001_t3_x4dim/sgn
 
 phase: train
 save_score: True
@@ -45,8 +45,10 @@ model_args:
   in_channels: 3
   seg: 20
   bias: True
-  g_proj_shared: True
+  g_proj_shared: False
   gcn_t_kernel: 3
+  dropout: 0.0
+  c_multiplier: 4
 label_smoothing: 0.1
 
 # optim

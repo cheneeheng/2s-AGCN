@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/sgn/220327213001_1337
-model_saved_name: ./data/data/ntu_result/xview/sgn/220327213001_1337/sgn
+work_dir: ./data/data/ntu_result/xview/sgn_v2/220327213001_1337
+model_saved_name: ./data/data/ntu_result/xview/sgn_v2/220327213001_1337/sgn
 
 phase: train
 save_score: True
@@ -12,7 +12,7 @@ print_log: true
 
 # feeder
 feeder: feeders.feeder.Feeder
-num_worker: 8
+num_worker: 16
 train_feeder_args:
   data_path: ./data/data/ntu_sgn/processed_data/NTU_CV_train.pkl
   label_path: ./data/data/ntu_sgn/processed_data/NTU_CV_train_label.pkl
@@ -38,7 +38,7 @@ test_dataloader_args:
 use_sgn_dataloader: True
 
 # model
-model: model.sgn.SGN
+model: model.sgn_v2.SGN
 model_args:
   num_class: 60
   num_point: 25
