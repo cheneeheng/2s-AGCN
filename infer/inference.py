@@ -9,6 +9,7 @@ from collections import OrderedDict
 from functools import partial
 
 from data_gen.preprocess import pre_normalization
+from feeders.loader import NTUDataLoaders
 from infer.data_preprocess import DataPreprocessor
 from main_utils import get_parser, import_class, init_seed
 
@@ -76,7 +77,8 @@ if __name__ == '__main__':
         '--weight-path',
         type=str,
         # default='./data/model/ntu_25j/'
-        default='/data/2s-agcn/model/ntu_15j/xview/211130150001/'
+        default='/data/2s-agcn/model/ntu_15j/xview/220327213001_1337/'
+        # default='/data/2s-agcn/model/ntu_15j/xview/211130150001/'
         # default='/data/2s-agcn/model/ntu_15j/xview/220314100001/'
         # default='/data/2s-agcn/model/ntu_15j/xsub/220314090001/'
     )
@@ -97,8 +99,17 @@ if __name__ == '__main__':
     os.makedirs(output_dir, exist_ok=True)
 
     # Data processor -----------------------------------------------------------
-    preprocess_fn = partial(pre_normalization, zaxis2=[8, 1], xaxis=[2, 5],
-                            verbose=False, tqdm=False)
+    if 'sgn' in arg.model:
+        preprocess_fn = NTUDataLoaders(dataset='NTU60',
+                                       case=0,
+                                       aug=0,
+                                       seg=20,
+                                       multi_test=5).to_fix_length
+        preprocess_fn = partial(preprocess_fn,
+                                labels=None, sampling_frequency=5)
+    else:
+        preprocess_fn = partial(pre_normalization, zaxis2=[8, 1], xaxis=[2, 5],
+                                verbose=False, tqdm=False)
 
     DataProc = DataPreprocessor(num_joint=arg.num_joint,
                                 max_seq_length=arg.max_frame,
@@ -174,21 +185,36 @@ if __name__ == '__main__':
 
         # Normalization.
         input_data = DataProc.select_skeletons_and_normalize_data(
-            arg.max_num_skeleton_true)
-        input_data = np.transpose(input_data, [0, 4, 2, 3, 1])  # N, C, T, V, M
-        input_data = np.concatenate(
-            [input_data, input_data, input_data], axis=2)
+            arg.max_num_skeleton_true,
+            sgn='sgn' in arg.model
+        )
+
+        if 'aagcn' in arg.model:
+            # N, C, T, V, M
+            input_data = np.concatenate(
+                [input_data, input_data, input_data], axis=2)
 
         # Inference.
         with torch.no_grad():
+
             if next(Model.parameters()).is_cuda:
                 output, _ = Model(torch.from_numpy(input_data).cuda(0))
+
+                if 'sgn' in arg.model:
+                    output = output.view((-1, 5, output.size(1)))
+                    output = output.mean(1)
+
                 _, predict_label = torch.max(output, 1)
                 output = output.data.cpu()
                 predict_label = predict_label.data.cpu()
 
             else:
                 output, _ = Model(torch.from_numpy(input_data))
+
+                if 'sgn' in arg.model:
+                    output = output.view((-1, 5, output.size(1)))
+                    output = output.mean(1)
+
                 _, predict_label = torch.max(output, 1)
 
         logits, pred = output.tolist(), predict_label.item()

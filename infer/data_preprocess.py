@@ -67,10 +67,16 @@ class DataPreprocessor(object):
             data = np.expand_dims(data, axis=0)
         data = np.transpose(data, [0, 4, 2, 3, 1])  # N, C, T, V, M
         data = self.preprocess_fn(data)
-        data = np.transpose(data, [0, 4, 2, 3, 1])  # N, M, T, V, C
-        return data
+        return data  # N, C, T, V, M
 
     def select_skeletons_and_normalize_data(self,
-                                            num_skels: int = 2) -> np.ndarray:
-        data = self.select_skeletons(num_skels=num_skels)
-        return self.normalize_data(data)
+                                            num_skels: int = 2,
+                                            sgn: bool = False) -> np.ndarray:
+        data = self.select_skeletons(num_skels=num_skels)  # N, M, T, V, C
+        if sgn:
+            data = np.transpose(data, [0, 2, 1, 3, 4])  # N, T, M, V, C
+            data = data.reshape((*data.shape[:2], -1))  # N, T, MVC
+            data = self.preprocess_fn(data)  # N, 'T, MVC
+            return data  # N, 'T, MVC
+        else:
+            return self.normalize_data(data)  # N, C, T, V, M

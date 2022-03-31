@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data import DistributedSampler
 
 import numpy as np
-from typing import Tuple
+from typing import Tuple, Optional
 
 from feeders import tools
 
@@ -171,8 +171,9 @@ class NTUDataLoaders(object):
 
     def to_fix_length(self,
                       skeleton_seqs: list,
-                      labels: list,
-                      sampling_frequency: int = 1) -> Tuple[list, list, list]:
+                      labels: Optional[list],
+                      sampling_frequency: int = 1
+                      ) -> Tuple[list, list, Optional[list]]:
         # skeleton_seqs: n,t,mvc
         # labels: n
         new_skeleton_seqs = []
@@ -180,7 +181,7 @@ class NTUDataLoaders(object):
         for _, skeleton_seq in enumerate(skeleton_seqs):
             zero_row = []
             for i in range(len(skeleton_seq)):
-                if (skeleton_seq[i, :] == np.zeros((1, 150))).all():
+                if (skeleton_seq[i, :] == np.zeros((1, skeleton_seq.shape[-1]))).all():  # noqa
                     zero_row.append(i)
             skeleton_seq = np.delete(skeleton_seq, zero_row, axis=0)
             skeleton_seq, subject_seq = self.turn_two_to_one(skeleton_seq)

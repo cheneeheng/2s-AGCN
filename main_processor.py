@@ -597,7 +597,10 @@ class Processor():
 
                     if self.arg.use_sgn_dataloader and self.arg.test_dataloader_args['multi_test'] > 1:  # noqa
                         output = output.view(
-                            (-1, data.size(0)//label.size(0), output.size(1)))
+                            (-1,
+                             data[0].size(0)//label.size(0),
+                             output.size(1))
+                        )
                         output = output.mean(1)
 
                     loss = self.loss(output, label) + l1
