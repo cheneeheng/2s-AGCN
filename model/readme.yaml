@@ -1158,6 +1158,16 @@ sgn_v2:
         - 220329160001_part_motion_asppnodeterminitic_0135_rerun:
                   - shared_proj
                   - 94.0%
+        - 220331160001_subject:
+                  - 94.1%
+        - 220331160001_part:
+                  - 94.3%
+        - 220331160001_part_motion:
+                  - 93.9%
+        - 220331160001_part_subject:
+                  - 93.9%
+        - 220331160001_part_subject_aspp:
+                  - 94.1%
 
 sgn_v3:
         - 220328170001_t3_gpshared:

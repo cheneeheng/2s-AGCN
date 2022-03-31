@@ -8,6 +8,7 @@ __all__ = [
     'print_arg',
     'init_seed',
     'str2bool',
+    'bool2int',
     'import_class',
 ]
 
@@ -46,6 +47,16 @@ def str2bool(v):
         return False
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
+def bool2int(v):
+    if isinstance(v, bool):
+        if v:
+            return 1
+        else:
+            return 0
+    elif isinstance(v, str):
+        return bool2int(str2bool(v))
 
 
 def import_class(name):

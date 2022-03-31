@@ -6,17 +6,19 @@
 
 # Code refractored
 
-from typing import Tuple, Optional
 import torch
 from torch import nn
 from torch.nn import functional as F
 from torch.profiler import profile, record_function, ProfilerActivity
 
-
 import math
 import time
 from collections import OrderedDict
 from tqdm import tqdm
+from typing import Tuple, Optional, Union
+
+
+from utils.utils import *
 
 
 class Module(nn.Module):
@@ -89,9 +91,10 @@ class SGN(nn.Module):
                  seg: int = 20,
                  bias: bool = True,
                  g_proj_shared: bool = False,
-                 part: bool = False,
-                 motion: bool = False,
+                 part: Union[bool, int] = 0,
+                 motion: Union[bool, int] = 0,
                  aspp: list = None,
+                 t_kernel: int = 3,
                  subject: bool = False,
                  c_multiplier: int = 1,
                  dropout: float = 0.0,
@@ -109,8 +112,9 @@ class SGN(nn.Module):
         self.seg = seg
         self.bias = bias
         self.g_proj_shared = g_proj_shared
-        self.part = part
-        self.motion = motion
+        self.part = bool2int(part)
+        self.motion = bool2int(motion)
+        self.t_kernel = t_kernel
         self.subject = subject
 
         self.pos_embed = embed(in_channels,
@@ -126,14 +130,14 @@ class SGN(nn.Module):
                                norm=True,
                                bias=bias)
 
-        if self.part:
+        if self.part == 1:
             self.par_embed = embed(in_channels*3,
                                    self.c1,
                                    inter_channels=self.c1,
                                    num_point=len(self.parts_3points),
                                    norm=True,
                                    bias=bias)
-            if self.motion:
+            if self.motion == 1:
                 self.mot_embed = embed(in_channels,
                                        self.c1,
                                        inter_channels=self.c1,
@@ -163,7 +167,7 @@ class SGN(nn.Module):
                                norm=False,
                                bias=bias)
 
-        if self.part:
+        if self.part == 1:
             self.tem = one_hot(seg, num_point+len(self.parts_3points), mode=1)
             self.gro = one_hot(len(self.parts_3points), seg, mode=0)
             self.gro_embed = embed(len(self.parts_3points),
@@ -191,14 +195,14 @@ class SGN(nn.Module):
                 dilations=aspp)
 
         self.smp = nn.AdaptiveMaxPool2d((1, seg))
-        self.cnn = local(self.c3, self.c4, bias=bias)
+        self.cnn = local(self.c3, self.c4, bias=bias, t_kernel=t_kernel)
         self.tmp = nn.AdaptiveMaxPool2d((1, 1))
         self.do = nn.Dropout(dropout)
         self.fc = nn.Linear(self.c4, num_class)
 
         self.init()
 
-        if self.part:
+        if self.part == 1:
             self.register_buffer('parts_3points_vec',
                                  torch.tensor(self.parts_3points,
                                               dtype=torch.int).reshape(-1))
@@ -243,7 +247,7 @@ class SGN(nn.Module):
         dif = self.vel_embed(dif)
         dy1 = pos + dif  # n,c,v,t
 
-        if self.part:
+        if self.part == 1:
             par = torch.index_select(x1, 2, self.parts_3points_vec)  # n,t,v+,c
             par = par.view((bs, step, -1, 3, self.in_channels))  # n,t,v+,3,c
             mid = par.mean(dim=-2, keepdim=True)  # n,t,v+,1,c
@@ -252,7 +256,7 @@ class SGN(nn.Module):
             par = par.permute(0, 3, 2, 1).contiguous()  # n,c+,v+,t
             dy2 = self.par_embed(par)  # n,c,v+,t
 
-            if self.motion:
+            if self.motion == 1:
                 mid = mid.squeeze(-2)  # n,t,v+,c
                 mid = mid.permute(0, 3, 2, 1).contiguous()  # n,c,v+,t
                 mot = mid[:, :, :, 1:] - mid[:, :, :, 0:-1]  # n,c,v+,t-1
@@ -263,7 +267,7 @@ class SGN(nn.Module):
         # Joint and frame embeddings
         tem1 = self.tem_embed(self.tem(bs))
         spa1 = self.spa_embed(self.spa(bs))
-        if self.part:
+        if self.part == 1:
             gro1 = self.gro_embed(self.gro(bs))
         if self.subject:
             s = s.view((bs, step, 1, 1))  # n,t,v,c
@@ -272,7 +276,7 @@ class SGN(nn.Module):
 
         # Joint-level Module
         x = torch.cat([dy1, spa1], 1)  # n,c,v,t
-        if self.part:
+        if self.part == 1:
             x1 = torch.cat([dy2, gro1], 1)  # n,c,v',t
             x = torch.cat([x, x1], 2)  # n,c,v'+v,t
         g = self.compute_g1(x)
@@ -414,12 +418,12 @@ class cnn1x1(cnn1xn):
 
 
 class local(Module):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, t_kernel: int = 3, **kwargs):
         super(local, self).__init__(*args, **kwargs)
         self.cnn1 = cnn1xn(self.in_channels,
                            self.in_channels,
-                           kernel_size=3,
-                           padding=1,
+                           kernel_size=t_kernel,
+                           padding=t_kernel//2,
                            bias=self.bias)
         self.bn1 = nn.BatchNorm2d(self.in_channels)
         self.relu = nn.ReLU()
@@ -502,9 +506,10 @@ class atrous_spatial_pyramid_pooling(Module):
                     ])
                 )
             })
-            dilations.pop(0)
 
         for dil in dilations:
+            if dil == 0:
+                continue
             self.aspp.update({
                 f'aspp_{dil}':
                 nn.Sequential(

@@ -552,8 +552,8 @@ class Processor(object):
             else:
                 # forward
                 output, loss = self.forward_pass(data, label)
-                if batch_idx == 0 and epoch == 0:
-                    self.train_writer.add_graph(self.model, output)
+                # if batch_idx == 0 and epoch == 0:
+                #     self.train_writer.add_graph(self.model, output)
                 # backward
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -629,7 +629,7 @@ class Processor(object):
             loss_values = []
             score_frag = []
             step = 0
-            process = self.get_data_iterator(epoch, 'train')
+            process = self.get_data_iterator(epoch, 'val')
 
             # 3. main loop
             for batch_idx, (data, label, index) in enumerate(process):
