@@ -106,15 +106,14 @@ if __name__ == '__main__':
                                 preprocess_fn=preprocess_fn)
 
     # Prepare model ------------------------------------------------------------
-    Model = import_class(arg.model)
-    AAGCN = Model(**arg.model_args)
-    AAGCN.eval()
+    Model = import_class(arg.model)(**arg.model_args)
+    Model.eval()
     weight_file = [i for i in os.listdir(arg.weight_path) if '.pt' in i]
     weight_file = os.path.join(arg.weight_path, weight_file[0])
     weights = torch.load(weight_file)
-    AAGCN.load_state_dict(weights)
+    Model.load_state_dict(weights)
     if arg.gpu:
-        AAGCN = AAGCN.cuda(0)
+        Model = Model.cuda(0)
     print("Model loaded...")
 
     # MAIN LOOP ----------------------------------------------------------------
@@ -158,7 +157,7 @@ if __name__ == '__main__':
                             max_body=arg.max_num_skeleton,
                             num_joint=arg.num_joint)
             # Batch frames to fixed length.
-            DataProc.append_data(data)
+            DataProc.append_data(data[:2, :, :, :])
 
         # 2. Batch frames to fixed length. -------------------------------------
         # 3. Normalization. ----------------------------------------------------
@@ -173,14 +172,14 @@ if __name__ == '__main__':
 
         # Inference.
         with torch.no_grad():
-            if next(AAGCN.parameters()).is_cuda:
-                output, _ = AAGCN(torch.Tensor(input_data).cuda(0))
+            if next(Model.parameters()).is_cuda:
+                output, _ = Model(torch.from_numpy(input_data).cuda(0))
                 _, predict_label = torch.max(output, 1)
                 output = output.data.cpu()
                 predict_label = predict_label.data.cpu()
 
             else:
-                output, _ = AAGCN(torch.Tensor(input_data))
+                output, _ = Model(torch.from_numpy(input_data))
                 _, predict_label = torch.max(output, 1)
 
         logits, pred = output.tolist(), predict_label.item()
