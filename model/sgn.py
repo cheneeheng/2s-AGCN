@@ -57,7 +57,7 @@ class SGN(nn.Module):
         nn.init.constant_(self.gcn2.w.cnn.weight, 0)
         nn.init.constant_(self.gcn3.w.cnn.weight, 0)
 
-    def forward(self, x, x1):
+    def forward(self, x):
 
         # Dynamic Representation
         bs, step, dim = x.size()

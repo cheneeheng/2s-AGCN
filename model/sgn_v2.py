@@ -264,7 +264,7 @@ class SGN(nn.Module):
         # Classification
         y = self.tmp(x)
         y = torch.flatten(y, 1)
-        y = self.so(y)
+        y = self.do(y)
         y = self.fc(y)
 
         return y, g

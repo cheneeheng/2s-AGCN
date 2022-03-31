@@ -1,30 +1,28 @@
 #!/usr/bin/env python
 # from __future__ import print_function
 
-import json
 import inspect
+import json
 import numpy as np
 import os
 import pickle
 import shutil
 import time
+import yaml
+from collections import OrderedDict
+from tqdm import tqdm
+from typing import Tuple, Optional
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import yaml
-
-from collections import OrderedDict
-
 import torch.distributed as dist
 import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel as DDP
-
 from torch.profiler import profile, schedule, tensorboard_trace_handler
 from torch.utils.tensorboard import SummaryWriter
-from tqdm import tqdm
 
 from feeders.loader import FeederDataLoader
-
 from model.module.loss import LabelSmoothingLoss
 
 from sam.sam.sam import SAM
@@ -362,11 +360,39 @@ class Processor():
     def to_long_cuda(self, x: torch.Tensor) -> torch.Tensor:
         return x.long().cuda(self.output_device, non_blocking=True)
 
+    def to_cuda(self,
+                data: tuple,
+                label: Optional[torch.Tensor]
+                ) -> Tuple[tuple, Optional[torch.Tensor]]:
+        num_of_inputs = len(inspect.signature(self.model.forward))
+        data = tuple(self.to_float_cuda(data[i]) for i in range(num_of_inputs))
+        if label is not None:
+            label = self.to_long_cuda(label)
+        return data, label
+
     # **************************************************************************
     # TRAIN AND EVAL
     # **************************************************************************
 
-    def train(self, epoch, save_model=False):
+    def forward_pass(self,
+                     data: tuple,
+                     label: Optional[torch.Tensor]
+                     ) -> Tuple[tuple, Optional[torch.Tensor]]:
+        output, _ = self.model(*data)
+        # if batch_idx == 0 and epoch == 0:
+        #     self.train_writer.add_graph(self.model, output)
+        if isinstance(output, tuple):
+            output, l1 = output
+            l1 = l1.mean()
+        else:
+            l1 = 0
+        if label is None or self.loss is None:
+            loss = None
+        else:
+            loss = self.loss(output, label) + l1
+        return output, loss
+
+    def train(self, epoch: int, save_model: bool = False):
 
         # 1. Timing
         self.record_time()
@@ -436,49 +462,27 @@ class Processor():
             self.global_step += 1
 
             # 5.1. get data
-            data = tuple(self.to_float_cuda(i) for i in data)
-            label = self.to_long_cuda(label)
+            data, label = self.to_cuda(data, label)
             timer['dataloader'] += self.split_time()
 
             # 5.2. forward + backward + optimize
             if self.arg.optimizer == 'SAM_SGD':
                 # 1. first forward-backward pass
                 enable_running_stats(self.model)
-                output, _ = self.model(*data)
-                if isinstance(output, tuple):
-                    output, l1 = output
-                    l1 = l1.mean()
-                else:
-                    l1 = 0
-                loss = self.loss(output, label) + l1
+                output, loss = self.forward_pass(data, label)
                 with self.model.no_sync():
                     loss.backward()
                 self.optimizer.first_step(zero_grad=True)
                 # 2. second forward-backward pass
                 # make sure to do a full forward pass
                 disable_running_stats(self.model)
-                output, _ = self.model(data)
-                if isinstance(output, tuple):
-                    output, l1 = output
-                    l1 = l1.mean()
-                else:
-                    l1 = 0
-                loss = self.loss(output, label) + l1
+                output, loss = self.forward_pass(data, label)
                 loss.backward()
                 self.optimizer.second_step(zero_grad=True)
 
             else:
                 # forward
-                output, _ = self.model(data)
-                # if batch_idx == 0 and epoch == 0:
-                #     self.train_writer.add_graph(self.model, output)
-                if isinstance(output, tuple):
-                    output, l1 = output
-                    l1 = l1.mean()
-                else:
-                    l1 = 0
-                loss = self.loss(output, label) + l1
-
+                output, loss = self.forward_pass(data, label)
                 # backward
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -582,9 +586,7 @@ class Processor():
 
                 with torch.no_grad():
 
-                    data = tuple(self.to_float_cuda(i) for i in data)
-                    label = self.to_long_cuda(label)
-
+                    data, label = self.to_cuda(data, label)
                     output, _ = self.model(*data)
 
                     if isinstance(output, tuple):
