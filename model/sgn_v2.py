@@ -142,12 +142,11 @@ class SGN(nn.Module):
                                        bias=bias)
 
         if self.subject:
-            self.sub_embed = embed(1,
-                                   self.c3,
-                                   inter_channels=self.c1,
-                                   num_point=1,
-                                   norm=True,
-                                   bias=bias)
+            self.sub_embed = embed_subject(1,
+                                           self.c3,
+                                           inter_channels=self.c1,
+                                           num_subjects=2,
+                                           bias=bias)
 
         self.spa = one_hot(num_point, seg, mode=0)
         self.tem = one_hot(seg, num_point, mode=1)
@@ -327,6 +326,31 @@ class norm_data(nn.Module):
         x = x.view(bs, -1, step)
         x = self.bn(x)
         x = x.view(bs, -1, num_point, step).contiguous()
+        return x
+
+
+class embed_subject(Module):
+    def __init__(self,
+                 *args,
+                 num_subjects=2,
+                 inter_channels: int = 0,
+                 **kwargs):
+        super(embed_subject, self).__init__(*args, **kwargs)
+        embedding = torch.empty(num_subjects, inter_channels)
+        nn.init.normal_(embedding, std=0.02)  # bert
+        self.embedding = nn.Parameter(embedding)
+        self.cnn1 = cnn1x1(inter_channels, self.out_channels, bias=self.bias)
+        self.relu = nn.ReLU()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        bs, _, _, step = x.shape  # n,c,v,t
+        x1 = x.reshape(-1).unsqueeze(-1)  # nt,1
+        x1 = x1.expand(x1.shape[0], self.embedding.shape[-1]).type(torch.int64)
+        x1 = torch.gather(self.embedding, 0, x1)
+        x1 = x1.reshape((bs, step, 1, self.embedding.shape[-1]))
+        x1 = x1.transpose(1, -1)
+        x = self.cnn1(x1)
+        x = self.relu(x)
         return x
 
 
