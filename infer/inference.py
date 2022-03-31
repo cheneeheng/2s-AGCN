@@ -5,10 +5,11 @@ import time
 import torch
 import yaml
 
+from collections import OrderedDict
 from functools import partial
 
-from infer.data_preprocess import DataPreprocessor
 from data_gen.preprocess import pre_normalization
+from infer.data_preprocess import DataPreprocessor
 from main_utils import get_parser, import_class, init_seed
 
 
@@ -111,6 +112,14 @@ if __name__ == '__main__':
     weight_file = [i for i in os.listdir(arg.weight_path) if '.pt' in i]
     weight_file = os.path.join(arg.weight_path, weight_file[0])
     weights = torch.load(weight_file)
+    # temporary hack
+    if 'sgn' in arg.model:
+        weights = OrderedDict([[k.replace('joint_', 'pos_'), v]
+                               for k, v in weights.items()])
+        weights = OrderedDict([[k.replace('dif_', 'vel_'), v]
+                               for k, v in weights.items()])
+        weights = OrderedDict([[k.replace('cnn.cnn2', 'cnn.cnn2.cnn'), v]
+                               for k, v in weights.items()])
     Model.load_state_dict(weights)
     if arg.gpu:
         Model = Model.cuda(0)
