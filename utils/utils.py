@@ -50,13 +50,17 @@ def str2bool(v):
 
 
 def bool2int(v):
-    if isinstance(v, bool):
+    if isinstance(v, int):
+        return v
+    elif isinstance(v, bool):
         if v:
             return 1
         else:
             return 0
     elif isinstance(v, str):
         return bool2int(str2bool(v))
+    else:
+        raise ValueError('expects int, bool, str types only')
 
 
 def import_class(name):

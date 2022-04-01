@@ -713,10 +713,10 @@ class Processor(object):
                 self.train(epoch, save_model=save_model)
                 if self.scheduler[0] == 'EPOCH':
                     self.scheduler[1].step()
-                # if ((epoch + 1) % self.arg.eval_interval == 0) or \
-                #         ((epoch + 1) == self.arg.num_epoch):
-                self.eval(epoch, save_score=self.arg.save_score,
-                          loader_name=['val'])
+                if ((epoch + 1) % self.arg.eval_interval == 0) or \
+                        ((epoch + 1) == self.arg.num_epoch):
+                    self.eval(epoch, save_score=self.arg.save_score,
+                              loader_name=['val'])
             self.print_log(f'Best Accuracy: {self.best_acc*100:.2f}%')
             self.print_log(f'Best Accuracy Epoch: {self.best_acc_epoch}%')
             self.print_log(f'Model Name: {self.arg.model_saved_name}')
