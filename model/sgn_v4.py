@@ -499,7 +499,7 @@ class embed_subject(Module):
                          activation=nn.ReLU())
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        bs, _, _, step = x.shape  # n,c,v,t
+        bs, _, _, step = x.shape  # n,c,v,t => n,1,1,t
         x1 = x.reshape(-1).unsqueeze(-1)  # nt,1
         x1 = x1.expand(x1.shape[0], self.embedding.shape[-1]).type(torch.int64)
         x1 = torch.gather(self.embedding, 0, x1)

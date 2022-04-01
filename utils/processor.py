@@ -718,7 +718,7 @@ class Processor(object):
                     self.eval(epoch, save_score=self.arg.save_score,
                               loader_name=['val'])
             self.print_log(f'Best Accuracy: {self.best_acc*100:.2f}%')
-            self.print_log(f'Best Accuracy Epoch: {self.best_acc_epoch}%')
+            self.print_log(f'Best Accuracy Epoch: {self.best_acc_epoch}')
             self.print_log(f'Model Name: {self.arg.model_saved_name}')
             self.print_log('Done.\n')
 

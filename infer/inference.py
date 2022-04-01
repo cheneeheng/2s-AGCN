@@ -2,11 +2,13 @@ import json
 import numpy as np
 import os
 import time
-import torch
 import yaml
 
 from collections import OrderedDict
 from functools import partial
+
+import torch
+from torch.nn import functional as F
 
 from data_gen.preprocess import pre_normalization
 from feeders.loader import NTUDataLoaders
@@ -48,6 +50,31 @@ def read_xyz(file, max_body=4, num_joint=25):
     # openpose
     data /= 1000.0
     return data  # M, T, V, C
+
+
+def filter_logits(logits: list):
+    # {
+    #     "8": "sitting down",
+    #     "9": "standing up (from sitting position)",
+    #     "10": "clapping",
+    #     "23": "hand waving",
+    #     "26": "hopping (one foot jumping)",
+    #     "27": "jump up",
+    #     "35": "nod head/bow",
+    #     "36": "shake head",
+    #     "43": "falling",
+    #     "56": "giving something to other person",
+    #     "58": "handshaking",
+    #     "59": "walking towards each other",
+    #     "60": "walking apart from each other"
+    # }
+    ids = [7, 8, 9, 22, 25, 27, 34, 35, 42, 55, 57, 58, 59]
+    sort_idx = np.argsort(-np.array(logits)).tolist()
+    print(sort_idx)
+    sort_idx = [i for i in sort_idx if i in ids]
+    print(sort_idx)
+    new_logits = [logits[i] for i in sort_idx]
+    return sort_idx, new_logits
 
 
 if __name__ == '__main__':
@@ -197,12 +224,14 @@ if __name__ == '__main__':
         # Inference.
         with torch.no_grad():
 
-            if next(Model.parameters()).is_cuda:
+            if arg.gpu:
                 output, _ = Model(torch.from_numpy(input_data).cuda(0))
 
                 if 'sgn' in arg.model:
                     output = output.view((-1, 5, output.size(1)))
                     output = output.mean(1)
+
+                output = F.softmax(output, 1)
 
                 _, predict_label = torch.max(output, 1)
                 output = output.data.cpu()
@@ -215,16 +244,22 @@ if __name__ == '__main__':
                     output = output.view((-1, 5, output.size(1)))
                     output = output.mean(1)
 
+                output = F.softmax(output, 1)
+
                 _, predict_label = torch.max(output, 1)
 
-        logits, pred = output.tolist(), predict_label.item()
+        logits, preds = output.tolist(), predict_label.item()
+
+        sort_idx, new_logits = filter_logits(logits)
 
         output_file = os.path.join(output_dir, skel_file)
         with open(output_file, 'a+') as f:
-            output_str = ",".join([str(logit) for logit in logits])
-            output_str = f'{pred},{output_str}\n'
-            f.write(output_str.replace('[', '').replace(']', ''))
-            print(pred)
+            output_str1 = ",".join([str(i) for i in preds])
+            output_str2 = ",".join([str(i) for i in new_logits])
+            output_str = f'{output_str1};{output_str2}\n'
+            output_str = output_str.replace('[', '').replace(']', '')
+            f.write(output_str)
+            print(f"{sort_idx[0]: >2}, {new_logits[0]*100:>5.2f}")
 
         if arg.timing:
             end_time = time.time() - start_time
