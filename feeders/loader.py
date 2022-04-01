@@ -236,15 +236,16 @@ class NTUDataLoaders(object):
         new_skeleton_seq = []
         subject_seq = []
         for _, skel in enumerate(skeleton_seq):
-            if (skel[0:75] == np.zeros((1, 75))).all():
-                new_skeleton_seq.append(skel[75:])
+            idx = skel.shape[-1] // 2
+            if (skel[0:idx] == np.zeros((1, idx))).all():
+                new_skeleton_seq.append(skel[idx:])
                 subject_seq.append([1.0])
-            elif (skel[75:] == np.zeros((1, 75))).all():
-                new_skeleton_seq.append(skel[0:75])
+            elif (skel[idx:] == np.zeros((1, idx))).all():
+                new_skeleton_seq.append(skel[0:idx])
                 subject_seq.append([0.0])
             else:
-                new_skeleton_seq.append(skel[0:75])
-                new_skeleton_seq.append(skel[75:])
+                new_skeleton_seq.append(skel[0:idx])
+                new_skeleton_seq.append(skel[idx:])
                 subject_seq.append([0.0])
                 subject_seq.append([1.0])
         assert len(new_skeleton_seq) == len(subject_seq)

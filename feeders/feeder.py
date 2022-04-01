@@ -12,12 +12,32 @@ from utils.utils import init_seed
 
 from utils.visualization import visualize_3dskeleton_in_matplotlib
 
+# openpose : ntu
+JOINT_MAPPING = {
+    0: 4,
+    1: 21,
+    2: 9,
+    3: 10,
+    4: 11,
+    5: 5,
+    6: 6,
+    7: 7,
+    8: 1,
+    9: 17,
+    10: 18,
+    11: 19,
+    12: 13,
+    13: 14,
+    14: 15,
+}
+
 
 class Feeder(Dataset):
     def __init__(self,
                  data_path: str,
                  label_path: str,
                  dataset: str = 'NTU60-CV',
+                 joint_15: bool = False,
                  random_choose: bool = False,
                  random_shift: bool = False,
                  random_move: bool = False,
@@ -50,6 +70,7 @@ class Feeder(Dataset):
         self.data_path = data_path
         self.label_path = label_path
         self.dataset = dataset
+        self.joint_15 = joint_15
         self.random_choose = random_choose
         self.random_shift = random_shift
         self.random_move = random_move
@@ -85,6 +106,14 @@ class Feeder(Dataset):
                     self.label = pickle.load(f)
                 with open(self.data_path, 'rb') as f:
                     self.data = pickle.load(f)
+
+            if self.joint_15:
+                data = np.zeros((*self.data.shape[:2], 2*3*15),
+                                dtype=self.data.dtype)
+                for new_id, old_id in JOINT_MAPPING.items():
+                    data[:, :, new_id*3:new_id*3+3] = \
+                        self.data[:, :, (old_id-1)*3:(old_id-1)*3+3]
+                self.data = data
 
             # path = './data/data/ntu_sgn/processed_data/NTU_CV_val_label.pkl'
             # with open(path, 'rb') as f:
