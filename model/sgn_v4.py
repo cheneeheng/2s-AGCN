@@ -6,7 +6,7 @@
 
 # Code refractored
 
-# CODE FREEZED AT 01.04.2022
+# Continue from on sgn_v2
 
 import torch
 from torch import nn
@@ -30,7 +30,8 @@ class Module(nn.Module):
                  kernel_size: int = 1,
                  padding: int = 0,
                  dilation: int = 1,
-                 bias: bool = False):
+                 bias: bool = False,
+                 deterministic: Optional[bool] = None):
         super(Module, self).__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -38,6 +39,101 @@ class Module(nn.Module):
         self.padding = padding
         self.dilation = dilation
         self.bias = bias
+        if deterministic is None:
+            self.deterministic = torch.backends.cudnn.deterministic
+        else:
+            self.deterministic = deterministic
+
+
+class cnn1xn(Module):
+    def __init__(self, *args, deterministic=True, **kwargs):
+        super(cnn1xn, self).__init__(*args, **kwargs)
+        assert isinstance(self.kernel_size, int)
+        assert isinstance(self.padding, int)
+        assert isinstance(self.dilation, int)
+        self.cnn = nn.Conv2d(self.in_channels,
+                             self.out_channels,
+                             kernel_size=(1, self.kernel_size),
+                             padding=(0, self.padding),
+                             dilation=self.dilation,
+                             bias=self.bias)
+        self.deterministic = deterministic
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if not self.deterministic:
+            torch.backends.cudnn.deterministic = False
+            # torch.backends.cudnn.benchmark = True
+        x = self.cnn(x)
+        if not self.deterministic:
+            torch.backends.cudnn.deterministic = True
+            # torch.backends.cudnn.benchmark = True
+        return x
+
+
+class cnn1x1(cnn1xn):
+    def __init__(self, *args, **kwargs):
+        kwargs['kernel_size'] = 1
+        kwargs['padding'] = 0
+        kwargs['dilation'] = 1
+        super(cnn1x1, self).__init__(*args, **kwargs)
+
+
+class Conv(Module):
+    def __init__(self,
+                 *args,
+                 dropout: Optional[nn.Module] = None,
+                 activation: Optional[nn.Module] = None,
+                 normalization: Optional[nn.Module] = None,
+                 **kwargs):
+        super(Conv, self).__init__(*args, **kwargs)
+        self.activation = activation
+        self.normalization = normalization
+        cnn = OrderedDict({
+            'conv': cnn1xn(self.in_channels,
+                           self.out_channels,
+                           kernel_size=self.kernel_size,
+                           padding=self.padding,
+                           dilation=self.dilation,
+                           bias=self.bias,
+                           deterministic=self.deterministic),
+        })
+        if normalization is not None:
+            cnn.update({'norm': normalization})
+        if activation is not None:
+            cnn.update({'act': activation})
+        if dropout is not None:
+            cnn.update({'dropout': dropout})
+        self.cnn = nn.Sequential(cnn)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.cnn(x)
+
+
+class PoolModule(Module):
+    def __init__(self,
+                 *args,
+                 pooling: nn.Module,
+                 dropout: Optional[nn.Module] = None,
+                 activation: Optional[nn.Module] = None,
+                 normalization: Optional[nn.Module] = None,
+                 **kwargs):
+        super(Conv, self).__init__(*args, **kwargs)
+        self.activation = activation
+        self.normalization = normalization
+        pool = OrderedDict({
+            'pool': pooling,
+            'conv': cnn1x1(self.in_channels, self.out_channels, bias=self.bias),
+        })
+        if normalization is not None:
+            pool.update({'norm': normalization})
+        if activation is not None:
+            pool.update({'act': activation})
+        if dropout is not None:
+            pool.update({'dropout': dropout})
+        self.pool = nn.Sequential(pool)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.pool(x)
 
 
 class SGN(nn.Module):
@@ -358,31 +454,6 @@ class norm_data(nn.Module):
         return x
 
 
-class embed_subject(Module):
-    def __init__(self,
-                 *args,
-                 num_subjects=2,
-                 inter_channels: int = 0,
-                 **kwargs):
-        super(embed_subject, self).__init__(*args, **kwargs)
-        embedding = torch.empty(num_subjects, inter_channels)
-        nn.init.normal_(embedding, std=0.02)  # bert
-        self.embedding = nn.Parameter(embedding)
-        self.cnn1 = cnn1x1(inter_channels, self.out_channels, bias=self.bias)
-        self.relu = nn.ReLU()
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        bs, _, _, step = x.shape  # n,c,v,t
-        x1 = x.reshape(-1).unsqueeze(-1)  # nt,1
-        x1 = x1.expand(x1.shape[0], self.embedding.shape[-1]).type(torch.int64)
-        x1 = torch.gather(self.embedding, 0, x1)
-        x1 = x1.reshape((bs, step, 1, self.embedding.shape[-1]))
-        x1 = x1.transpose(1, -1)
-        x = self.cnn1(x1)
-        x = self.relu(x)
-        return x
-
-
 class embed(Module):
     def __init__(self,
                  *args,
@@ -395,51 +466,47 @@ class embed(Module):
             self.norm = norm_data(self.in_channels * num_point)
         else:
             self.norm = lambda x: x
-        self.cnn1 = cnn1x1(self.in_channels, inter_channels, bias=self.bias)
-        self.relu = nn.ReLU()
-        self.cnn2 = cnn1x1(inter_channels, self.out_channels, bias=self.bias)
+        self.cnn1 = Conv(self.in_channels,
+                         inter_channels,
+                         bias=self.bias,
+                         activation=nn.ReLU())
+        self.cnn2 = Conv(inter_channels,
+                         self.out_channels,
+                         bias=self.bias,
+                         activation=nn.ReLU())
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: n,c,v,t
         x = self.norm(x)
         x = self.cnn1(x)
-        x = self.relu(x)
         x = self.cnn2(x)
-        x = self.relu(x)
         return x
 
 
-class cnn1xn(Module):
-    def __init__(self, *args, deterministic=True, **kwargs):
-        super(cnn1xn, self).__init__(*args, **kwargs)
-        assert isinstance(self.kernel_size, int)
-        assert isinstance(self.padding, int)
-        assert isinstance(self.dilation, int)
-        self.cnn = nn.Conv2d(self.in_channels,
-                             self.out_channels,
-                             kernel_size=(1, self.kernel_size),
-                             padding=(0, self.padding),
-                             dilation=self.dilation,
-                             bias=self.bias)
-        self.deterministic = deterministic
+class embed_subject(Module):
+    def __init__(self,
+                 *args,
+                 num_subjects=2,
+                 inter_channels: int = 0,
+                 **kwargs):
+        super(embed_subject, self).__init__(*args, **kwargs)
+        embedding = torch.empty(num_subjects, inter_channels)
+        nn.init.normal_(embedding, std=0.02)  # bert
+        self.embedding = nn.Parameter(embedding)
+        self.cnn1 = Conv(self.in_channels,
+                         self.out_channels,
+                         bias=self.bias,
+                         activation=nn.ReLU())
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        if not self.deterministic:
-            torch.backends.cudnn.deterministic = False
-            # torch.backends.cudnn.benchmark = True
-        x = self.cnn(x)
-        if not self.deterministic:
-            torch.backends.cudnn.deterministic = True
-            # torch.backends.cudnn.benchmark = True
+        bs, _, _, step = x.shape  # n,c,v,t
+        x1 = x.reshape(-1).unsqueeze(-1)  # nt,1
+        x1 = x1.expand(x1.shape[0], self.embedding.shape[-1]).type(torch.int64)
+        x1 = torch.gather(self.embedding, 0, x1)
+        x1 = x1.reshape((bs, step, 1, self.embedding.shape[-1]))
+        x1 = x1.transpose(1, -1)
+        x = self.cnn1(x1)
         return x
-
-
-class cnn1x1(cnn1xn):
-    def __init__(self, *args, **kwargs):
-        kwargs['kernel_size'] = 1
-        kwargs['padding'] = 0
-        kwargs['dilation'] = 1
-        super(cnn1x1, self).__init__(*args, **kwargs)
 
 
 class local(Module):
@@ -454,18 +521,19 @@ class local(Module):
             self.maxp = nn.MaxPool2d(kernel_size=(1, t_kernel),
                                      padding=(0, t_kernel//2))
         else:
-            self.cnn1 = cnn1xn(self.in_channels,
-                               self.in_channels,
-                               kernel_size=t_kernel,
-                               padding=t_kernel//2,
-                               bias=self.bias)
-            self.bn1 = nn.BatchNorm2d(self.in_channels)
-            self.dropout = nn.Dropout2d(0.2)
-        self.cnn2 = cnn1x1(self.in_channels,
-                           self.out_channels,
-                           bias=self.bias)
-        self.bn2 = nn.BatchNorm2d(self.out_channels)
-        self.relu = nn.ReLU()
+            self.cnn1 = Conv(self.in_channels,
+                             self.in_channels,
+                             kernel_size=t_kernel,
+                             padding=t_kernel//2,
+                             bias=self.bias,
+                             activation=nn.ReLU(),
+                             normalization=nn.BatchNorm2d(self.out_channels),
+                             dropout=nn.Dropout2d(0.2))
+        self.cnn2 = Conv(self.in_channels,
+                         self.out_channels,
+                         bias=self.bias,
+                         activation=nn.ReLU(),
+                         normalization=nn.BatchNorm2d(self.out_channels))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: n,c,v,t ; v=1 due to SMP
@@ -473,12 +541,7 @@ class local(Module):
             x = self.maxp(x)
         else:
             x = self.cnn1(x)
-            x = self.bn1(x)
-            x = self.relu(x)
-            x = self.dropout(x)
         x = self.cnn2(x)
-        x = self.bn2(x)
-        x = self.relu(x)
         return x
 
 
@@ -487,9 +550,9 @@ class gcn_spa(Module):
         super(gcn_spa, self).__init__(*args, **kwargs)
         self.bn = nn.BatchNorm2d(self.out_channels)
         self.relu = nn.ReLU()
-        self.w1 = cnn1x1(self.in_channels, self.out_channels, bias=self.bias)
-        self.w2 = cnn1xn(self.in_channels, self.out_channels, bias=self.bias,
-                         kernel_size=self.kernel_size, padding=self.padding)
+        self.w1 = Conv(self.in_channels, self.out_channels, bias=self.bias)
+        self.w2 = Conv(self.in_channels, self.out_channels, bias=self.bias,
+                       kernel_size=self.kernel_size, padding=self.padding)
 
     def forward(self, x: torch.Tensor, g: torch.Tensor) -> torch.Tensor:
         x1 = x.permute(0, 3, 2, 1).contiguous()  # n,t,v,c
@@ -504,13 +567,11 @@ class gcn_spa(Module):
 class compute_g_spa(Module):
     def __init__(self, *args, g_proj_shared: bool = False, **kwargs):
         super(compute_g_spa, self).__init__(*args, **kwargs)
-        self.g1 = cnn1x1(self.in_channels, self.out_channels, bias=self.bias)
+        self.g1 = Conv(self.in_channels, self.out_channels, bias=self.bias)
         if g_proj_shared:
             self.g2 = self.g1
         else:
-            self.g2 = cnn1x1(self.in_channels,
-                             self.out_channels,
-                             bias=self.bias)
+            self.g2 = Conv(self.in_channels, self.out_channels, bias=self.bias)
         self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -532,44 +593,34 @@ class atrous_spatial_pyramid_pooling(Module):
         self.pool = 0 in dilations
         if self.pool:
             self.aspp.update({
-                'aspp_pool':
-                nn.Sequential(
-                    OrderedDict([
-                        (f'avg_pool', nn.AdaptiveAvgPool2d(1)),
-                        (f'conv_pool', cnn1x1(self.in_channels,
-                                              self.out_channels,
-                                              bias=self.bias)),
-                        (f'relu_pool', nn.ReLU()),
-                    ])
-                )
+                'aspp_pool': PoolModule(self.in_channels,
+                                        self.out_channels,
+                                        bias=self.bias,
+                                        pooling=nn.AdaptiveAvgPool2d(1),
+                                        activation=nn.ReLU())
             })
 
         for dil in dilations:
             if dil == 0:
                 continue
             self.aspp.update({
-                f'aspp_{dil}':
-                nn.Sequential(
-                    OrderedDict([
-                        (f'conv_{dil}', cnn1xn(self.in_channels,
-                                               self.out_channels,
-                                               kernel_size=3,
-                                               padding=dil,
-                                               dilation=dil,
-                                               bias=self.bias,
-                                               deterministic=False)),
-                        (f'bn_{dil}', nn.BatchNorm2d(self.out_channels)),
-                        (f'relu_{dil}', nn.ReLU()),
-                    ])
-                )
+                f'aspp_{dil}': Conv(self.in_channels,
+                                    self.out_channels,
+                                    kernel_size=3,
+                                    padding=dil,
+                                    dilation=dil,
+                                    bias=self.bias,
+                                    activation=nn.ReLU(),
+                                    normalization=nn.BatchNorm2d(self.out_channels),  # noqa
+                                    deterministic=False)
             })
 
         branches = len(dilations) + 1 if self.pool else len(dilations)
-        self.proj = cnn1x1(self.out_channels * branches,
-                           self.out_channels,
-                           bias=self.bias)
-        self.bn = nn.BatchNorm2d(self.out_channels)
-        self.dropout = nn.Dropout2d(0.2)
+        self.proj = Conv(self.out_channels * branches,
+                         self.out_channels,
+                         bias=self.bias,
+                         normalization=nn.BatchNorm2d(self.out_channels),
+                         dropout=nn.Dropout2d(0.2))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: n,c,v,t
@@ -583,19 +634,12 @@ class atrous_spatial_pyramid_pooling(Module):
                                    align_corners=False)
         res = torch.cat(res, dim=1)
         x = self.proj(res)
-        x = self.bn(x)
-        x = self.dropout(x)
         return x
 
 
 if __name__ == '__main__':
 
     batch_size = 64
-
-    # model = SGN(seg=20, part=True, motion=True, aspp=[0, 1, 5, 9]).cuda()
-    # for i in tqdm(range(100)):
-    #     inputs = torch.ones(batch_size, 20, 75).cuda()
-    #     model(inputs)
 
     model = SGN(seg=20, part=True, motion=True,
                 subject=True, aspp=[0, 1, 5, 9]).cuda()
@@ -612,25 +656,3 @@ if __name__ == '__main__':
     # print(prof.key_averages(group_by_input_shape=True).table(
     #     sort_by="cpu_time_total", row_limit=10))
     print(prof.key_averages().table(sort_by="self_cpu_time_total"))
-    # print(prof.key_averages().table())
-
-    # model = SGN(seg=20, part=True, motion=True, aspp=[0, 1, 5, 9]).cuda()
-    # print(model)
-    # s = time.time()
-    # for i in tqdm(range(100)):
-    #     model(torch.ones(batch_size, 20, 75).cuda())
-    # print("Time :", time.time()-s)
-
-    # model = SGN(seg=20, part=True, motion=True, aspp=[]).cuda()
-    # s = time.time()
-    # for i in tqdm(range(100)):
-    #     model(torch.ones(batch_size, 20, 75).cuda())
-    # print("Time :", time.time()-s)
-
-    # model = SGN(seg=20, part=True, motion=True, aspp=[0, 1, 5, 9]).cuda()
-    # s = time.time()
-    # for i in tqdm(range(100)):
-    #     model(torch.ones(batch_size, 20, 75).cuda())
-    # print("Time :", time.time()-s)
-
-    # print(sum(p.numel() for p in model.parameters() if p.requires_grad))

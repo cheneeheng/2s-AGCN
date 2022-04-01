@@ -15,3 +15,4 @@ from . import aagcn_v37
 from . import sgn
 from . import sgn_v2
 from . import sgn_v3
+from . import sgn_v4
