@@ -82,22 +82,25 @@ class SGN(nn.Module):
         (1, 20, 4),
     ]
 
-    # 0,1 indicator of person 1 and 2 (dataloader)
-
     def __init__(self,
                  num_class: int = 60,
                  num_point: int = 25,
                  in_channels: int = 3,
                  seg: int = 20,
                  bias: bool = True,
-                 g_proj_shared: bool = False,
-                 part: Union[bool, int] = 0,
-                 motion: Union[bool, int] = 0,
-                 aspp: list = None,
-                 t_kernel: int = 3,
-                 subject: bool = False,
+
                  c_multiplier: int = 1,
                  dropout: float = 0.0,
+
+                 part: Union[bool, int] = 0,
+                 motion: Union[bool, int] = 0,
+                 subject: bool = False,
+
+                 g_proj_shared: bool = False,
+
+                 t_kernel: int = 3,
+                 t_max_pool: bool = False,
+                 aspp: list = None,
                  ):
         super(SGN, self).__init__()
 
@@ -111,11 +114,14 @@ class SGN(nn.Module):
         self.in_channels = in_channels
         self.seg = seg
         self.bias = bias
-        self.g_proj_shared = g_proj_shared
+
         self.part = bool2int(part)
         self.motion = bool2int(motion)
-        self.t_kernel = t_kernel
         self.subject = subject
+
+        self.g_proj_shared = g_proj_shared
+        self.t_kernel = t_kernel
+        self.t_max_pool = t_max_pool
 
         self.pos_embed = embed(in_channels,
                                self.c1,
@@ -139,6 +145,13 @@ class SGN(nn.Module):
                                    bias=bias)
             if self.motion == 1:
                 self.mot_embed = embed(in_channels,
+                                       self.c1,
+                                       inter_channels=self.c1,
+                                       num_point=len(self.parts_3points),
+                                       norm=True,
+                                       bias=bias)
+            elif self.motion == 2:
+                self.mot_embed = embed(in_channels*3,
                                        self.c1,
                                        inter_channels=self.c1,
                                        num_point=len(self.parts_3points),
@@ -195,7 +208,8 @@ class SGN(nn.Module):
                 dilations=aspp)
 
         self.smp = nn.AdaptiveMaxPool2d((1, seg))
-        self.cnn = local(self.c3, self.c4, bias=bias, t_kernel=t_kernel)
+        self.cnn = local(self.c3, self.c4, bias=bias,
+                         t_kernel=t_kernel, t_max_pool=t_max_pool)
         self.tmp = nn.AdaptiveMaxPool2d((1, 1))
         self.do = nn.Dropout(dropout)
         self.fc = nn.Linear(self.c4, num_class)
@@ -427,27 +441,39 @@ class cnn1x1(cnn1xn):
 
 
 class local(Module):
-    def __init__(self, *args, t_kernel: int = 3, **kwargs):
+    def __init__(self,
+                 *args,
+                 t_kernel: int = 3,
+                 t_max_pool: bool = False,
+                 **kwargs):
         super(local, self).__init__(*args, **kwargs)
-        self.cnn1 = cnn1xn(self.in_channels,
-                           self.in_channels,
-                           kernel_size=t_kernel,
-                           padding=t_kernel//2,
-                           bias=self.bias)
-        self.bn1 = nn.BatchNorm2d(self.in_channels)
-        self.relu = nn.ReLU()
+        self.t_max_pool = t_max_pool
+        if t_max_pool:
+            self.maxp = nn.MaxPool2d(kernel_size=(1, t_kernel),
+                                     padding=(1, t_kernel//2))
+        else:
+            self.cnn1 = cnn1xn(self.in_channels,
+                               self.in_channels,
+                               kernel_size=t_kernel,
+                               padding=t_kernel//2,
+                               bias=self.bias)
+            self.bn1 = nn.BatchNorm2d(self.in_channels)
+            self.dropout = nn.Dropout2d(0.2)
         self.cnn2 = cnn1x1(self.in_channels,
                            self.out_channels,
                            bias=self.bias)
         self.bn2 = nn.BatchNorm2d(self.out_channels)
-        self.dropout = nn.Dropout2d(0.2)
+        self.relu = nn.ReLU()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: n,c,v,t ; v=1 due to SMP
-        x = self.cnn1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.dropout(x)
+        if self.t_max_pool:
+            x = self.maxp(x)
+        else:
+            x = self.cnn1(x)
+            x = self.bn1(x)
+            x = self.relu(x)
+            x = self.dropout(x)
         x = self.cnn2(x)
         x = self.bn2(x)
         x = self.relu(x)
