@@ -122,8 +122,13 @@ class Feeder(Dataset):
             # with open(path, 'rb') as f:
             #     self.data = pickle.load(f)
 
-            self.data = self.data.reshape(self.data.shape[0],
-                                          self.data.shape[1], 2, 25, 3)  # NTU
+            # NTU
+            if self.joint_15:
+                self.data = self.data.reshape(self.data.shape[0],
+                                              self.data.shape[1], 2, 15, 3)
+            else:
+                self.data = self.data.reshape(self.data.shape[0],
+                                              self.data.shape[1], 2, 25, 3)
             self.data = self.data.transpose((0, 4, 1, 3, 2))
             self.sample_name = self.label
 
