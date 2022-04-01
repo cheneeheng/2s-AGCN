@@ -251,8 +251,8 @@ class SGN(nn.Module):
             par = torch.index_select(x1, 2, self.parts_3points_vec)  # n,t,v+,c
             par = par.view((bs, step, -1, 3, self.in_channels))  # n,t,v+,3,c
             mid = par.mean(dim=-2, keepdim=True)  # n,t,v+,1,c
-            par = par - mid  # n,t,v+,3,c
-            par = par.view((bs, step, -1, self.in_channels*3))  # n,t,v+,c+
+            par1 = par - mid  # n,t,v+,3,c
+            par = par1.view((bs, step, -1, self.in_channels*3))  # n,t,v+,c+
             par = par.permute(0, 3, 2, 1).contiguous()  # n,c+,v+,t
             dy2 = self.par_embed(par)  # n,c,v+,t
 
@@ -261,6 +261,15 @@ class SGN(nn.Module):
                 mid = mid.permute(0, 3, 2, 1).contiguous()  # n,c,v+,t
                 mot = mid[:, :, :, 1:] - mid[:, :, :, 0:-1]  # n,c,v+,t-1
                 mot = self.pad_zeros(mot)
+                mot = self.mot_embed(mot)
+                dy2 += mot
+            elif self.motion == 2:
+                # mid = mid  # n,t,v+,1,c
+                # par1 = par1  # n,t,v+,3,c
+                mot = par1[:, 1:] - mid[:, :-1]  # n,t-1,v+,3,c
+                mot = mot.view((*mot.shape[:3], -1))  # n,t-1,v+,c+
+                mot = mot.permute(0, 3, 2, 1).contiguous()  # n,c,v+,t-1
+                mot = self.pad_zeros(mot)  # n,c,v+,t
                 mot = self.mot_embed(mot)
                 dy2 += mot
 
