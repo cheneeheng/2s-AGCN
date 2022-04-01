@@ -51,6 +51,7 @@ class Processor(object):
                 self.create_folder_and_writer()
         self.global_step = 0
         self.best_acc = 0
+        self.best_acc_epoch = 0
         self.load_data()
         self.load_model()
         self.load_optimizer()
@@ -670,6 +671,7 @@ class Processor(object):
             accuracy = self.data_loader[ln].dataset.top_k(score, 1)
             if accuracy > self.best_acc:
                 self.best_acc = accuracy
+                self.best_acc_epoch = epoch
 
             # 7. logging
             if self.rank == 0:
@@ -715,8 +717,9 @@ class Processor(object):
                 #         ((epoch + 1) == self.arg.num_epoch):
                 self.eval(epoch, save_score=self.arg.save_score,
                           loader_name=['val'])
-            self.print_log(f'Best Accuracy: {self.best_acc}\n')
-            self.print_log(f'Model Name: {self.arg.model_saved_name}\n')
+            self.print_log(f'Best Accuracy: {self.best_acc*100:.2f}%')
+            self.print_log(f'Best Accuracy Epoch: {self.best_acc_epoch}%')
+            self.print_log(f'Model Name: {self.arg.model_saved_name}')
             self.print_log('Done.\n')
 
         elif self.arg.phase == 'test':
