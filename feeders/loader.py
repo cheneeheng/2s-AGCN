@@ -215,21 +215,15 @@ class NTUDataLoaders(object):
 
         if self.motion_sampler == 1:
             x = np.linalg.norm(skeleton_seq, axis=1)  # T
-            intervals, cumulative_sum = [], 0
             seg_sum = (sum((x[:-1] + x[1:])) / 2) / self.seg
-            for i in range(1, len(x)):
-                cumulative_sum += ((x[i-1] + x[i]) / 2)
-                if cumulative_sum > seg_sum:
-                    cumulative_sum -= seg_sum
-                    intervals.append(i)
-                    if len(intervals) == self.seg-2:
-                        break
-            intervals = np.array([0] + intervals + [skeleton_seq.shape[0]-1],
-                                 dtype=int)
+            trapz = (np.cumsum(x[:-1]) + np.cumsum(x[1:])) / 2
+            intervals = np.unique(trapz // seg_sum, return_index=True)[1] + 1
+            intervals[0] = 0
             intervals_range = intervals[1:] - intervals[:-1]
             random_intervals_range_fn = partial(np.random.randint,
                                                 low=0,
                                                 high=intervals_range)
+            intervals = intervals[:-1]
 
         else:
             avg_range = skeleton_seq.shape[0] // self.seg
