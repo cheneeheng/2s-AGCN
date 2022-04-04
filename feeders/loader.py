@@ -213,14 +213,29 @@ class NTUDataLoaders(object):
                            subject_seqs: list,
                            sampling_frequency: int = 1) -> Tuple[list, list]:
 
+        def _split_largest_interval(intervals_range):
+            if len(intervals_range) < self.seg:
+                max_idx = intervals_range.argmax()
+                new_range = np.concatenate(
+                    [intervals_range[:max_idx],
+                     intervals_range[max_idx]//2,
+                     intervals_range[max_idx] - (intervals_range[max_idx]//2),
+                     intervals_range[max_idx+1:]])
+                return _split_largest_interval(new_range)
+            else:
+                return intervals_range
+
         if self.motion_sampler == 1:
             x = np.linalg.norm(skeleton_seq, axis=1)  # T
             seg_sum = (sum((x[:-1] + x[1:])) / 2) / self.seg
             trapz = (np.cumsum(x[:-1]) + np.cumsum(x[1:])) / 2
-            intervals = np.zeros(self.seg+1, dtype=int)  # T+1
-            intervals[1:-1] = np.unique(trapz // seg_sum, return_index=True)[1]
-            intervals[-1] = len(x)-1
+            intervals = np.unique(trapz // seg_sum, return_index=True)[1] + 1
+            intervals[0] = 0
             intervals_range = intervals[1:] - intervals[:-1]  # T
+            if len(intervals_range) > self.seg:
+                raise ValueError("intervals_range length is more than seg")
+            else:
+                intervals_range = _split_largest_interval(intervals_range)
             random_intervals_range_fn = partial(np.random.randint,
                                                 low=0,
                                                 high=intervals_range)
