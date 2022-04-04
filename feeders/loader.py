@@ -9,6 +9,7 @@ from torch.utils.data import DistributedSampler
 
 import numpy as np
 from typing import Tuple, Optional
+from functools import partial
 
 from feeders import tools
 
@@ -29,13 +30,20 @@ class NTUDataset(Dataset):
 
 
 class NTUDataLoaders(object):
-    def __init__(self, dataset='NTU', case=0, aug=1, seg=30, multi_test=5):
+    def __init__(self,
+                 dataset: str = 'NTU',
+                 case: int = 0,
+                 aug: int = 1,
+                 seg: int = 30,
+                 multi_test: int = 5,
+                 motion_sampler: int = 0):
         self.dataset = dataset
         self.case = case
         self.aug = aug
         self.seg = seg
         self.train_set, self.val_set, self.test_set = None, None, None
         self.multi_test = multi_test
+        self.motion_sampler = motion_sampler
 
     def get_train_loader(self, batch_size, num_workers):
         if self.aug == 0:
@@ -204,11 +212,35 @@ class NTUDataLoaders(object):
                            skeleton_seqs: list,
                            subject_seqs: list,
                            sampling_frequency: int = 1) -> Tuple[list, list]:
-        ave_duration = skeleton_seq.shape[0] // self.seg
+
+        if self.motion_sampler == 1:
+            x = np.linalg.norm(skeleton_seq, axis=1)  # T
+            intervals, cumulative_sum = [], 0
+            seg_sum = (sum((x[:-1] + x[1:])) / 2) / self.seg
+            for i in range(1, len(x)):
+                cumulative_sum += ((x[i-1] + x[i]) / 2)
+                if cumulative_sum > seg_sum:
+                    cumulative_sum -= seg_sum
+                    intervals.append(i)
+                    if len(intervals) == self.seg-2:
+                        break
+            intervals = np.array([0] + intervals + [skeleton_seq.shape[0]-1],
+                                 dtype=int)
+            intervals_range = intervals[1:] - intervals[:-1]
+            random_intervals_range_fn = partial(np.random.randint,
+                                                low=0,
+                                                high=intervals_range)
+
+        else:
+            avg_range = skeleton_seq.shape[0] // self.seg
+            intervals = np.multiply(list(range(self.seg)), avg_range)
+            random_intervals_range_fn = partial(np.random.randint,
+                                                low=avg_range,
+                                                size=self.seg)
+
         assert sampling_frequency >= 1
         for _ in range(sampling_frequency):
-            offsets = np.multiply(list(range(self.seg)), ave_duration)
-            offsets += np.random.randint(ave_duration, size=self.seg)
+            offsets = intervals + random_intervals_range_fn()
             skeleton_seqs.append(skeleton_seq[offsets])
             subject_seqs.append(subject_seq[offsets])
         return skeleton_seqs, subject_seqs
@@ -253,7 +285,12 @@ class NTUDataLoaders(object):
 
 
 class FeederDataLoader(NTUDataLoaders):
-    def __init__(self, dataset='NTU60-CV', aug=1, seg=30, multi_test=5):
+    def __init__(self,
+                 dataset: str = 'NTU60-CV',
+                 aug: int = 1,
+                 seg: int = 30,
+                 multi_test: int = 5,
+                 motion_sampler: int = 0):
         if 'CS' in dataset:
             case = 0
         elif 'CV' in dataset:

@@ -17,10 +17,11 @@ import math
 import time
 from collections import OrderedDict
 from tqdm import tqdm
-from typing import Tuple, Optional, Union
-
+from typing import Tuple, Optional, Union, Type
 
 from utils.utils import *
+
+bn = nn.BatchNorm2d
 
 
 class Module(nn.Module):
@@ -31,7 +32,11 @@ class Module(nn.Module):
                  padding: int = 0,
                  dilation: int = 1,
                  bias: bool = False,
-                 deterministic: Optional[bool] = None):
+                 deterministic: Optional[bool] = None,
+                 dropout: Optional[Type[nn.Module]] = None,
+                 activation: Optional[Type[nn.Module]] = None,
+                 normalization: Optional[Type[nn.Module]] = None
+                 ):
         super(Module, self).__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -43,97 +48,74 @@ class Module(nn.Module):
             self.deterministic = torch.backends.cudnn.deterministic
         else:
             self.deterministic = deterministic
+        self.dropout = dropout
+        self.activation = activation
+        self.normalization = normalization
+
+    def update_block_dict(self, block: OrderedDict) -> OrderedDict:
+        if self.normalization is not None:
+            block.update({'norm': self.normalization()})
+        if self.activation is not None:
+            block.update({'act': self.activation()})
+        if self.dropout is not None:
+            block.update({'dropout': self.dropout()})
+        return block
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.block(x)
 
 
-class cnn1xn(Module):
-    def __init__(self, *args, deterministic=True, **kwargs):
-        super(cnn1xn, self).__init__(*args, **kwargs)
+class Conv1xN(Module):
+    def __init__(self, *args, **kwargs):
+        super(Conv1xN, self).__init__(*args, **kwargs)
         assert isinstance(self.kernel_size, int)
         assert isinstance(self.padding, int)
         assert isinstance(self.dilation, int)
-        self.cnn = nn.Conv2d(self.in_channels,
-                             self.out_channels,
-                             kernel_size=(1, self.kernel_size),
-                             padding=(0, self.padding),
-                             dilation=self.dilation,
-                             bias=self.bias)
-        self.deterministic = deterministic
+        self.conv = nn.Conv2d(self.in_channels,
+                              self.out_channels,
+                              kernel_size=(1, self.kernel_size),
+                              padding=(0, self.padding),
+                              dilation=self.dilation,
+                              bias=self.bias)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if not self.deterministic:
             torch.backends.cudnn.deterministic = False
             # torch.backends.cudnn.benchmark = True
-        x = self.cnn(x)
+        x = self.conv(x)
         if not self.deterministic:
             torch.backends.cudnn.deterministic = True
             # torch.backends.cudnn.benchmark = True
         return x
 
 
-class cnn1x1(cnn1xn):
-    def __init__(self, *args, **kwargs):
-        kwargs['kernel_size'] = 1
-        kwargs['padding'] = 0
-        kwargs['dilation'] = 1
-        super(cnn1x1, self).__init__(*args, **kwargs)
-
-
 class Conv(Module):
-    def __init__(self,
-                 *args,
-                 dropout: Optional[nn.Module] = None,
-                 activation: Optional[nn.Module] = None,
-                 normalization: Optional[nn.Module] = None,
-                 **kwargs):
+    def __init__(self, *args, **kwargs):
         super(Conv, self).__init__(*args, **kwargs)
-        self.activation = activation
-        self.normalization = normalization
-        cnn = OrderedDict({
-            'conv': cnn1xn(self.in_channels,
-                           self.out_channels,
-                           kernel_size=self.kernel_size,
-                           padding=self.padding,
-                           dilation=self.dilation,
-                           bias=self.bias,
-                           deterministic=self.deterministic),
+        block = OrderedDict({
+            'conv': Conv1xN(self.in_channels,
+                            self.out_channels,
+                            kernel_size=self.kernel_size,
+                            padding=self.padding,
+                            dilation=self.dilation,
+                            bias=self.bias,
+                            deterministic=self.deterministic),
         })
-        if normalization is not None:
-            cnn.update({'norm': normalization})
-        if activation is not None:
-            cnn.update({'act': activation})
-        if dropout is not None:
-            cnn.update({'dropout': dropout})
-        self.cnn = nn.Sequential(cnn)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.cnn(x)
+        block = self.update_block_dict(block)
+        self.block = nn.Sequential(block)
 
 
-class PoolModule(Module):
-    def __init__(self,
-                 *args,
-                 pooling: nn.Module,
-                 dropout: Optional[nn.Module] = None,
-                 activation: Optional[nn.Module] = None,
-                 normalization: Optional[nn.Module] = None,
-                 **kwargs):
-        super(Conv, self).__init__(*args, **kwargs)
-        self.activation = activation
-        self.normalization = normalization
-        pool = OrderedDict({
+class Pool(Module):
+    def __init__(self, *args, pooling: nn.Module, **kwargs):
+        super(Pool, self).__init__(*args, **kwargs)
+        block = OrderedDict({
             'pool': pooling,
-            'conv': cnn1x1(self.in_channels, self.out_channels, bias=self.bias),
+            'conv': Conv1xN(self.in_channels,
+                            self.out_channels,
+                            bias=self.bias),
         })
-        if normalization is not None:
-            pool.update({'norm': normalization})
-        if activation is not None:
-            pool.update({'act': activation})
-        if dropout is not None:
-            pool.update({'dropout': dropout})
-        self.pool = nn.Sequential(pool)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.pool(x)
+        block = self.update_block_dict(block)
+        self.block = nn.Sequential(block)
 
 
 class SGN(nn.Module):
@@ -197,7 +179,7 @@ class SGN(nn.Module):
                  g_proj_shared: bool = False,
 
                  t_kernel: int = 3,
-                 t_max_pool: bool = False,
+                 t_max_pool: Union[bool, int] = 0,
                  aspp: list = None,
                  ):
         super(SGN, self).__init__()
@@ -215,11 +197,17 @@ class SGN(nn.Module):
 
         self.part = bool2int(part)
         self.motion = bool2int(motion)
+
         self.subject = subject
 
         self.g_proj_shared = g_proj_shared
         self.t_kernel = t_kernel
-        self.t_max_pool = t_max_pool
+        self.t_max_pool = bool2int(t_max_pool)
+
+        assert self.part in [0, 1]
+        assert self.motion in [0, 1, 2]
+        assert self.t_kernel > 0
+        assert self.t_max_pool >= 0
 
         self.pos_embed = embed(in_channels,
                                self.c1,
@@ -257,9 +245,8 @@ class SGN(nn.Module):
                                        bias=bias)
 
         if self.subject:
-            self.sub_embed = embed_subject(1,
+            self.sub_embed = embed_subject(self.c1,
                                            self.c3,
-                                           inter_channels=self.c1,
                                            num_subjects=2,
                                            bias=bias)
 
@@ -325,9 +312,9 @@ class SGN(nn.Module):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
                 m.weight.data.normal_(0, math.sqrt(2. / n))
 
-        nn.init.constant_(self.gcn1.w1.cnn.weight, 0)
-        nn.init.constant_(self.gcn2.w1.cnn.weight, 0)
-        nn.init.constant_(self.gcn3.w1.cnn.weight, 0)
+        nn.init.constant_(self.gcn1.w1.block.conv.conv.weight, 0)
+        nn.init.constant_(self.gcn2.w1.block.conv.conv.weight, 0)
+        nn.init.constant_(self.gcn3.w1.block.conv.conv.weight, 0)
 
     def pad_zeros(self, x: torch.Tensor) -> torch.Tensor:
         return torch.cat([x.new(*x.shape[:-1], 1).zero_(), x], dim=-1)
@@ -469,11 +456,11 @@ class embed(Module):
         self.cnn1 = Conv(self.in_channels,
                          inter_channels,
                          bias=self.bias,
-                         activation=nn.ReLU())
+                         activation=nn.ReLU)
         self.cnn2 = Conv(inter_channels,
                          self.out_channels,
                          bias=self.bias,
-                         activation=nn.ReLU())
+                         activation=nn.ReLU)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: n,c,v,t
@@ -487,16 +474,15 @@ class embed_subject(Module):
     def __init__(self,
                  *args,
                  num_subjects=2,
-                 inter_channels: int = 0,
                  **kwargs):
         super(embed_subject, self).__init__(*args, **kwargs)
-        embedding = torch.empty(num_subjects, inter_channels)
+        embedding = torch.empty(num_subjects, self.in_channels)
         nn.init.normal_(embedding, std=0.02)  # bert
         self.embedding = nn.Parameter(embedding)
         self.cnn1 = Conv(self.in_channels,
                          self.out_channels,
                          bias=self.bias,
-                         activation=nn.ReLU())
+                         activation=nn.ReLU)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         bs, _, _, step = x.shape  # n,c,v,t => n,1,1,t
@@ -513,27 +499,30 @@ class local(Module):
     def __init__(self,
                  *args,
                  t_kernel: int = 3,
-                 t_max_pool: bool = False,
+                 t_max_pool: int = 0,
                  **kwargs):
         super(local, self).__init__(*args, **kwargs)
         self.t_max_pool = t_max_pool
         if t_max_pool:
+            # self.maxp = nn.MaxPool2d(kernel_size=(1, t_kernel),
+            #                          padding=(0, t_kernel//2))
             self.maxp = nn.MaxPool2d(kernel_size=(1, t_kernel),
-                                     padding=(0, t_kernel//2))
+                                     stride=(1, t_max_pool))
         else:
+
             self.cnn1 = Conv(self.in_channels,
                              self.in_channels,
                              kernel_size=t_kernel,
                              padding=t_kernel//2,
                              bias=self.bias,
-                             activation=nn.ReLU(),
-                             normalization=nn.BatchNorm2d(self.out_channels),
-                             dropout=nn.Dropout2d(0.2))
+                             activation=nn.ReLU,
+                             normalization=lambda: bn(self.in_channels),
+                             dropout=lambda: nn.Dropout2d(0.2))
         self.cnn2 = Conv(self.in_channels,
                          self.out_channels,
                          bias=self.bias,
-                         activation=nn.ReLU(),
-                         normalization=nn.BatchNorm2d(self.out_channels))
+                         activation=nn.ReLU,
+                         normalization=lambda: bn(self.out_channels))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: n,c,v,t ; v=1 due to SMP
@@ -548,7 +537,7 @@ class local(Module):
 class gcn_spa(Module):
     def __init__(self, *args, **kwargs):
         super(gcn_spa, self).__init__(*args, **kwargs)
-        self.bn = nn.BatchNorm2d(self.out_channels)
+        self.bn = bn(self.out_channels)
         self.relu = nn.ReLU()
         self.w1 = Conv(self.in_channels, self.out_channels, bias=self.bias)
         self.w2 = Conv(self.in_channels, self.out_channels, bias=self.bias,
@@ -593,34 +582,35 @@ class atrous_spatial_pyramid_pooling(Module):
         self.pool = 0 in dilations
         if self.pool:
             self.aspp.update({
-                'aspp_pool': PoolModule(self.in_channels,
-                                        self.out_channels,
-                                        bias=self.bias,
-                                        pooling=nn.AdaptiveAvgPool2d(1),
-                                        activation=nn.ReLU())
+                'aspp_pool': Pool(self.in_channels,
+                                  self.out_channels,
+                                  bias=self.bias,
+                                  pooling=nn.AdaptiveAvgPool2d(1),
+                                  activation=nn.ReLU)
             })
 
         for dil in dilations:
             if dil == 0:
                 continue
             self.aspp.update({
-                f'aspp_{dil}': Conv(self.in_channels,
-                                    self.out_channels,
-                                    kernel_size=3,
-                                    padding=dil,
-                                    dilation=dil,
-                                    bias=self.bias,
-                                    activation=nn.ReLU(),
-                                    normalization=nn.BatchNorm2d(self.out_channels),  # noqa
-                                    deterministic=False)
+                f'aspp_{dil}': Conv(
+                    self.in_channels,
+                    self.out_channels,
+                    kernel_size=3,
+                    padding=dil,
+                    dilation=dil,
+                    bias=self.bias,
+                    activation=nn.ReLU,
+                    normalization=lambda: bn(self.out_channels),
+                    deterministic=False
+                )
             })
 
-        branches = len(dilations) + 1 if self.pool else len(dilations)
-        self.proj = Conv(self.out_channels * branches,
+        self.proj = Conv(self.out_channels * len(dilations),
                          self.out_channels,
                          bias=self.bias,
-                         normalization=nn.BatchNorm2d(self.out_channels),
-                         dropout=nn.Dropout2d(0.2))
+                         normalization=lambda: bn(self.out_channels),
+                         dropout=lambda: nn.Dropout2d(0.2))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: n,c,v,t
@@ -640,6 +630,14 @@ class atrous_spatial_pyramid_pooling(Module):
 if __name__ == '__main__':
 
     batch_size = 64
+
+    model = SGN(seg=20, part=True, motion=True,
+                subject=True, aspp=[0, 1, 5, 9])
+    inputs = torch.ones(batch_size, 20, 75)
+    subjects = torch.ones(batch_size, 20, 1)
+    model(inputs, subjects)
+    print(model)
+    exit(1)
 
     model = SGN(seg=20, part=True, motion=True,
                 subject=True, aspp=[0, 1, 5, 9]).cuda()
