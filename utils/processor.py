@@ -409,7 +409,7 @@ class Processor(object):
             rank=self.rank,
             ddp=self.arg.ddp,
             num_worker=self.arg.num_worker,
-            worker_init_fn=init_seed,
+            # worker_init_fn=init_seed,
         )
         Feeder = import_class(self.arg.feeder)
         self.data_loader = dict()

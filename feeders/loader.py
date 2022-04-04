@@ -217,13 +217,14 @@ class NTUDataLoaders(object):
             x = np.linalg.norm(skeleton_seq, axis=1)  # T
             seg_sum = (sum((x[:-1] + x[1:])) / 2) / self.seg
             trapz = (np.cumsum(x[:-1]) + np.cumsum(x[1:])) / 2
-            intervals = np.unique(trapz // seg_sum, return_index=True)[1] + 1
-            intervals[0] = 0
-            intervals_range = intervals[1:] - intervals[:-1]
+            intervals = np.zeros(self.seg+1, dtype=int)  # T+1
+            intervals[1:-1] = np.unique(trapz // seg_sum, return_index=True)[1]
+            intervals[-1] = len(x)-1
+            intervals_range = intervals[1:] - intervals[:-1]  # T
             random_intervals_range_fn = partial(np.random.randint,
                                                 low=0,
                                                 high=intervals_range)
-            intervals = intervals[:-1]
+            intervals = intervals[:-1]  # T
 
         else:
             avg_range = skeleton_seq.shape[0] // self.seg
@@ -235,6 +236,7 @@ class NTUDataLoaders(object):
         assert sampling_frequency >= 1
         for _ in range(sampling_frequency):
             offsets = intervals + random_intervals_range_fn()
+            assert len(offsets) == self.seg, f"{len(offsets)} =/= {self.seg}"
             skeleton_seqs.append(skeleton_seq[offsets])
             subject_seqs.append(subject_seq[offsets])
         return skeleton_seqs, subject_seqs
