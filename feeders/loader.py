@@ -298,7 +298,7 @@ class FeederDataLoader(NTUDataLoaders):
         else:
             case = -1
         super(FeederDataLoader, self).__init__(
-            dataset, case, aug, seg, multi_test)
+            dataset, case, aug, seg, multi_test, motion_sampler)
 
     def get_loader(self,
                    feeder: Dataset,
