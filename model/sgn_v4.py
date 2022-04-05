@@ -19,103 +19,10 @@ from collections import OrderedDict
 from tqdm import tqdm
 from typing import Tuple, Optional, Union, Type
 
+from model.module.module_wrapper import *
 from utils.utils import *
 
 bn = nn.BatchNorm2d
-
-
-class Module(nn.Module):
-    def __init__(self,
-                 in_channels: int,
-                 out_channels: int,
-                 kernel_size: int = 1,
-                 padding: int = 0,
-                 dilation: int = 1,
-                 bias: bool = False,
-                 deterministic: Optional[bool] = None,
-                 dropout: Optional[Type[nn.Module]] = None,
-                 activation: Optional[Type[nn.Module]] = None,
-                 normalization: Optional[Type[nn.Module]] = None
-                 ):
-        super(Module, self).__init__()
-        self.in_channels = in_channels
-        self.out_channels = out_channels
-        self.kernel_size = kernel_size
-        self.padding = padding
-        self.dilation = dilation
-        self.bias = bias
-        if deterministic is None:
-            self.deterministic = torch.backends.cudnn.deterministic
-        else:
-            self.deterministic = deterministic
-        self.dropout = dropout
-        self.activation = activation
-        self.normalization = normalization
-
-    def update_block_dict(self, block: OrderedDict) -> OrderedDict:
-        if self.normalization is not None:
-            block.update({'norm': self.normalization()})
-        if self.activation is not None:
-            block.update({'act': self.activation()})
-        if self.dropout is not None:
-            block.update({'dropout': self.dropout()})
-        return block
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.block(x)
-
-
-class Conv1xN(Module):
-    def __init__(self, *args, **kwargs):
-        super(Conv1xN, self).__init__(*args, **kwargs)
-        assert isinstance(self.kernel_size, int)
-        assert isinstance(self.padding, int)
-        assert isinstance(self.dilation, int)
-        self.conv = nn.Conv2d(self.in_channels,
-                              self.out_channels,
-                              kernel_size=(1, self.kernel_size),
-                              padding=(0, self.padding),
-                              dilation=self.dilation,
-                              bias=self.bias)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        if not self.deterministic:
-            torch.backends.cudnn.deterministic = False
-            # torch.backends.cudnn.benchmark = True
-        x = self.conv(x)
-        if not self.deterministic:
-            torch.backends.cudnn.deterministic = True
-            # torch.backends.cudnn.benchmark = True
-        return x
-
-
-class Conv(Module):
-    def __init__(self, *args, **kwargs):
-        super(Conv, self).__init__(*args, **kwargs)
-        block = OrderedDict({
-            'conv': Conv1xN(self.in_channels,
-                            self.out_channels,
-                            kernel_size=self.kernel_size,
-                            padding=self.padding,
-                            dilation=self.dilation,
-                            bias=self.bias,
-                            deterministic=self.deterministic),
-        })
-        block = self.update_block_dict(block)
-        self.block = nn.Sequential(block)
-
-
-class Pool(Module):
-    def __init__(self, *args, pooling: nn.Module, **kwargs):
-        super(Pool, self).__init__(*args, **kwargs)
-        block = OrderedDict({
-            'pool': pooling,
-            'conv': Conv1xN(self.in_channels,
-                            self.out_channels,
-                            bias=self.bias),
-        })
-        block = self.update_block_dict(block)
-        self.block = nn.Sequential(block)
 
 
 class SGN(nn.Module):
@@ -180,6 +87,7 @@ class SGN(nn.Module):
                  fi: int = 1,
 
                  g_proj_shared: bool = False,
+                 gcn_t_kernel: int = 1,
 
                  t_kernel: int = 3,
                  t_max_pool: Union[bool, int] = 0,
@@ -207,6 +115,8 @@ class SGN(nn.Module):
         self.subject = bool2int(subject)
 
         self.g_proj_shared = g_proj_shared
+        self.gcn_t_kernel = gcn_t_kernel
+
         self.t_kernel = t_kernel
         self.t_max_pool = bool2int(t_max_pool)
 
@@ -308,21 +218,28 @@ class SGN(nn.Module):
 
         # GCN ------------------------------------------------------------------
         if self.jt == 0:
-            self.compute_g1 = compute_g_spa(self.c1,
-                                            self.c3,
-                                            bias=bias,
-                                            g_proj_shared=g_proj_shared)
-            self.gcn1 = gcn_spa(self.c1, self.c2, bias=bias)
-            self.gcn2 = gcn_spa(self.c2, self.c3, bias=bias)
-            self.gcn3 = gcn_spa(self.c3, self.c3, bias=bias)
+            _in_ch = self.c1
         elif self.jt == 1 or self.jt == 2:
-            self.compute_g1 = compute_g_spa(self.c2,
-                                            self.c3,
-                                            bias=bias,
-                                            g_proj_shared=g_proj_shared)
-            self.gcn1 = gcn_spa(self.c2, self.c2, bias=bias)
-            self.gcn2 = gcn_spa(self.c2, self.c3, bias=bias)
-            self.gcn3 = gcn_spa(self.c3, self.c3, bias=bias)
+            _in_ch = self.c2
+        self.compute_g1 = compute_g_spa(_in_ch,
+                                        self.c3,
+                                        bias=bias,
+                                        g_proj_shared=g_proj_shared)
+        self.gcn1 = gcn_spa(_in_ch,
+                            self.c2,
+                            bias=bias,
+                            kernel_size=gcn_t_kernel,
+                            padding=gcn_t_kernel//2)
+        self.gcn2 = gcn_spa(self.c2,
+                            self.c3,
+                            bias=bias,
+                            kernel_size=gcn_t_kernel,
+                            padding=gcn_t_kernel//2)
+        self.gcn3 = gcn_spa(self.c3,
+                            self.c3,
+                            bias=bias,
+                            kernel_size=gcn_t_kernel,
+                            padding=gcn_t_kernel//2)
 
         # ASPP -----------------------------------------------------------------
         if aspp is None or len(aspp) == 0:
