@@ -1,8 +1,8 @@
-import torch
-import random
-
 import numpy as np
+import random
 from scipy import interpolate
+
+import torch
 
 
 def downsample(data_numpy, step, random_sample=True):
@@ -176,19 +176,19 @@ def _rot(rot):
 
 
 # https://github.com/microsoft/SGN/blob/master/data.py
-def random_rotation(x, theta=0.5):
+def random_rotation(data_numpy, theta=0.5):
     # input: C,T,V,M
-    C, T, V, M = x.shape
-    # x: N,T'(m is merged into it), vc = n,t,vc
-    x = x.transpose(3, 1, 2, 0)
+    C, T, V, M = data_numpy.shape
+    # data_numpy: N,T'(m is merged into it), vc = n,t,vc
+    data_numpy = data_numpy.transpose(3, 1, 2, 0)
     rot = np.random.uniform(-theta, theta, (1, 3))
     rot = np.tile(rot, (1, T))
     rot = rot.reshape((-1, T, 3))
     rot = _rot(rot)
-    x = np.transpose(x, (0, 1, 3, 2))
-    x = np.matmul(rot, x)
-    x = np.transpose(x, (2, 1, 3, 0))
-    return x
+    data_numpy = np.transpose(data_numpy, (0, 1, 3, 2))
+    data_numpy = np.matmul(rot, data_numpy)
+    data_numpy = np.transpose(data_numpy, (2, 1, 3, 0))
+    return data_numpy
 
 
 def random_shift(data_numpy):
@@ -297,22 +297,80 @@ def _rot(rot: torch.Tensor) -> torch.Tensor:
     return rot
 
 
-def torch_transform(x: torch.Tensor, theta: float) -> torch.Tensor:
-    x = x.contiguous().view(x.size()[:2] + (-1, 3))
-    rot = x.new(x.size()[0], 3).uniform_(-theta, theta)
+def torch_transform(data_torch: torch.Tensor, theta: float) -> torch.Tensor:
+    data_torch = data_torch.contiguous().view(data_torch.size()[:2] + (-1, 3))
+    rot = data_torch.new(data_torch.size()[0], 3).uniform_(-theta, theta)
     # rot = np.float32(np.random.uniform(-theta, theta, (1, 3)))
     # rot = torch.from_numpy(rot)
-    rot = rot.repeat(1, x.size()[1])
-    rot = rot.contiguous().view((-1, x.size()[1], 3))
+    rot = rot.repeat(1, data_torch.size()[1])
+    rot = rot.contiguous().view((-1, data_torch.size()[1], 3))
     rot = _rot(rot)
-    x = torch.transpose(x, 2, 3)
-    x = torch.matmul(rot, x)
-    x = torch.transpose(x, 2, 3)
-    x = x.contiguous().view(x.size()[:2] + (-1,))
-    return x
+    data_torch = torch.transpose(data_torch, 2, 3)
+    data_torch = torch.matmul(rot, data_torch)
+    data_torch = torch.transpose(data_torch, 2, 3)
+    data_torch = data_torch.contiguous().view(data_torch.size()[:2] + (-1,))
+    return data_torch
 
 
+def split_array_using_auc(data_numpy: np.ndarray, num_segments: int):
+    N, C = data_numpy.shape
+    assert data_numpy.ndim == 2 and N >= num_segments
+
+    if N == num_segments:
+        return list(range(num_segments+1))
+
+    data_numpy = np.linalg.norm(data_numpy, axis=1)
+    # trapezoid [N-1]
+    cum_auc = (np.cumsum(data_numpy[:-1]) + np.cumsum(data_numpy[1:])) / 2
+    seg_area = cum_auc[-1] / num_segments
+    # segment lower bounds [N-1]
+    seg_idx, seg_lbs = np.unique((cum_auc / seg_area).astype(int),
+                                 return_index=True)
+
+    if len(seg_idx) > num_segments + 1:
+        raise ValueError("seg_lbs_range length is more than seg")
+    elif len(seg_idx) < num_segments + 1:
+        c = 0
+        for i in range(num_segments+1):
+            if i not in seg_idx:
+                added = False
+                for j in range(len(seg_lbs//2)):
+                    # shift left
+                    if i-j > 0:
+                        if seg_lbs[i-j] - seg_lbs[i-j-1] > 1:
+                            seg_lbs = np.concatenate(
+                                [seg_lbs[:i-j],
+                                 [seg_lbs[i-j]-1],
+                                 seg_lbs[i-j:]]
+                            )
+                            added = True
+                            break
+                    # shift right
+                    if i+j+1 < len(seg_lbs):
+                        if seg_lbs[i+j+1] - seg_lbs[i+j] > 1:
+                            seg_lbs = np.concatenate(
+                                [seg_lbs[:i+j+1],
+                                 [seg_lbs[i+j+1]-1],
+                                 seg_lbs[i+j+1:]]
+                            )
+                            added = True
+                            break
+                if not added:
+                    seg_lbs = np.concatenate(
+                        [seg_lbs[:i],
+                         [seg_lbs[i]],
+                         seg_lbs[i:]+1]
+                    )
+                c += 1
+
+    seg_lbs[1:-1] += 1
+    seg_lbs[-1] = N
+    return seg_lbs  # lower bound is valid
+
+
+# ##############################################################################
 # Tests
+# ##############################################################################
 # dummy = np.array([
 #     [[[1, 2], [2, 3]], [[2, 3], [3, 4]]],
 #     [[[2, 3], [3, 4]], [[3, 4], [4, 5]]],
@@ -322,3 +380,15 @@ def torch_transform(x: torch.Tensor, theta: float) -> torch.Tensor:
 # dummy1 = stretch_to_maximum_length(dummy)
 # print(np.array_str(dummy, precision=1, suppress_small=True))
 # print(np.array_str(dummy1, precision=1, suppress_small=True))
+
+# xarr = np.array([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, ])
+# xarr = np.array([1, 1, 1, 1, 11, 2, 33, 2, 1, 2])
+# xarr = np.array([1, 1, 1, 1, 2, 2, 3, 2, 1, 2, 1])
+# xarr = np.array([1, 1, 1, 1, 111, 2, 33, 2, 1, 2, 1, 100, 33, 2, 1, 1])
+# xarr = np.array([1, 1, 1, 1, 111, 2, 33, 2, 1, 2, 1, 100, 33, 2, 1, 1,
+#                  1, 1, 111, 2, 33, 2, 1, 2, 1, 100, 33, 2, 1, 1])
+# xarr = np.expand_dims(xarr, -1)
+# print("shape :", xarr.shape)
+# splits = split_array_using_auc(xarr, 10)
+# print("split idx :", splits, len(splits))
+# # print("split diff :", (splits[1:]-splits[:-1]).sum())

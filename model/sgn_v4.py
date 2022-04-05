@@ -173,7 +173,7 @@ class SGN(nn.Module):
                  dropout: float = 0.0,
 
                  part: Union[bool, int] = 0,
-                 motion: Union[bool, int] = 0,  
+                 motion: Union[bool, int] = 0,
                  subject: bool = False,
 
                  g_proj_shared: bool = False,

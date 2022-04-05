@@ -1235,6 +1235,15 @@ sgn_v4:
                   - 93.99%
         - 220404120001_part1_motion2:
                   - 94.10%
+        # NO INIT IN WORKER
+        - 220404120001_noinit_nw16:
+                  - 94.13%
+        - 220404120001_noinit_nw16_rerun:
+                  -
+        - 220404120001_rerun_noinit:
+                  - 94.48%
+        - 220404120001_rerun2_noinit:
+                  -
 
 sgn-code:
         - original sgn repo code
