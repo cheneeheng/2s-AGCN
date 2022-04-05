@@ -1239,11 +1239,21 @@ sgn_v4:
         - 220404120001_noinit_nw16:
                   - 94.13%
         - 220404120001_noinit_nw16_rerun:
-                  -
+                  - 94.13%
         - 220404120001_rerun_noinit:
                   - 94.48%
         - 220404120001_rerun2_noinit:
-                  -
+                  - 94.48%
+        - 220404180001_subject:
+                  - 94.14%
+        - 220404180001_motionsampler:
+                  - 94.86%
+        - 220404180001_part1:
+        - 220404180001_part1_motion2:
+
+        # joints 15
+        - 220405153001:
+                  - 90.67%
 
 sgn-code:
         - original sgn repo code

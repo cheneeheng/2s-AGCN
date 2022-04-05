@@ -174,7 +174,10 @@ class SGN(nn.Module):
 
                  part: Union[bool, int] = 0,
                  motion: Union[bool, int] = 0,
-                 subject: bool = False,
+                 subject: Union[bool, int] = 0,
+
+                 jt: int = 1,
+                 fi: int = 1,
 
                  g_proj_shared: bool = False,
 
@@ -195,20 +198,29 @@ class SGN(nn.Module):
         self.seg = seg
         self.bias = bias
 
+        self.jt = jt
+        self.fi = fi
+
         self.part = bool2int(part)
         self.motion = bool2int(motion)
 
-        self.subject = subject
+        self.subject = bool2int(subject)
 
         self.g_proj_shared = g_proj_shared
         self.t_kernel = t_kernel
         self.t_max_pool = bool2int(t_max_pool)
 
+        assert self.jt in [0, 1, 2]
+        assert self.fi in [0, 1, 2]
         assert self.part in [0, 1]
         assert self.motion in [0, 1, 2]
+        assert self.subject in [0, 1, 2]
         assert self.t_kernel > 0
         assert self.t_max_pool >= 0
 
+        parts_len = len(self.parts_3points)
+
+        # Dynamic Representation -----------------------------------------------
         self.pos_embed = embed(in_channels,
                                self.c1,
                                inter_channels=self.c1,
@@ -222,67 +234,90 @@ class SGN(nn.Module):
                                norm=True,
                                bias=bias)
 
-        if self.part == 1:
+        if self.part == 1 or self.part == 2:
             self.par_embed = embed(in_channels*3,
                                    self.c1,
                                    inter_channels=self.c1,
-                                   num_point=len(self.parts_3points),
+                                   num_point=parts_len,
                                    norm=True,
                                    bias=bias)
             if self.motion == 1:
                 self.mot_embed = embed(in_channels,
                                        self.c1,
                                        inter_channels=self.c1,
-                                       num_point=len(self.parts_3points),
+                                       num_point=parts_len,
                                        norm=True,
                                        bias=bias)
             elif self.motion == 2:
                 self.mot_embed = embed(in_channels*3,
                                        self.c1,
                                        inter_channels=self.c1,
-                                       num_point=len(self.parts_3points),
+                                       num_point=parts_len,
                                        norm=True,
                                        bias=bias)
 
-        if self.subject:
+        # Joint Embedding ------------------------------------------------------
+        if self.jt == 1 or self.jt == 2:
+            self.spa = one_hot(num_point, seg, mode=0)
+            self.spa_embed = embed(num_point,
+                                   self.c1,
+                                   inter_channels=self.c1,
+                                   num_point=num_point,
+                                   norm=False,
+                                   bias=bias,
+                                   mode=self.jt)
+
+        # Group Embedding ------------------------------------------------------
+        if self.part == 1 or self.part == 2:
+            if self.fi == 1 or self.fi == 2:
+                self.tem = one_hot(seg, num_point+parts_len, mode=1)
+            self.gro = one_hot(parts_len, seg, mode=0)
+            self.gro_embed = embed(parts_len,
+                                   self.c1,
+                                   inter_channels=self.c1,
+                                   num_point=parts_len,
+                                   norm=False,
+                                   bias=bias,
+                                   mode=self.part)
+
+        # Frame Embedding ------------------------------------------------------
+        if self.fi == 1 or self.fi == 2:
+            self.tem = one_hot(seg, num_point, mode=1)
+            self.tem_embed = embed(seg,
+                                   self.c3,
+                                   inter_channels=self.c1,
+                                   num_point=num_point,
+                                   norm=False,
+                                   bias=bias,
+                                   mode=self.fi)
+
+        # Subject Embedding ----------------------------------------------------
+        if self.subject == 1 or self.subject == 2:
             self.sub_embed = embed_subject(self.c1,
                                            self.c3,
                                            num_subjects=2,
-                                           bias=bias)
+                                           bias=bias,
+                                           mode=self.subject)
 
-        self.spa = one_hot(num_point, seg, mode=0)
-        self.tem = one_hot(seg, num_point, mode=1)
-        self.spa_embed = embed(num_point,
-                               self.c1,
-                               inter_channels=self.c1,
-                               num_point=num_point,
-                               norm=False,
-                               bias=bias)
-        self.tem_embed = embed(seg,
-                               self.c3,
-                               inter_channels=self.c1,
-                               num_point=num_point,
-                               norm=False,
-                               bias=bias)
+        # GCN ------------------------------------------------------------------
+        if self.jt == 0:
+            self.compute_g1 = compute_g_spa(self.c1,
+                                            self.c3,
+                                            bias=bias,
+                                            g_proj_shared=g_proj_shared)
+            self.gcn1 = gcn_spa(self.c1, self.c2, bias=bias)
+            self.gcn2 = gcn_spa(self.c2, self.c3, bias=bias)
+            self.gcn3 = gcn_spa(self.c3, self.c3, bias=bias)
+        elif self.jt == 1 or self.jt == 2:
+            self.compute_g1 = compute_g_spa(self.c2,
+                                            self.c3,
+                                            bias=bias,
+                                            g_proj_shared=g_proj_shared)
+            self.gcn1 = gcn_spa(self.c2, self.c2, bias=bias)
+            self.gcn2 = gcn_spa(self.c2, self.c3, bias=bias)
+            self.gcn3 = gcn_spa(self.c3, self.c3, bias=bias)
 
-        if self.part == 1:
-            self.tem = one_hot(seg, num_point+len(self.parts_3points), mode=1)
-            self.gro = one_hot(len(self.parts_3points), seg, mode=0)
-            self.gro_embed = embed(len(self.parts_3points),
-                                   self.c1,
-                                   inter_channels=self.c1,
-                                   num_point=len(self.parts_3points),
-                                   norm=False,
-                                   bias=bias)
-
-        self.compute_g1 = compute_g_spa(self.c2,
-                                        self.c3,
-                                        bias=bias,
-                                        g_proj_shared=g_proj_shared)
-        self.gcn1 = gcn_spa(self.c2, self.c2, bias=bias)
-        self.gcn2 = gcn_spa(self.c2, self.c3, bias=bias)
-        self.gcn3 = gcn_spa(self.c3, self.c3, bias=bias)
-
+        # ASPP -----------------------------------------------------------------
         if aspp is None or len(aspp) == 0:
             self.aspp = lambda x: x
         else:
@@ -292,16 +327,18 @@ class SGN(nn.Module):
                 bias=bias,
                 dilations=aspp)
 
+        # Frame level module ---------------------------------------------------
         self.smp = nn.AdaptiveMaxPool2d((1, seg))
         self.cnn = local(self.c3, self.c4, bias=bias,
                          t_kernel=t_kernel, t_max_pool=t_max_pool)
         self.tmp = nn.AdaptiveMaxPool2d((1, 1))
         self.do = nn.Dropout(dropout)
+
         self.fc = nn.Linear(self.c4, num_class)
 
         self.init()
 
-        if self.part == 1:
+        if self.part == 1 or self.part == 2:
             self.register_buffer('parts_3points_vec',
                                  torch.tensor(self.parts_3points,
                                               dtype=torch.int).reshape(-1))
@@ -336,7 +373,7 @@ class SGN(nn.Module):
         bs, step, dim = x.shape
         assert dim % 3 == 0, "Only support input of xyz coordinates only."
 
-        # Dynamic Representation
+        # Dynamic Representation -----------------------------------------------
         num_point = dim // 3
         x1 = x.view((bs, step, num_point, 3))  # n,t,v,c
         x = x1.permute(0, 3, 2, 1).contiguous()  # n,c,v,t
@@ -346,7 +383,7 @@ class SGN(nn.Module):
         dif = self.vel_embed(dif)
         dy1 = pos + dif  # n,c,v,t
 
-        if self.part == 1:
+        if self.part == 1 or self.part == 2:
             par = torch.index_select(x1, 2, self.parts_3points_vec)  # n,t,v+,c
             par = par.view((bs, step, -1, 3, self.in_channels))  # n,t,v+,3,c
             mid = par.mean(dim=-2, keepdim=True)  # n,t,v+,1,c
@@ -372,35 +409,51 @@ class SGN(nn.Module):
                 mot = self.mot_embed(mot)
                 dy2 += mot
 
-        # Joint and frame embeddings
-        tem1 = self.tem_embed(self.tem(bs))
-        spa1 = self.spa_embed(self.spa(bs))
-        if self.part == 1:
+        # Joint and frame embeddings -------------------------------------------
+        if self.jt == 1 or self.jt == 2:
+            spa1 = self.spa_embed(self.spa(bs))
+
+        if self.fi == 1 or self.fi == 2:
+            tem1 = self.tem_embed(self.tem(bs))
+
+        if self.part == 1 or self.part == 2:
             gro1 = self.gro_embed(self.gro(bs))
-        if self.subject:
+
+        if self.subject == 1 or self.subject == 2:
             s = s.view((bs, step, 1, 1))  # n,t,v,c
             s = s.permute(0, 3, 2, 1).contiguous()  # n,c,v,t
             sub1 = self.sub_embed(s)
 
-        # Joint-level Module
-        x = torch.cat([dy1, spa1], 1)  # n,c,v,t
-        if self.part == 1:
-            x1 = torch.cat([dy2, gro1], 1)  # n,c,v',t
-            x = torch.cat([x, x1], 2)  # n,c,v'+v,t
+        # Joint-level Module ---------------------------------------------------
+        if self.jt == 0:
+            x = dy1  # n,c,v,t
+
+            if self.part == 1 or self.part == 2:
+                x1 = dy2  # n,c,v',t
+                x = torch.cat([x, x1], 2)  # n,c,v'+v,t
+
+        elif self.jt == 1 or self.jt == 2:
+            x = torch.cat([dy1, spa1], 1)  # n,c,v,t
+
+            if self.part == 1 or self.part == 2:
+                x1 = torch.cat([dy2, gro1], 1)  # n,c,v',t
+                x = torch.cat([x, x1], 2)  # n,c,v'+v,t
+
         g = self.compute_g1(x)
         x = self.gcn1(x, g)
         x = self.gcn2(x, g)
         x = self.gcn3(x, g)
 
-        # Frame-level Module
-        x = x + tem1
-        if self.subject:
+        # Frame-level Module ---------------------------------------------------
+        if self.fi == 1 or self.fi == 2:
+            x = x + tem1
+        if self.subject == 1 or self.subject == 2:
             x = x + sub1
         x = self.smp(x)
         x = self.aspp(x)
         x = self.cnn(x)
 
-        # Classification
+        # Classification -------------------------------------------------------
         y = self.tmp(x)
         y = torch.flatten(y, 1)
         y = self.do(y)
@@ -447,51 +500,78 @@ class embed(Module):
                  norm: bool = False,
                  inter_channels: int = 0,
                  num_point: int = 25,
+                 mode: int = 1,
                  **kwargs):
         super(embed, self).__init__(*args, **kwargs)
+        assert mode in [1, 2]
+        self.mode = mode
         if norm:
             self.norm = norm_data(self.in_channels * num_point)
         else:
             self.norm = lambda x: x
-        self.cnn1 = Conv(self.in_channels,
-                         inter_channels,
-                         bias=self.bias,
-                         activation=nn.ReLU)
-        self.cnn2 = Conv(inter_channels,
-                         self.out_channels,
-                         bias=self.bias,
-                         activation=nn.ReLU)
+        if mode == 1:
+            self.cnn1 = Conv(self.in_channels,
+                             inter_channels,
+                             bias=self.bias,
+                             activation=nn.ReLU)
+            self.cnn2 = Conv(inter_channels,
+                             self.out_channels,
+                             bias=self.bias,
+                             activation=nn.ReLU)
+        elif mode == 2:
+            # bert style
+            self.cnn1 = Conv(self.in_channels,
+                             self.out_channels,
+                             bias=self.bias,
+                             normalization=lambda: bn(self.out_channels),
+                             dropout=lambda: nn.Dropout2d(0.2))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: n,c,v,t
         x = self.norm(x)
         x = self.cnn1(x)
-        x = self.cnn2(x)
+        if self.mode == 1:
+            x = self.cnn2(x)
         return x
 
 
 class embed_subject(Module):
     def __init__(self,
                  *args,
-                 num_subjects=2,
+                 num_subjects: int = 2,
+                 mode: int = 1,
                  **kwargs):
         super(embed_subject, self).__init__(*args, **kwargs)
-        embedding = torch.empty(num_subjects, self.in_channels)
-        nn.init.normal_(embedding, std=0.02)  # bert
-        self.embedding = nn.Parameter(embedding)
-        self.cnn1 = Conv(self.in_channels,
-                         self.out_channels,
-                         bias=self.bias,
-                         activation=nn.ReLU)
+        assert mode in [1, 2]
+        self.mode = mode
+        if mode == 1:
+            embedding = torch.empty(num_subjects, self.in_channels)
+            nn.init.normal_(embedding, std=0.02)  # bert
+            self.embedding = nn.Parameter(embedding)
+            self.cnn1 = Conv(self.in_channels,
+                             self.out_channels,
+                             bias=self.bias,
+                             activation=nn.ReLU)
+        elif mode == 2:
+            # bert style
+            embedding = torch.empty(num_subjects, self.out_channels)
+            nn.init.normal_(embedding, std=0.02)  # bert
+            self.embedding = nn.Parameter(embedding)
+            self.norm = bn(self.in_channels)
+            self.dropout = nn.Dropout2d(0.2)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         bs, _, _, step = x.shape  # n,c,v,t => n,1,1,t
-        x1 = x.reshape(-1).unsqueeze(-1)  # nt,1
-        x1 = x1.expand(x1.shape[0], self.embedding.shape[-1]).type(torch.int64)
-        x1 = torch.gather(self.embedding, 0, x1)
-        x1 = x1.reshape((bs, step, 1, self.embedding.shape[-1]))
-        x1 = x1.transpose(1, -1)
-        x = self.cnn1(x1)
+        x = x.reshape(-1).unsqueeze(-1)  # nt,1
+        x = x.expand(x.shape[0], self.embedding.shape[-1]).type(torch.int64)
+        x = torch.gather(self.embedding, 0, x)
+        x = x.reshape((bs, step, 1, self.embedding.shape[-1]))
+        x = x.transpose(1, -1)  # n,c,v,t
+        if self.mode == 1:
+            x = self.cnn1(x)
+        elif self.mode == 2:
+            x = self.norm(x)
+            x = self.dropout(x)
         return x
 
 
