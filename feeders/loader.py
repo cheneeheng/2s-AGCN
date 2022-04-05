@@ -215,7 +215,7 @@ class NTUDataLoaders(object):
 
         # sampling based on ~equal motion using AUC.
         if self.motion_sampler == 1:
-            intervals = tools.split_array_using_auc(skeleton_seq)
+            intervals = tools.split_array_using_auc(skeleton_seq, self.seg)
             intervals_range = intervals[1:] - intervals[:-1]
             random_intervals_range_fn = partial(np.random.randint,
                                                 low=0,

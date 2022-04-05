@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/sgn_v4/220404120001_noinit_motionsampler
-model_saved_name: ./data/data/ntu_result/xview/sgn_v4/220404120001_noinit_motionsampler/sgn
+work_dir: ./data/data/ntu_result/xview/sgn_v4/220404180001_motionsampler
+model_saved_name: ./data/data/ntu_result/xview/sgn_v4/220404180001_motionsampler/sgn
 
 phase: train
 save_score: True

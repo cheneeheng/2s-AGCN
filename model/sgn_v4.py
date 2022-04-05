@@ -394,9 +394,9 @@ class SGN(nn.Module):
 
         # Frame-level Module
         x = x + tem1
-        x = self.smp(x)
         if self.subject:
             x = x + sub1
+        x = self.smp(x)
         x = self.aspp(x)
         x = self.cnn(x)
 
