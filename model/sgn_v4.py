@@ -214,7 +214,7 @@ class SGN(nn.Module):
         assert self.fi in [0, 1, 2]
         assert self.part in [0, 1]
         assert self.motion in [0, 1, 2]
-        assert self.subject in [0, 1, 2]
+        assert self.subject in [0, 1, 2, 3]
         assert self.t_kernel > 0
         assert self.t_max_pool >= 0
 
@@ -292,12 +292,19 @@ class SGN(nn.Module):
                                    mode=self.fi)
 
         # Subject Embedding ----------------------------------------------------
-        if self.subject == 1 or self.subject == 2:
-            self.sub_embed = embed_subject(self.c1,
-                                           self.c3,
-                                           num_subjects=2,
-                                           bias=bias,
-                                           mode=self.subject)
+        if self.subject > 0:
+            if subject == 3:
+                self.sub_embed = embed(1,
+                                       self.c3,
+                                       inter_channels=self.c1,
+                                       num_point=2,
+                                       bias=bias)
+            else:
+                self.sub_embed = embed_subject(self.c1,
+                                               self.c3,
+                                               num_subjects=2,
+                                               bias=bias,
+                                               mode=self.subject)
 
         # GCN ------------------------------------------------------------------
         if self.jt == 0:
@@ -321,11 +328,10 @@ class SGN(nn.Module):
         if aspp is None or len(aspp) == 0:
             self.aspp = lambda x: x
         else:
-            self.aspp = atrous_spatial_pyramid_pooling(
-                self.c3,
-                self.c3,
-                bias=bias,
-                dilations=aspp)
+            self.aspp = atrous_spatial_pyramid_pooling(self.c3,
+                                                       self.c3,
+                                                       bias=bias,
+                                                       dilations=aspp)
 
         # Frame level module ---------------------------------------------------
         self.smp = nn.AdaptiveMaxPool2d((1, seg))
@@ -339,9 +345,10 @@ class SGN(nn.Module):
         self.init()
 
         if self.part == 1 or self.part == 2:
-            self.register_buffer('parts_3points_vec',
-                                 torch.tensor(self.parts_3points,
-                                              dtype=torch.int).reshape(-1))
+            self.register_buffer(
+                'parts_3points_vec',
+                torch.tensor(self.parts_3points, dtype=torch.int).reshape(-1)
+            )
 
     def init(self):
         for m in self.modules():
@@ -419,7 +426,7 @@ class SGN(nn.Module):
         if self.part == 1 or self.part == 2:
             gro1 = self.gro_embed(self.gro(bs))
 
-        if self.subject == 1 or self.subject == 2:
+        if self.subject > 0:
             s = s.view((bs, step, 1, 1))  # n,t,v,c
             s = s.permute(0, 3, 2, 1).contiguous()  # n,c,v,t
             sub1 = self.sub_embed(s)
@@ -447,7 +454,7 @@ class SGN(nn.Module):
         # Frame-level Module ---------------------------------------------------
         if self.fi == 1 or self.fi == 2:
             x = x + tem1
-        if self.subject == 1 or self.subject == 2:
+        if self.subject > 0:
             x = x + sub1
         x = self.smp(x)
         x = self.aspp(x)
@@ -557,7 +564,7 @@ class embed_subject(Module):
             embedding = torch.empty(num_subjects, self.out_channels)
             nn.init.normal_(embedding, std=0.02)  # bert
             self.embedding = nn.Parameter(embedding)
-            self.norm = bn(self.in_channels)
+            self.norm = bn(self.out_channels)
             self.dropout = nn.Dropout2d(0.2)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
