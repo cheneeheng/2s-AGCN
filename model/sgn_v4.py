@@ -123,7 +123,7 @@ class SGN(nn.Module):
         assert self.jt in [0, 1, 2]
         assert self.fi in [0, 1, 2]
         assert self.part in [0, 1]
-        assert self.motion in [0, 1, 2]
+        assert self.motion in [0, 1, 2, 3, 4]
         assert self.subject in [0, 1, 2, 3]
         assert self.t_kernel > 0
         assert self.t_max_pool >= 0
@@ -152,6 +152,7 @@ class SGN(nn.Module):
                                    norm=True,
                                    bias=bias)
             if self.motion == 1:
+                # diff between mids
                 self.mot_embed = embed(in_channels,
                                        self.c1,
                                        inter_channels=self.c1,
@@ -159,12 +160,31 @@ class SGN(nn.Module):
                                        norm=True,
                                        bias=bias)
             elif self.motion == 2:
+                # diff between next mid-centered parts with current mid
                 self.mot_embed = embed(in_channels*3,
                                        self.c1,
                                        inter_channels=self.c1,
                                        num_point=parts_len,
                                        norm=True,
                                        bias=bias)
+            elif self.motion == 3:
+                # diff between parts centered on mid in the first part
+                self.mot_embed = embed(in_channels*3,
+                                       self.c1,
+                                       inter_channels=self.c1,
+                                       num_point=parts_len,
+                                       norm=True,
+                                       bias=bias)
+            elif self.motion == 4:
+                # diff between parts centered on mid in the first part
+                _inter_channels = [self.c1, self.c1, self.c1]
+                self.mot_embed = embed(in_channels*3,
+                                       self.c1,
+                                       inter_channels=_inter_channels,
+                                       num_point=parts_len,
+                                       norm=True,
+                                       bias=bias,
+                                       mode=3)
 
         # Joint Embedding ------------------------------------------------------
         if self.jt == 1 or self.jt == 2:
@@ -320,18 +340,21 @@ class SGN(nn.Module):
                 mid = mid.squeeze(-2)  # n,t,v+,c
                 mid = mid.permute(0, 3, 2, 1).contiguous()  # n,c,v+,t
                 mot = mid[:, :, :, 1:] - mid[:, :, :, 0:-1]  # n,c,v+,t-1
-                mot = self.pad_zeros(mot)
-                mot = self.mot_embed(mot)
-                dy2 += mot
             elif self.motion == 2:
                 # mid = mid  # n,t,v+,1,c
                 # par1 = par1  # n,t,v+,3,c
                 mot = par1[:, 1:] - mid[:, :-1]  # n,t-1,v+,3,c
                 mot = mot.view((*mot.shape[:3], -1))  # n,t-1,v+,c+
                 mot = mot.permute(0, 3, 2, 1).contiguous()  # n,c,v+,t-1
-                mot = self.pad_zeros(mot)  # n,c,v+,t
-                mot = self.mot_embed(mot)
-                dy2 += mot
+            elif self.motion == 3:
+                # par1 = par1  # n,t,v+,3,c
+                mot = par1[:, 1:] - par1[:, :-1]  # n,t-1,v+,3,c
+                mot = mot.view((*mot.shape[:3], -1))  # n,t-1,v+,c+
+                mot = mot.permute(0, 3, 2, 1).contiguous()  # n,c,v+,t-1
+
+            mot = self.pad_zeros(mot)  # n,c,v+,t
+            mot = self.mot_embed(mot)
+            dy2 += mot
 
         # Joint and frame embeddings -------------------------------------------
         if self.jt == 1 or self.jt == 2:
@@ -422,17 +445,19 @@ class embed(Module):
     def __init__(self,
                  *args,
                  norm: bool = False,
-                 inter_channels: int = 0,
+                 inter_channels: Union[list, int] = 0,
                  num_point: int = 25,
                  mode: int = 1,
                  **kwargs):
         super(embed, self).__init__(*args, **kwargs)
         assert mode in [1, 2]
         self.mode = mode
+
         if norm:
             self.norm = norm_data(self.in_channels * num_point)
         else:
             self.norm = lambda x: x
+
         if mode == 1:
             self.cnn1 = Conv(self.in_channels,
                              inter_channels,
@@ -449,6 +474,15 @@ class embed(Module):
                              bias=self.bias,
                              normalization=lambda: bn(self.out_channels),
                              dropout=lambda: nn.Dropout2d(0.2))
+        if mode == 3:
+            assert isinstance(inter_channels, list)
+            inter_channels = \
+                [self.in_channels] + inter_channels + [self.out_channels]
+            for i in range(len(inter_channels)-1):
+                setattr(self, f'cnn{i+1}', Conv(inter_channels[i],
+                                                inter_channels[i+1],
+                                                bias=self.bias,
+                                                activation=nn.ReLU))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: n,c,v,t
@@ -456,6 +490,10 @@ class embed(Module):
         x = self.cnn1(x)
         if self.mode == 1:
             x = self.cnn2(x)
+        elif self.mode == 3:
+            x = self.cnn2(x)
+            x = self.cnn3(x)
+            x = self.cnn4(x)
         return x
 
 
