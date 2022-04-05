@@ -116,3 +116,5 @@ data/
 sandbox*
 
 sam
+run.sh
+update_git
