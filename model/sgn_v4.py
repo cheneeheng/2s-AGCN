@@ -121,7 +121,7 @@ class SGN(nn.Module):
 
         assert self.jt in [0, 1, 2]
         assert self.fi in [0, 1, 2]
-        assert self.part in [0, 1]
+        assert self.part in [0, 1, 2]
         assert self.motion in [0, 1, 2, 3, 4]
         assert self.subject in [0, 1, 2, 3]
         assert self.t_kernel > 0
@@ -227,7 +227,7 @@ class SGN(nn.Module):
                                    mode=self.jt)
 
         # Group Embedding ------------------------------------------------------
-        if self.part > 0:
+        if self.part > 0 and self.jt > 0:
             self.gro = one_hot(parts_len, seg, mode=0)
             self.gro_embed = embed(parts_len,
                                    self.c1,
@@ -370,7 +370,7 @@ class SGN(nn.Module):
         dif = self.vel_embed(dif)
         dy1 = pos + dif  # n,c,v,t
 
-        if self.part == 1 or self.part == 2:
+        if self.part > 0:
             par = torch.index_select(x1, 2, self.parts_3points_vec)  # n,t,v+,c
             par = par.view((bs, step, -1, 3, self.in_channels))  # n,t,v+,3,c
             mid = par.mean(dim=-2, keepdim=True)  # n,t,v+,1,c
@@ -379,25 +379,26 @@ class SGN(nn.Module):
             par = par.permute(0, 3, 2, 1).contiguous()  # n,c+,v+,t
             dy2 = self.par_embed(par)  # n,c,v+,t
 
-            if self.motion == 1:
-                mid = mid.squeeze(-2)  # n,t,v+,c
-                mid = mid.permute(0, 3, 2, 1).contiguous()  # n,c,v+,t
-                mot = mid[:, :, :, 1:] - mid[:, :, :, 0:-1]  # n,c,v+,t-1
-            elif self.motion == 2:
-                # mid = mid  # n,t,v+,1,c
-                # par1 = par1  # n,t,v+,3,c
-                mot = par1[:, 1:] - mid[:, :-1]  # n,t-1,v+,3,c
-                mot = mot.view((*mot.shape[:3], -1))  # n,t-1,v+,c+
-                mot = mot.permute(0, 3, 2, 1).contiguous()  # n,c,v+,t-1
-            elif self.motion == 3 or self.motion == 4:
-                # par1 = par1  # n,t,v+,3,c
-                mot = par1[:, 1:] - par1[:, :-1]  # n,t-1,v+,3,c
-                mot = mot.view((*mot.shape[:3], -1))  # n,t-1,v+,c+
-                mot = mot.permute(0, 3, 2, 1).contiguous()  # n,c,v+,t-1
+            if self.motion > 0:
+                if self.motion == 1:
+                    mid = mid.squeeze(-2)  # n,t,v+,c
+                    mid = mid.permute(0, 3, 2, 1).contiguous()  # n,c,v+,t
+                    mot = mid[:, :, :, 1:] - mid[:, :, :, 0:-1]  # n,c,v+,t-1
+                elif self.motion == 2:
+                    # mid = mid  # n,t,v+,1,c
+                    # par1 = par1  # n,t,v+,3,c
+                    mot = par1[:, 1:] - mid[:, :-1]  # n,t-1,v+,3,c
+                    mot = mot.view((*mot.shape[:3], -1))  # n,t-1,v+,c+
+                    mot = mot.permute(0, 3, 2, 1).contiguous()  # n,c,v+,t-1
+                elif self.motion == 3 or self.motion == 4:
+                    # par1 = par1  # n,t,v+,3,c
+                    mot = par1[:, 1:] - par1[:, :-1]  # n,t-1,v+,3,c
+                    mot = mot.view((*mot.shape[:3], -1))  # n,t-1,v+,c+
+                    mot = mot.permute(0, 3, 2, 1).contiguous()  # n,c,v+,t-1
 
-            mot = self.pad_zeros(mot)  # n,c,v+,t
-            mot = self.mot_embed(mot)
-            dy2 += mot
+                mot = self.pad_zeros(mot)  # n,c,v+,t
+                mot = self.mot_embed(mot)
+                dy2 += mot
 
         # Joint and frame embeddings -------------------------------------------
         if self.jt > 0:
@@ -406,7 +407,7 @@ class SGN(nn.Module):
         if self.fi > 0:
             tem1 = self.tem_embed(self.tem(bs))
 
-        if self.part > 0:
+        if self.part > 0 and self.jt > 0:
             gro1 = self.gro_embed(self.gro(bs))
 
         if self.subject > 0:
@@ -422,10 +423,10 @@ class SGN(nn.Module):
                 x1 = dy2  # n,c,v',t
                 x = torch.cat([x, x1], 2)  # n,c,v'+v,t
 
-        elif self.jt == 1 or self.jt == 2:
+        elif self.jt > 0:
             x = torch.cat([dy1, spa1], 1)  # n,c,v,t
 
-            if self.part == 1 or self.part == 2:
+            if self.part > 0:
                 x1 = torch.cat([dy2, gro1], 1)  # n,c,v',t
                 x = torch.cat([x, x1], 2)  # n,c,v'+v,t
 
