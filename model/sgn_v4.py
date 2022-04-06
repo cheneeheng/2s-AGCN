@@ -347,7 +347,7 @@ class SGN(nn.Module):
                 mot = par1[:, 1:] - mid[:, :-1]  # n,t-1,v+,3,c
                 mot = mot.view((*mot.shape[:3], -1))  # n,t-1,v+,c+
                 mot = mot.permute(0, 3, 2, 1).contiguous()  # n,c,v+,t-1
-            elif self.motion == 3:
+            elif self.motion == 3 or self.motion == 4:
                 # par1 = par1  # n,t,v+,3,c
                 mot = par1[:, 1:] - par1[:, :-1]  # n,t-1,v+,3,c
                 mot = mot.view((*mot.shape[:3], -1))  # n,t-1,v+,c+

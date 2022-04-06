@@ -334,7 +334,7 @@ def split_array_using_auc(data_numpy: np.ndarray, num_segments: int):
         for i in range(num_segments+1):
             if i not in seg_idx:
                 added = False
-                for j in range(len(seg_lbs//2)):
+                for j in range(len(seg_lbs)):
                     # shift left
                     if i-j > 0:
                         if seg_lbs[i-j] - seg_lbs[i-j-1] > 1:
