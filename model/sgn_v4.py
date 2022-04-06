@@ -11,18 +11,14 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
-from torch.profiler import profile, record_function, ProfilerActivity
+from torch.nn import Module as PyTorchModule
+from torch.profiler import profile, ProfilerActivity
 
 import math
-import time
-from collections import OrderedDict
-from tqdm import tqdm
 from typing import Tuple, Optional, Union, Type
 
 from model.module.module_wrapper import *
 from utils.utils import *
-
-bn = nn.BatchNorm2d
 
 
 class SGN(nn.Module):
@@ -92,6 +88,7 @@ class SGN(nn.Module):
                  t_kernel: int = 3,
                  t_max_pool: Union[bool, int] = 0,
                  aspp: list = None,
+                 norm_type: str = 'bn'
                  ):
         super(SGN, self).__init__()
 
@@ -120,6 +117,8 @@ class SGN(nn.Module):
         self.t_kernel = t_kernel
         self.t_max_pool = bool2int(t_max_pool)
 
+        self.norm_type = norm_type
+
         assert self.jt in [0, 1, 2]
         assert self.fi in [0, 1, 2]
         assert self.part in [0, 1]
@@ -127,6 +126,16 @@ class SGN(nn.Module):
         assert self.subject in [0, 1, 2, 3]
         assert self.t_kernel > 0
         assert self.t_max_pool >= 0
+        assert self.norm_type in ['bn', 'ln']
+
+        if self.norm_type == 'bn':
+            norm_mod = nn.BatchNorm2d
+            norm_mod_1d = nn.BatchNorm1d
+        elif self.norm_type == 'ln':
+            def norm_mod(x): return nn.GroupNorm(1, x)
+            def norm_mod_1d(x): return nn.GroupNorm(1, x)
+            # norm_mod = nn.LayerNorm
+            # norm_mod_1d = nn.LayerNorm
 
         parts_len = len(self.parts_3points)
 
@@ -135,29 +144,45 @@ class SGN(nn.Module):
                                self.c1,
                                inter_channels=self.c1,
                                num_point=num_point,
-                               norm=True,
+                               norm=norm_mod_1d,
+                               norm_mod=norm_mod,
                                bias=bias)
         self.vel_embed = embed(in_channels,
                                self.c1,
                                inter_channels=self.c1,
                                num_point=num_point,
-                               norm=True,
+                               norm=norm_mod_1d,
+                               norm_mod=norm_mod,
                                bias=bias)
 
-        if self.part == 1 or self.part == 2:
+        if self.part == 1:
             self.par_embed = embed(in_channels*3,
                                    self.c1,
                                    inter_channels=self.c1,
                                    num_point=parts_len,
-                                   norm=True,
+                                   norm=norm_mod_1d,
+                                   norm_mod=norm_mod,
                                    bias=bias)
+        elif self.part == 2:
+            _inter_channels = [self.c1, self.c1, self.c1]
+            self.par_embed = embed(in_channels*3,
+                                   self.c1,
+                                   inter_channels=_inter_channels,
+                                   num_point=parts_len,
+                                   norm=norm_mod_1d,
+                                   norm_mod=norm_mod,
+                                   bias=bias,
+                                   mode=3)
+
+        if self.part > 0:
             if self.motion == 1:
                 # diff between mids
                 self.mot_embed = embed(in_channels,
                                        self.c1,
                                        inter_channels=self.c1,
                                        num_point=parts_len,
-                                       norm=True,
+                                       norm=norm_mod_1d,
+                                       norm_mod=norm_mod,
                                        bias=bias)
             elif self.motion == 2:
                 # diff between next mid-centered parts with current mid
@@ -165,7 +190,8 @@ class SGN(nn.Module):
                                        self.c1,
                                        inter_channels=self.c1,
                                        num_point=parts_len,
-                                       norm=True,
+                                       norm=norm_mod_1d,
+                                       norm_mod=norm_mod,
                                        bias=bias)
             elif self.motion == 3:
                 # diff between parts centered on mid in the first part
@@ -173,7 +199,8 @@ class SGN(nn.Module):
                                        self.c1,
                                        inter_channels=self.c1,
                                        num_point=parts_len,
-                                       norm=True,
+                                       norm=norm_mod_1d,
+                                       norm_mod=norm_mod,
                                        bias=bias)
             elif self.motion == 4:
                 # diff between parts centered on mid in the first part
@@ -182,7 +209,8 @@ class SGN(nn.Module):
                                        self.c1,
                                        inter_channels=_inter_channels,
                                        num_point=parts_len,
-                                       norm=True,
+                                       norm=norm_mod_1d,
+                                       norm_mod=norm_mod,
                                        bias=bias,
                                        mode=3)
 
@@ -193,7 +221,8 @@ class SGN(nn.Module):
                                    self.c1,
                                    inter_channels=self.c1,
                                    num_point=num_point,
-                                   norm=False,
+                                   norm=None,
+                                   norm_mod=norm_mod,
                                    bias=bias,
                                    mode=self.jt)
 
@@ -204,7 +233,8 @@ class SGN(nn.Module):
                                    self.c1,
                                    inter_channels=self.c1,
                                    num_point=parts_len,
-                                   norm=False,
+                                   norm=None,
+                                   norm_mod=norm_mod,
                                    bias=bias,
                                    mode=self.part)
 
@@ -218,7 +248,8 @@ class SGN(nn.Module):
                                    self.c3,
                                    inter_channels=self.c1,
                                    num_point=num_point,
-                                   norm=False,
+                                   norm=None,
+                                   norm_mod=norm_mod,
                                    bias=bias,
                                    mode=self.fi)
 
@@ -229,13 +260,16 @@ class SGN(nn.Module):
                                        self.c3,
                                        inter_channels=self.c1,
                                        num_point=2,
+                                       norm=None,
+                                       norm_mod=norm_mod,
                                        bias=bias)
             else:
                 self.sub_embed = embed_subject(self.c1,
                                                self.c3,
                                                num_subjects=2,
                                                bias=bias,
-                                               mode=self.subject)
+                                               mode=self.subject,
+                                               norm_mod=norm_mod)
 
         # GCN ------------------------------------------------------------------
         if self.jt == 0:
@@ -250,17 +284,20 @@ class SGN(nn.Module):
                             self.c2,
                             bias=bias,
                             kernel_size=gcn_t_kernel,
-                            padding=gcn_t_kernel//2)
+                            padding=gcn_t_kernel//2,
+                            norm_mod=norm_mod)
         self.gcn2 = gcn_spa(self.c2,
                             self.c3,
                             bias=bias,
                             kernel_size=gcn_t_kernel,
-                            padding=gcn_t_kernel//2)
+                            padding=gcn_t_kernel//2,
+                            norm_mod=norm_mod)
         self.gcn3 = gcn_spa(self.c3,
                             self.c3,
                             bias=bias,
                             kernel_size=gcn_t_kernel,
-                            padding=gcn_t_kernel//2)
+                            padding=gcn_t_kernel//2,
+                            norm_mod=norm_mod)
 
         # ASPP -----------------------------------------------------------------
         if aspp is None or len(aspp) == 0:
@@ -269,12 +306,17 @@ class SGN(nn.Module):
             self.aspp = atrous_spatial_pyramid_pooling(self.c3,
                                                        self.c3,
                                                        bias=bias,
-                                                       dilations=aspp)
+                                                       dilations=aspp,
+                                                       norm_mod=norm_mod)
 
         # Frame level module ---------------------------------------------------
         self.smp = nn.AdaptiveMaxPool2d((1, seg))
-        self.cnn = local(self.c3, self.c4, bias=bias,
-                         t_kernel=t_kernel, t_max_pool=t_max_pool)
+        self.cnn = local(self.c3,
+                         self.c4,
+                         bias=bias,
+                         t_kernel=t_kernel,
+                         t_max_pool=t_max_pool,
+                         norm_mod=norm_mod)
         self.tmp = nn.AdaptiveMaxPool2d((1, 1))
         self.do = nn.Dropout(dropout)
 
@@ -430,9 +472,11 @@ class one_hot(nn.Module):
 
 
 class norm_data(nn.Module):
-    def __init__(self, dim: int):
+    def __init__(self,
+                 dim: int,
+                 norm_mod: Type[PyTorchModule] = nn.BatchNorm1d):
         super(norm_data, self).__init__()
-        self.bn = nn.BatchNorm1d(dim)  # channel dim * num_point
+        self.bn = norm_mod(dim)  # channel dim * num_point
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         bs, _, num_point, step = x.shape
@@ -445,17 +489,18 @@ class norm_data(nn.Module):
 class embed(Module):
     def __init__(self,
                  *args,
-                 norm: bool = False,
+                 norm: Optional[Type[PyTorchModule]] = None,
                  inter_channels: Union[list, int] = 0,
                  num_point: int = 25,
                  mode: int = 1,
-                 **kwargs):
+                 norm_mod: Type[PyTorchModule] = nn.BatchNorm2d,
+                 ** kwargs):
         super(embed, self).__init__(*args, **kwargs)
         assert mode in [1, 2, 3]
         self.mode = mode
 
-        if norm:
-            self.norm = norm_data(self.in_channels * num_point)
+        if norm is not None:
+            self.norm = norm_data(self.in_channels * num_point, norm)
         else:
             self.norm = lambda x: x
 
@@ -473,7 +518,7 @@ class embed(Module):
             self.cnn1 = Conv(self.in_channels,
                              self.out_channels,
                              bias=self.bias,
-                             normalization=lambda: bn(self.out_channels),
+                             normalization=lambda: norm_mod(self.out_channels),
                              dropout=lambda: nn.Dropout2d(0.2))
         if mode == 3:
             assert isinstance(inter_channels, list)
@@ -503,6 +548,7 @@ class embed_subject(Module):
                  *args,
                  num_subjects: int = 2,
                  mode: int = 1,
+                 norm_mod: Type[PyTorchModule] = nn.BatchNorm2d,
                  **kwargs):
         super(embed_subject, self).__init__(*args, **kwargs)
         assert mode in [1, 2]
@@ -520,7 +566,7 @@ class embed_subject(Module):
             embedding = torch.empty(num_subjects, self.out_channels)
             nn.init.normal_(embedding, std=0.02)  # bert
             self.embedding = nn.Parameter(embedding)
-            self.norm = bn(self.out_channels)
+            self.norm = norm_mod(self.out_channels)
             self.dropout = nn.Dropout2d(0.2)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -543,6 +589,7 @@ class local(Module):
                  *args,
                  t_kernel: int = 3,
                  t_max_pool: int = 0,
+                 norm_mod: Type[PyTorchModule] = nn.BatchNorm2d,
                  **kwargs):
         super(local, self).__init__(*args, **kwargs)
         self.t_max_pool = t_max_pool
@@ -559,13 +606,13 @@ class local(Module):
                              padding=t_kernel//2,
                              bias=self.bias,
                              activation=nn.ReLU,
-                             normalization=lambda: bn(self.in_channels),
+                             normalization=lambda: norm_mod(self.in_channels),
                              dropout=lambda: nn.Dropout2d(0.2))
         self.cnn2 = Conv(self.in_channels,
                          self.out_channels,
                          bias=self.bias,
                          activation=nn.ReLU,
-                         normalization=lambda: bn(self.out_channels))
+                         normalization=lambda: norm_mod(self.out_channels))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: n,c,v,t ; v=1 due to SMP
@@ -578,9 +625,12 @@ class local(Module):
 
 
 class gcn_spa(Module):
-    def __init__(self, *args, **kwargs):
+    def __init__(self,
+                 *args,
+                 norm_mod: Type[PyTorchModule] = nn.BatchNorm2d,
+                 **kwargs):
         super(gcn_spa, self).__init__(*args, **kwargs)
-        self.bn = bn(self.out_channels)
+        self.bn = norm_mod(self.out_channels)
         self.relu = nn.ReLU()
         self.w1 = Conv(self.in_channels, self.out_channels, bias=self.bias)
         self.w2 = Conv(self.in_channels, self.out_channels, bias=self.bias,
@@ -597,7 +647,10 @@ class gcn_spa(Module):
 
 
 class compute_g_spa(Module):
-    def __init__(self, *args, g_proj_shared: bool = False, **kwargs):
+    def __init__(self,
+                 *args,
+                 g_proj_shared: bool = False,
+                 **kwargs):
         super(compute_g_spa, self).__init__(*args, **kwargs)
         self.g1 = Conv(self.in_channels, self.out_channels, bias=self.bias)
         if g_proj_shared:
@@ -618,6 +671,7 @@ class atrous_spatial_pyramid_pooling(Module):
     def __init__(self,
                  *args,
                  dilations: list = [1, 3, 5, 7],
+                 norm_mod: Type[PyTorchModule] = nn.BatchNorm2d,
                  **kwargs):
         super(atrous_spatial_pyramid_pooling, self).__init__(*args, **kwargs)
         self.aspp = torch.nn.ModuleDict()
@@ -644,7 +698,7 @@ class atrous_spatial_pyramid_pooling(Module):
                     dilation=dil,
                     bias=self.bias,
                     activation=nn.ReLU,
-                    normalization=lambda: bn(self.out_channels),
+                    normalization=lambda: norm_mod(self.out_channels),
                     deterministic=False
                 )
             })
@@ -652,7 +706,7 @@ class atrous_spatial_pyramid_pooling(Module):
         self.proj = Conv(self.out_channels * len(dilations),
                          self.out_channels,
                          bias=self.bias,
-                         normalization=lambda: bn(self.out_channels),
+                         normalization=lambda: norm_mod(self.out_channels),
                          dropout=lambda: nn.Dropout2d(0.2))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -675,7 +729,7 @@ if __name__ == '__main__':
     batch_size = 64
 
     model = SGN(seg=20, part=True, motion=True,
-                subject=True, aspp=[0, 1, 5, 9])
+                subject=True, aspp=[0, 1, 5, 9], norm_type='ln')
     inputs = torch.ones(batch_size, 20, 75)
     subjects = torch.ones(batch_size, 20, 1)
     model(inputs, subjects)

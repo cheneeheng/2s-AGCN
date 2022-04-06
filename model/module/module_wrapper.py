@@ -20,7 +20,7 @@ class Module(PyTorchModule):
                  deterministic: Optional[bool] = None,
                  dropout: Optional[Type[PyTorchModule]] = None,
                  activation: Optional[Type[PyTorchModule]] = None,
-                 normalization: Optional[Type[PyTorchModule]] = None
+                 normalization: Optional[Type[PyTorchModule]] = None,
                  ):
         super(Module, self).__init__()
         self.in_channels = in_channels
