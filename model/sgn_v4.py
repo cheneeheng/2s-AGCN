@@ -187,7 +187,7 @@ class SGN(nn.Module):
                                        mode=3)
 
         # Joint Embedding ------------------------------------------------------
-        if self.jt == 1 or self.jt == 2:
+        if self.jt > 0:
             self.spa = one_hot(num_point, seg, mode=0)
             self.spa_embed = embed(num_point,
                                    self.c1,
@@ -198,9 +198,7 @@ class SGN(nn.Module):
                                    mode=self.jt)
 
         # Group Embedding ------------------------------------------------------
-        if self.part == 1 or self.part == 2:
-            if self.fi == 1 or self.fi == 2:
-                self.tem = one_hot(seg, num_point+parts_len, mode=1)
+        if self.part > 0:
             self.gro = one_hot(parts_len, seg, mode=0)
             self.gro_embed = embed(parts_len,
                                    self.c1,
@@ -211,8 +209,11 @@ class SGN(nn.Module):
                                    mode=self.part)
 
         # Frame Embedding ------------------------------------------------------
-        if self.fi == 1 or self.fi == 2:
-            self.tem = one_hot(seg, num_point, mode=1)
+        if self.fi > 0:
+            if self.part > 0:
+                self.tem = one_hot(seg, num_point+parts_len, mode=1)
+            else:
+                self.tem = one_hot(seg, num_point, mode=1)
             self.tem_embed = embed(seg,
                                    self.c3,
                                    inter_channels=self.c1,
@@ -357,13 +358,13 @@ class SGN(nn.Module):
             dy2 += mot
 
         # Joint and frame embeddings -------------------------------------------
-        if self.jt == 1 or self.jt == 2:
+        if self.jt > 0:
             spa1 = self.spa_embed(self.spa(bs))
 
-        if self.fi == 1 or self.fi == 2:
+        if self.fi > 0:
             tem1 = self.tem_embed(self.tem(bs))
 
-        if self.part == 1 or self.part == 2:
+        if self.part > 0:
             gro1 = self.gro_embed(self.gro(bs))
 
         if self.subject > 0:
@@ -392,7 +393,7 @@ class SGN(nn.Module):
         x = self.gcn3(x, g)
 
         # Frame-level Module ---------------------------------------------------
-        if self.fi == 1 or self.fi == 2:
+        if self.fi > 0:
             x = x + tem1
         if self.subject > 0:
             x = x + sub1
@@ -450,7 +451,7 @@ class embed(Module):
                  mode: int = 1,
                  **kwargs):
         super(embed, self).__init__(*args, **kwargs)
-        assert mode in [1, 2]
+        assert mode in [1, 2, 3]
         self.mode = mode
 
         if norm:
