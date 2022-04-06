@@ -10,6 +10,7 @@
 
 import torch
 from torch import nn
+from torch import Tensor
 from torch.nn import functional as F
 from torch.nn import Module as PyTorchModule
 from torch.profiler import profile, ProfilerActivity
@@ -22,7 +23,7 @@ from model.module.pos_embedding import *
 from utils.utils import *
 
 
-class SGN(nn.Module):
+class SGN(PyTorchModule):
 
     c1 = 64  # pos,vel,joint embed
     c2 = 128  # G,gcn
@@ -86,6 +87,8 @@ class SGN(nn.Module):
                  jt: int = 1,
                  fi: int = 1,
 
+                 pe: int = 0,
+
                  g_proj_shared: bool = False,
                  gcn_t_kernel: int = 1,
 
@@ -107,16 +110,18 @@ class SGN(nn.Module):
         self.seg = seg
         self.bias = bias
 
-        self.pt = pt
-        self.jt = jt
-        self.fi = fi
-
         self.position = position
         self.velocity = velocity
         self.part = bool2int(part)
         self.motion = bool2int(motion)
 
         self.subject = bool2int(subject)
+
+        self.pt = pt
+        self.jt = jt
+        self.fi = fi
+
+        self.pe = pe
 
         self.g_proj_shared = g_proj_shared
         self.gcn_t_kernel = gcn_t_kernel
@@ -136,10 +141,16 @@ class SGN(nn.Module):
         assert self.jt in [0, 1, 2, 3]
         assert self.fi in [0, 1, 2, 3]
 
-        if self.position == 0:
-            self.jt = 0
-        if self.part == 0:
-            self.pt = 0
+        assert self.pe in [0, 1, 2]
+
+        if self.position == 0 and self.jt > 0:
+            raise ValueError("position is 0 but jt is not")
+        if self.part == 0 and self.pt > 0:
+            raise ValueError("part is 0 but pt is not")
+        if self.jt > 0 and self.pt == 0:
+            raise ValueError("jt > 0 but pt is 0")
+        if self.pt > 0 and self.jt == 0:
+            raise ValueError("pt > 0 but jt is 0")
 
         assert self.t_kernel > 0
         assert self.t_max_pool >= 0
@@ -283,6 +294,8 @@ class SGN(nn.Module):
                                            norm_mod=norm_mod,
                                            mode=self.subject)
 
+        # Position Embedding ---------------------------------------------------
+
         # GCN ------------------------------------------------------------------
         if self.jt > 0 or self.pt > 0:
             _in_ch = self.c2
@@ -358,22 +371,22 @@ class SGN(nn.Module):
         nn.init.constant_(self.gcn2.w1.block.conv.conv.weight, 0)
         nn.init.constant_(self.gcn3.w1.block.conv.conv.weight, 0)
 
-    def pad_zeros(self, x: torch.Tensor) -> torch.Tensor:
+    def pad_zeros(self, x: Tensor) -> Tensor:
         return torch.cat([x.new(*x.shape[:-1], 1).zero_(), x], dim=-1)
 
     def forward(self,
-                x: torch.Tensor,
-                s: Optional[torch.Tensor] = None
-                ) -> Tuple[torch.Tensor, torch.Tensor]:
+                x: Tensor,
+                s: Optional[Tensor] = None
+                ) -> Tuple[Tensor, Tensor]:
         """Model forward pass.
 
         Args:
-            x (torch.Tensor): 3D joint position of a sequence of skeletons.
-            s (torch.Tensor): Subject id for each frame.
+            x (Tensor): 3D joint position of a sequence of skeletons.
+            s (Tensor): Subject id for each frame.
 
         Returns:
-            y (torch.Tensor): logits.
-            g (torch.Tensor): Attention matrix for GCN.
+            y (Tensor): logits.
+            g (Tensor): Attention matrix for GCN.
         """
         bs, step, dim = x.shape
         assert dim % 3 == 0, "Only support input of xyz coordinates only."
@@ -499,7 +512,7 @@ class SGN(nn.Module):
         return y, g
 
 
-class one_hot(nn.Module):
+class one_hot(PyTorchModule):
     def __init__(self, dim_eye: int, dim_length: int, mode: int):
         super(one_hot, self).__init__()
         onehot = torch.eye(dim_eye, dim_eye)
@@ -513,19 +526,19 @@ class one_hot(nn.Module):
             raise ValueError("Unknown mode")
         self.register_buffer("onehot", onehot)
 
-    def forward(self, bs: int) -> torch.Tensor:
+    def forward(self, bs: int) -> Tensor:
         x = self.onehot.repeat(bs, 1, 1, 1)
         return x
 
 
-class norm_data(nn.Module):
+class norm_data(PyTorchModule):
     def __init__(self,
                  dim: int,
                  norm_mod: Type[PyTorchModule] = nn.BatchNorm1d):
         super(norm_data, self).__init__()
         self.bn = norm_mod(dim)  # channel dim * num_point
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         bs, _, num_point, step = x.shape
         x = x.view(bs, -1, step)
         x = self.bn(x)
@@ -577,7 +590,7 @@ class embed(Module):
                                                 bias=self.bias,
                                                 activation=nn.ReLU))
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         # x: n,c,v,t
         x = self.norm(x)
         x = self.cnn1(x)
@@ -635,7 +648,7 @@ class embed_subject(Module):
                                                 bias=self.bias,
                                                 activation=nn.ReLU))
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         bs, _, _, step = x.shape  # n,c,v,t => n,1,1,t
         x = x.reshape(-1).unsqueeze(-1)  # nt,1
         x = x.expand(x.shape[0], self.embedding.shape[-1]).type(torch.int64)
@@ -688,7 +701,7 @@ class local(Module):
                          activation=nn.ReLU,
                          normalization=lambda: norm_mod(self.out_channels))
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         # x: n,c,v,t ; v=1 due to SMP
         if self.t_max_pool:
             x = self.maxp(x)
@@ -710,7 +723,7 @@ class gcn_spa(Module):
         self.w2 = Conv(self.in_channels, self.out_channels, bias=self.bias,
                        kernel_size=self.kernel_size, padding=self.padding)
 
-    def forward(self, x: torch.Tensor, g: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: Tensor, g: Tensor) -> Tensor:
         x1 = x.permute(0, 3, 2, 1).contiguous()  # n,t,v,c
         x1 = g.matmul(x1)
         x1 = x1.permute(0, 3, 2, 1).contiguous()  # n,c,v,t
@@ -733,7 +746,7 @@ class compute_g_spa(Module):
             self.g2 = Conv(self.in_channels, self.out_channels, bias=self.bias)
         self.softmax = nn.Softmax(dim=-1)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         g1 = self.g1(x).permute(0, 3, 2, 1).contiguous()  # n,t,v,c
         g2 = self.g2(x).permute(0, 3, 1, 2).contiguous()  # n,t,c,v
         g3 = g1.matmul(g2)  # n,t,v,v
@@ -749,7 +762,6 @@ class atrous_spatial_pyramid_pooling(Module):
                  **kwargs):
         super(atrous_spatial_pyramid_pooling, self).__init__(*args, **kwargs)
         self.aspp = torch.nn.ModuleDict()
-
         self.pool = 0 in dilations
         if self.pool:
             self.aspp.update({
@@ -759,7 +771,6 @@ class atrous_spatial_pyramid_pooling(Module):
                                   pooling=nn.AdaptiveAvgPool2d(1),
                                   activation=nn.ReLU)
             })
-
         for dil in dilations:
             if dil == 0:
                 continue
@@ -776,14 +787,13 @@ class atrous_spatial_pyramid_pooling(Module):
                     deterministic=False
                 )
             })
-
         self.proj = Conv(self.out_channels * len(dilations),
                          self.out_channels,
                          bias=self.bias,
                          normalization=lambda: norm_mod(self.out_channels),
                          dropout=lambda: nn.Dropout2d(0.2))
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         # x: n,c,v,t
         res = []
         for _, block in self.aspp.items():
@@ -802,7 +812,7 @@ if __name__ == '__main__':
 
     batch_size = 64
 
-    model = SGN(seg=20, part=True, motion=True,
+    model = SGN(seg=20, part=True, motion=True, pt=1,
                 subject=True, aspp=[0, 1, 5, 9], norm_type='ln')
     inputs = torch.ones(batch_size, 20, 75)
     subjects = torch.ones(batch_size, 20, 1)
