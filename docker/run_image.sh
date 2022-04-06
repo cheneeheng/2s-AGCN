@@ -1,6 +1,17 @@
 #! /bin/sh
 
-IMAGE_NAME="2s-agcn:cuda11.5.1-cudnn8-devel-ubuntu20.04"
+if [ ${1} == 'CPU' ]; then
+    echo "Building CPU version..."
+    IMAGE_NAME="2s-agcn:ubuntu20.04"
+elif [ ${1} == 'CU111' ]; then
+    echo "Building cuda11.1.1 version..."
+    IMAGE_NAME="2s-agcn:cuda11.1.1-cudnn8-devel-ubuntu20.04"
+elif [ ${1} == 'CU113' ]; then
+    echo "Building cuda11.3.1 version..."
+    IMAGE_NAME="2s-agcn:cuda11.3.1-cudnn8-devel-ubuntu20.04"
+else
+    echo "Build failed, please specify the build type"
+fi
 
 CODE_PATH="/home/dhm/workspace/demo_event/code/2s-AGCN"
 DATA_PATH="/home/dhm/workspace/demo_event/data/2s-agcn"
@@ -14,4 +25,4 @@ docker run -it --rm --shm-size 8g --gpus=all \
     --mount type=bind,source=${CODE_PATH},target=/code/2s-AGCN \
     --mount type=bind,source=${DATA_PATH},target=/data/2s-agcn \
     --mount type=bind,source=${OPENPOSE_DATA_PATH},target=/data/openpose \
-    ${IMAGE_NAME} $1
+    ${IMAGE_NAME} ${2}

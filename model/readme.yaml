@@ -1,4 +1,4 @@
-/aagcn:
+aagcn:
         - xsub:
                   - ./data/data/openpose_b25_j15_ntu_result/xview/aagcn_joint/220314090001
                   - 85.6%

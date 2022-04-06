@@ -37,14 +37,10 @@ def read_xyz(file, max_body=4, num_joint=25):
     for m, body_joint in enumerate(skel_data):
         for j in range(0, len(body_joint), 3):
             if m < max_body and j//3 < num_joint:
-                # ntu
-                # data[m, 0, j//3, :] = [body_joint[j],
-                #                        body_joint[j+1],
-                #                        body_joint[j+2]]
-                # openpose
-                data[m, 0, j//3, :] = [-body_joint[j],
-                                       -body_joint[j+2],
-                                       -body_joint[j+1]]
+                # x subject right, y to camera, z up
+                data[m, 0, j//3, :] = [body_joint[j],
+                                       body_joint[j+1],
+                                       body_joint[j+2]]
             else:
                 pass
     # openpose
