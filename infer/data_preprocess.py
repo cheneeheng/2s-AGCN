@@ -72,11 +72,12 @@ class DataPreprocessor(object):
     def select_skeletons_and_normalize_data(self,
                                             num_skels: int = 2,
                                             sgn: bool = False) -> np.ndarray:
-        data = self.select_skeletons(num_skels=num_skels)  # N, M, T, V, C
+        data = self.select_skeletons(num_skels=num_skels)  # M, T, V, C
         if sgn:
-            data = np.transpose(data, [0, 2, 1, 3, 4])  # N, T, M, V, C
-            data = data.reshape((*data.shape[:2], -1))  # N, T, MVC
-            data = self.preprocess_fn(data)  # N, 'T, MVC
-            return data  # N, 'T, MVC
+            data = np.transpose(data, [1, 0, 2, 3])  # T, M, V, C
+            data = data.reshape((data.shape[0], -1))  # T, MVC
+            data = [data]  # N,T,MVC
+            data, _, _ = self.preprocess_fn(data)  # N,'T, MVC
+            return np.array(data, dtype=data[0].dtype)  # N, 'T, MVC
         else:
             return self.normalize_data(data)  # N, C, T, V, M

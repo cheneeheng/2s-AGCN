@@ -67,9 +67,7 @@ def filter_logits(logits: list) -> Tuple[list, list]:
     # }
     ids = [7, 8, 9, 22, 25, 27, 34, 35, 42, 55, 57, 58, 59]
     sort_idx = np.argsort(-np.array(logits)).tolist()
-    print(sort_idx)
     sort_idx = [i for i in sort_idx if i in ids]
-    print(sort_idx)
     new_logits = [logits[i] for i in sort_idx]
     return sort_idx, new_logits
 
@@ -100,8 +98,9 @@ def get_parser() -> argparse.ArgumentParser:
         '--weight-path',
         type=str,
         # default='./data/model/ntu_25j/'
-        default='/data/2s-agcn/model/ntu_15j/xview/220327213001_1337/'
-        # default='/data/2s-agcn/model/ntu_15j/xview/211130150001/'
+        # default='/data/2s-agcn/model/ntu_15j/xview/220405153001/'  # ntu15j sgn
+        # default='/data/2s-agcn/model/ntu_15j/xview/220327213001_1337/'
+        default='/data/2s-agcn/model/ntu_15j/xview/211130150001/'
         # default='/data/2s-agcn/model/ntu_15j/xview/220314100001/'
         # default='/data/2s-agcn/model/ntu_15j/xsub/220314090001/'
         # default='/data/2s-agcn/model/ntu_15j/xview/220405153001/'
@@ -153,13 +152,13 @@ def init_model(arg: argparse.Namespace):
     weight_file = os.path.join(arg.weight_path, weight_file[0])
     weights = torch.load(weight_file)
     # temporary hack
-    if 'sgn' in arg.model:
-        weights = OrderedDict([[k.replace('joint_', 'pos_'), v]
-                               for k, v in weights.items()])
-        weights = OrderedDict([[k.replace('dif_', 'vel_'), v]
-                               for k, v in weights.items()])
-        weights = OrderedDict([[k.replace('cnn.cnn2', 'cnn.cnn2.cnn'), v]
-                               for k, v in weights.items()])
+#    if 'sgn' in arg.model:
+#        weights = OrderedDict([[k.replace('joint_', 'pos_'), v]
+#                               for k, v in weights.items()])
+#        weights = OrderedDict([[k.replace('dif_', 'vel_'), v]
+#                               for k, v in weights.items()])
+#        weights = OrderedDict([[k.replace('cnn.cnn2', 'cnn.cnn2.cnn'), v]
+#                               for k, v in weights.items()])
     Model.load_state_dict(weights)
     if arg.gpu:
         Model = Model.cuda(0)
