@@ -179,7 +179,7 @@ class SGN(PyTorchModule):
         assert self.subject in [0, 1, 2, 3, 4]
 
         assert self.joint_type in [0, 1]
-        assert self.part_type in [0, 1]
+        assert self.part_type in [0, 1, 2]
 
         assert self.pt in [0, 1, 2, 3]
         assert self.jt in [0, 1, 2, 3]
@@ -467,7 +467,9 @@ class SGN(PyTorchModule):
 
         if self.part > 0:
             par = torch.index_select(x1, 2, self.parts_3points_vec)  # n,t,v+,c
-            par = par.view((bs, step, -1, 3, self.in_channels))  # n,t,v+,3,c
+            par = par.view(
+                (bs, step, -1, len(self.parts_3points[0]), self.in_channels)
+            )  # n,t,v+,3,c
             mid = par.mean(dim=-2, keepdim=True)  # n,t,v+,1,c
             par1 = par - mid  # n,t,v+,3,c
             par = par1.view(
@@ -484,7 +486,10 @@ class SGN(PyTorchModule):
             elif self.motion == 2:
                 if self.part == 0:
                     par = torch.index_select(x1, 2, self.parts_3points_vec)
-                    par = par.view((bs, step, -1, 3, self.in_channels))
+                    par = par.view(
+                        (bs, step, -1,
+                         len(self.parts_3points[0]), self.in_channels)
+                    )
                     mid = par.mean(dim=-2, keepdim=True)
                     par1 = par - mid
                 mot = par1[:, 1:] - mid[:, :-1]  # n,t-1,v+,3,c
@@ -886,7 +891,7 @@ if __name__ == '__main__':
                 part=1,
                 motion=1,
                 pt=1,
-                part_type=1,
+                part_type=2,
                 # joint_type=1,
                 subject=True, aspp=[0, 1, 5, 9], norm_type='ln')
     inputs = torch.ones(batch_size, 20, 75)
