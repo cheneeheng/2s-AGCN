@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/sgn_v4/220404180001_part2
-model_saved_name: ./data/data/ntu_result/xview/sgn_v4/220404180001_part2/sgn
+work_dir: ./data/data/ntu_result/xview/sgn_v4/220404180001_dimx3
+model_saved_name: ./data/data/ntu_result/xview/sgn_v4/220404180001_dimx3/sgn
 
 phase: train
 save_score: True
@@ -49,9 +49,9 @@ model_args:
   in_channels: 3
   seg: 20
   bias: True
-  c_multiplier: 1
-  dropout: 0.0
-  part: 2
+  c_multiplier: 3
+  # dropout: 0.0
+  # part: 2
   # motion: 0
   # subject: 0
   # jt: 1

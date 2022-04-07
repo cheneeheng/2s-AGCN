@@ -122,6 +122,7 @@ class NTUDataLoaders(object):
             x = x.reshape(-1, x.shape[1] * x.shape[2], x.shape[3]*x.shape[4])
             x = list(x)
 
+        # N,t,MVC
         x, s, y = self.to_fix_length(x, y, sampling_frequency)
 
         if sort_data:

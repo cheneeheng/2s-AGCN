@@ -129,7 +129,7 @@ class Feeder(Dataset):
             else:
                 self.data = self.data.reshape(self.data.shape[0],
                                               self.data.shape[1], 2, 25, 3)
-            self.data = self.data.transpose((0, 4, 1, 3, 2))
+            self.data = self.data.transpose((0, 4, 1, 3, 2))  # n,c,t,v,m
             self.sample_name = np.array(
                 [i for i in range(self.label.shape[0])],
                 dtype=self.label.dtype
