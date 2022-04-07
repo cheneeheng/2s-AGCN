@@ -18,6 +18,7 @@ def get_parser() -> ap.ArgumentParser:
     p.add_argument('--work-dir',
                    default='./work_dir/temp',
                    help='the work folder for storing results')
+    # UNUSED, KEPT FOR BACKWARD COMPAT
     p.add_argument('--model-saved-name',
                    default='',
                    help='the folder to store events and test results')

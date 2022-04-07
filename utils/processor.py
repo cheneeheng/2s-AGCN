@@ -63,6 +63,8 @@ class Processor(object):
             arg_dict = vars(self.arg)
             if not os.path.exists(self.arg.work_dir):
                 os.makedirs(self.arg.work_dir)
+            else:
+                raise ValueError(f"{self.arg.work_dir} already exists ...")
             if ".yaml" in self.arg.config:
                 with open(f'{self.arg.work_dir}/config.yaml', 'w') as f:
                     yaml.dump(arg_dict, f)
@@ -77,16 +79,36 @@ class Processor(object):
     # --------------------------------------------------------------------------
 
     def create_folder_and_writer(self):
-        def _join(x): return os.path.join(self.arg.model_saved_name, x)
-        if not self.arg.train_feeder_args['debug']:
-            if os.path.isdir(self.arg.model_saved_name):
+        def dir_check(dir):
+            try:
+                os.makedirs(dir)
+            except FileExistsError:
                 if self.arg.weights is None:
-                    msg = f'log_dir: {self.arg.model_saved_name} already exist'
+                    msg = f'weights unspecified and {dir} already exist'
                     raise ValueError(msg)
-            self.train_writer = SummaryWriter(_join('train'), 'train')
-            self.val_writer = SummaryWriter(_join('val'), 'val')
+        # weight
+        if self.arg.phase == 'train':
+            weight_dir = os.path.join(self.arg.work_dir, 'weight')
+            dir_check(weight_dir)
+        # scores
+        if self.arg.save_score:
+            score_dir = os.path.join(self.arg.work_dir, 'score')
+            dir_check(score_dir)
+        # right wrong predictions as txt
+        if self.arg.phase == 'test':
+            pred_dir = os.path.join(self.arg.work_dir, 'prediction')
+            dir_check(pred_dir)
+        # events
+        event_dir = os.path.join(self.arg.work_dir, 'event')
+        if not self.arg.train_feeder_args['debug']:
+            dir_check(event_dir)
+            self.train_writer = SummaryWriter(
+                os.path.join(event_dir, 'train'), 'train')
+            self.val_writer = SummaryWriter(
+                os.path.join(event_dir, 'val'), 'val')
         else:
-            self.train_writer = SummaryWriter(_join('test'), 'test')
+            self.train_writer = SummaryWriter(
+                os.path.join(event_dir, 'train_debug'), 'train_debug')
             self.val_writer = self.train_writer
 
     def print_time(self):
@@ -156,8 +178,10 @@ class Processor(object):
             dist_tmp = [None for _ in range(self.arg.world_size)]
             dist.all_gather_object(dist_tmp, score_dict)
             score_dict = {k: v for d in dist_tmp for k, v in d.items()}
-        path = f'{self.arg.work_dir}/epoch{epoch + 1}_{loader_name}_score.pkl'
-        with open(path, 'wb') as f:
+        score_path = os.path.join(self.arg.work_dir,
+                                  'score',
+                                  f'epoch{epoch + 1}_{loader_name}.pkl')
+        with open(score_path, 'wb') as f:
             pickle.dump(score_dict, f)
 
     def writer(self, mode: str, acc: float, loss: float):
@@ -180,8 +204,9 @@ class Processor(object):
         state_dict = self.model.state_dict()
         weights = OrderedDict([[k.split('module.')[-1], v.cpu()]
                                for k, v in state_dict.items()])
-        torch.save(weights, self.arg.model_saved_name + '-' +
-                   str(epoch) + '-' + str(int(self.global_step)) + '.pt')
+        filename = f'{self.arg.model.split["."][-1]}-{epoch}-{int(self.global_step)}.pt'  # noqa
+        weight_path = os.path.join(self.arg.work_dir, 'weight', filename)
+        torch.save(weights, weight_path)
 
     def load_weights(self):
         self.global_step = int(self.arg.weights[:-3].split('-')[-1])
@@ -239,6 +264,7 @@ class Processor(object):
     def get_model(self):
         Model = import_class(self.arg.model)
         if self.rank == 0:
+            # Saves a copy of the model file
             shutil.copy2(inspect.getfile(Model), self.arg.work_dir)
         self.model = Model(**self.arg.model_args).cuda(self.output_device)
         if self.arg.ddp:
@@ -678,8 +704,8 @@ class Processor(object):
                 if self.arg.phase == 'train':
                     self.writer(mode='val', acc=accuracy, loss=loss_value)
 
-            self.print_log(f'Accuracy: {accuracy:.4f}')
-            self.print_log(f'Model: {self.arg.model_saved_name}')
+            # self.print_log(f'\tAccuracy: {accuracy:.4f}')
+            # self.print_log(f'Model   : {self.arg.work_dir}')
             self.print_log(f'\tMean {ln} '
                            f'loss of {len(self.data_loader[ln])} '
                            f'batches: {loss_value:.4f}')
@@ -718,20 +744,20 @@ class Processor(object):
                     self.eval(epoch, save_score=self.arg.save_score,
                               loader_name=['val'])
             self.print_log(f'Best Accuracy: {self.best_acc*100:.2f}%')
-            self.print_log(f'Best Accuracy Epoch: {self.best_acc_epoch}')
-            self.print_log(f'Model Name: {self.arg.model_saved_name}')
+            self.print_log(f'Best Epoch   : {self.best_acc_epoch}')
+            self.print_log(f'Model Name   : {self.arg.work_dir}')
             self.print_log('Done.\n')
 
         elif self.arg.phase == 'test':
             if not self.arg.test_feeder_args['debug']:
-                wf = self.arg.model_saved_name + '_wrong.txt'
-                rf = self.arg.model_saved_name + '_right.txt'
+                wf = os.path.join(self.arg.work_dir, 'prediction', 'wrong.txt')
+                rf = os.path.join(self.arg.work_dir, 'prediction', 'right.txt')
             else:
                 wf = rf = None
             if self.arg.weights is None:
                 raise ValueError('Please appoint --weights.')
             self.arg.print_log = False
-            self.print_log(f'Model:   {self.arg.model}')
+            self.print_log(f'Model  : {self.arg.model}')
             self.print_log(f'Weights: {self.arg.weights}')
             self.eval(epoch=0, save_score=self.arg.save_score,
                       loader_name=['val'], wrong_file=wf, result_file=rf)
