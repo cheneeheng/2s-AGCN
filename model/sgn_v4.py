@@ -20,7 +20,7 @@ from torch.profiler import profile, ProfilerActivity
 import math
 from typing import Tuple, Optional, Union, Type
 
-from model.module.module_wrapper import *
+from model.module.pytorch_module_wrapper import *
 from model.module.pos_embedding import *
 from utils.utils import *
 

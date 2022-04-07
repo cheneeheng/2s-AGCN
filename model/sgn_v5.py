@@ -18,7 +18,7 @@ from torch.profiler import profile, ProfilerActivity
 import math
 from typing import Tuple, Optional, Union, Type
 
-from model.module.module_wrapper import *
+from model.module.pytorch_module_wrapper import *
 from model.module.pos_embedding import *
 from utils.utils import *
 
@@ -31,40 +31,54 @@ class SGN(PyTorchModule):
     c4 = 512  # final conv
 
     # NTU
-    parts_3points = [
+    parts_3points_wholebody = [
+        # spine
         (1, 0, 16),
         (1, 0, 12),
         (16, 0, 12),
         (20, 1, 0),
         (3, 2, 20),
-
+        # right hand
         (20, 4, 5),
         (4, 5, 6),
         (5, 6, 7),
         (5, 6, 22),
         (6, 7, 21),
-
+        # left hand
         (20, 8, 9),
         (8, 9, 10),
         (9, 10, 11),
         (9, 10, 24),
         (10, 11, 23),
-
+        # right leg
         (0, 12, 13),
         (12, 13, 14),
         (13, 14, 15),
-
+        # left leg
         (0, 16, 17),
         (16, 17, 18),
         (17, 18, 19),
-
+        # upper chest
         (2, 20, 1),
         (2, 20, 8),
         (2, 20, 4),
-
         (8, 20, 4),
         (1, 20, 8),
         (1, 20, 4),
+    ]
+    parts_3points_armandhand = [
+        # right hand
+        (20, 4, 5),
+        (4, 5, 6),
+        (5, 6, 7),
+        (5, 6, 22),
+        (6, 7, 21),
+        # left hand
+        (20, 8, 9),
+        (8, 9, 10),
+        (9, 10, 11),
+        (9, 10, 24),
+        (10, 11, 23),
     ]
 
     def __init__(self,
@@ -83,6 +97,8 @@ class SGN(PyTorchModule):
                  motion: Union[bool, int] = 0,
                  subject: Union[bool, int] = 0,
 
+                 part_type: int = 0,
+
                  pt: int = 0,
                  jt: int = 1,
                  fi: int = 1,
@@ -97,6 +113,7 @@ class SGN(PyTorchModule):
                  t_kernel: int = 3,
                  t_max_pool: Union[bool, int] = 0,
                  aspp: list = None,
+
                  norm_type: str = 'bn'
                  ):
         super(SGN, self).__init__()
@@ -119,6 +136,8 @@ class SGN(PyTorchModule):
 
         self.subject = bool2int(subject)
 
+        self.part_type = part_type
+
         self.pt = pt
         self.jt = jt
         self.fi = fi
@@ -140,6 +159,8 @@ class SGN(PyTorchModule):
         assert self.motion in [0, 1, 2, 3, 4]
         assert self.subject in [0, 1, 2, 3, 4]
 
+        assert self.part_type in [0, 1]
+
         assert self.pt in [0, 1, 2, 3]
         assert self.jt in [0, 1, 2, 3]
         assert self.fi in [0, 1, 2, 3]
@@ -156,116 +177,73 @@ class SGN(PyTorchModule):
         assert self.norm_type in ['bn', 'ln']
 
         if self.norm_type == 'bn':
-            norm_mod = nn.BatchNorm2d
-            norm_mod_1d = nn.BatchNorm1d
+            self.norm_mod = nn.BatchNorm2d
+            self.norm_mod_1d = nn.BatchNorm1d
         elif self.norm_type == 'ln':
-            def norm_mod(x): return nn.GroupNorm(1, x)
-            def norm_mod_1d(x): return nn.GroupNorm(1, x)
+            self.norm_mod = lambda x: nn.GroupNorm(1, x)
+            self.norm_mod_1d = lambda x: nn.GroupNorm(1, x)
+            # def norm_mod(x): return nn.GroupNorm(1, x)
+            # def norm_mod_1d(x): return nn.GroupNorm(1, x)
             # norm_mod = nn.LayerNorm
             # norm_mod_1d = nn.LayerNorm
+
+        if part_type == 0:
+            self.parts_3points = self.parts_3points_wholebody
+        elif part_type == 1:
+            self.parts_3points = self.parts_3points_armandhand
 
         parts_len = len(self.parts_3points)
 
         # Dynamic Representation -----------------------------------------------
         if self.position > 0:
-            _inter_channels = self.get_inter_channels(self.position, self.c1)
-            self.pos_embed = Embedding(in_channels,
-                                       self.c1,
-                                       inter_channels=_inter_channels,
-                                       bias=bias,
-                                       norm=norm_mod_1d,
-                                       norm_mod=norm_mod,
-                                       num_point=num_point,
-                                       mode=self.position)
+            self.pos_embed = self.init_dr(mode=self.position,
+                                          num_point=num_point,
+                                          in_channels=in_channels)
+
         if self.velocity > 0:
-            _inter_channels = self.get_inter_channels(self.velocity, self.c1)
-            self.vel_embed = Embedding(in_channels,
-                                       self.c1,
-                                       inter_channels=_inter_channels,
-                                       bias=bias,
-                                       norm=norm_mod_1d,
-                                       norm_mod=norm_mod,
-                                       num_point=num_point,
-                                       mode=self.velocity)
+            self.vel_embed = self.init_dr(mode=self.velocity,
+                                          num_point=num_point,
+                                          in_channels=in_channels)
 
         if self.part > 0:
-            _inter_channels = self.get_inter_channels(self.part, self.c1)
-            self.par_embed = Embedding(in_channels*3,
-                                       self.c1,
-                                       inter_channels=_inter_channels,
-                                       bias=bias,
-                                       norm=norm_mod_1d,
-                                       norm_mod=norm_mod,
-                                       num_point=parts_len,
-                                       mode=self.part)
+            self.par_embed = self.init_dr(mode=self.part,
+                                          num_point=parts_len,
+                                          in_channels=in_channels*3)
 
         if self.motion == 1:
             # diff between mids
-            self.mot_embed = Embedding(in_channels,
-                                       self.c1,
-                                       inter_channels=self.c1,
-                                       bias=bias,
-                                       norm=norm_mod_1d,
-                                       norm_mod=norm_mod,
-                                       num_point=parts_len,
-                                       mode=1)
+            self.mot_embed = self.init_dr(mode=1,
+                                          num_point=parts_len,
+                                          in_channels=in_channels)
         elif self.motion == 2:
             # diff between next mid-centered parts with current mid
-            self.mot_embed = Embedding(in_channels*3,
-                                       self.c1,
-                                       inter_channels=self.c1,
-                                       bias=bias,
-                                       norm=norm_mod_1d,
-                                       norm_mod=norm_mod,
-                                       num_point=parts_len,
-                                       mode=1)
+            self.mot_embed = self.init_dr(mode=1,
+                                          num_point=parts_len,
+                                          in_channels=in_channels*3)
         elif self.motion == 3:
             # diff between parts centered on mid in the first part
-            self.mot_embed = Embedding(in_channels*3,
-                                       self.c1,
-                                       inter_channels=self.c1,
-                                       bias=bias,
-                                       norm=norm_mod_1d,
-                                       norm_mod=norm_mod,
-                                       num_point=parts_len,
-                                       mode=1)
+            self.mot_embed = self.init_dr(mode=1,
+                                          num_point=parts_len,
+                                          in_channels=in_channels*3)
         elif self.motion == 4:
             # diff between parts centered on mid in the first part
-            _inter_channels = [self.c1, self.c1, self.c1]
-            self.mot_embed = Embedding(in_channels*3,
-                                       self.c1,
-                                       inter_channels=_inter_channels,
-                                       bias=bias,
-                                       norm=norm_mod_1d,
-                                       norm_mod=norm_mod,
-                                       num_point=parts_len,
-                                       mode=3)
+            self.mot_embed = self.init_dr(mode=3,
+                                          num_point=parts_len,
+                                          in_channels=in_channels*3)
 
         # Joint Embedding ------------------------------------------------------
         if self.jt > 0:
-            _inter_channels = self.get_inter_channels(self.jt, self.c1)
             self.spa = OneHotTensor(num_point, seg, mode=0)
-            self.spa_embed = Embedding(num_point,
-                                       self.c1,
-                                       inter_channels=_inter_channels,
-                                       bias=bias,
-                                       norm=None,
-                                       norm_mod=norm_mod,
-                                       num_point=num_point,
-                                       mode=self.jt)
+            self.spa_embed = self.init_emb(mode=self.jt,
+                                           num_point=num_point,
+                                           in_channels=num_point)
 
         # Group Embedding ------------------------------------------------------
         if self.pt > 0:
-            _inter_channels = self.get_inter_channels(self.pt, self.c1)
             self.gro = OneHotTensor(parts_len, seg, mode=0)
-            self.gro_embed = Embedding(parts_len,
-                                       self.c1,
-                                       inter_channels=_inter_channels,
-                                       bias=bias,
-                                       norm=None,
-                                       norm_mod=norm_mod,
-                                       num_point=parts_len,
-                                       mode=self.pt)
+            self.gro_embed = self.init_emb(mode=self.pt,
+                                           num_point=parts_len,
+                                           in_channels=parts_len)
 
         # Frame Embedding ------------------------------------------------------
         if self.fi > 0:
@@ -273,15 +251,10 @@ class SGN(PyTorchModule):
                 self.tem = OneHotTensor(seg, num_point+parts_len, mode=1)
             else:
                 self.tem = OneHotTensor(seg, num_point, mode=1)
-            _inter_channels = self.get_inter_channels(self.fi, self.c1)
-            self.tem_embed = Embedding(seg,
-                                       self.c3,
-                                       inter_channels=_inter_channels,
-                                       bias=bias,
-                                       norm=None,
-                                       norm_mod=norm_mod,
-                                       num_point=num_point,
-                                       mode=self.fi)
+            self.tem_embed = self.init_emb(mode=self.fi,
+                                           num_point=num_point,
+                                           in_channels=seg,
+                                           out_channels=self.c3)
 
         # Subject Embedding ----------------------------------------------------
         if self.subject > 0:
@@ -290,10 +263,11 @@ class SGN(PyTorchModule):
                                               inter_channels=self.c1,
                                               num_subjects=2,
                                               bias=bias,
-                                              norm_mod=norm_mod,
+                                              norm_mod=self.norm_mod,
                                               mode=self.subject)
 
         # Position Embedding ---------------------------------------------------
+        # Frame embedding is a form of PE
 
         # GCN ------------------------------------------------------------------
         if self.jt > 0 or self.pt > 0:
@@ -309,19 +283,19 @@ class SGN(PyTorchModule):
                                bias=bias,
                                kernel_size=gcn_t_kernel,
                                padding=gcn_t_kernel//2,
-                               norm_mod=norm_mod)
+                               norm_mod=self.norm_mod)
         self.gcn2 = GCNSpatial(self.c2,
                                self.c3,
                                bias=bias,
                                kernel_size=gcn_t_kernel,
                                padding=gcn_t_kernel//2,
-                               norm_mod=norm_mod)
+                               norm_mod=self.norm_mod)
         self.gcn3 = GCNSpatial(self.c3,
                                self.c3,
                                bias=bias,
                                kernel_size=gcn_t_kernel,
                                padding=gcn_t_kernel//2,
-                               norm_mod=norm_mod)
+                               norm_mod=self.norm_mod)
 
         # ASPP -----------------------------------------------------------------
         if aspp is None or len(aspp) == 0:
@@ -331,7 +305,7 @@ class SGN(PyTorchModule):
                              self.c3,
                              bias=bias,
                              dilations=aspp,
-                             norm_mod=norm_mod)
+                             norm_mod=self.norm_mod)
 
         # Frame level module ---------------------------------------------------
         self.smp = nn.AdaptiveMaxPool2d((1, seg))
@@ -340,7 +314,7 @@ class SGN(PyTorchModule):
                                bias=bias,
                                t_kernel=t_kernel,
                                t_max_pool=t_max_pool,
-                               norm_mod=norm_mod)
+                               norm_mod=self.norm_mod)
         self.tmp = nn.AdaptiveMaxPool2d((1, 1))
         self.do = nn.Dropout(dropout)
 
@@ -354,11 +328,48 @@ class SGN(PyTorchModule):
                 torch.tensor(self.parts_3points, dtype=torch.int).reshape(-1)
             )
 
-    def get_inter_channels(self, mode: int, ch: int) -> Union[list, int]:
-        if mode == 3:
-            return [ch, ch, ch]
-        else:
-            return ch
+    def init_dr(self,
+                mode: int,
+                num_point: int,
+                in_channels: int,
+                out_channels: Optional[int] = None,
+                bias: Optional[bool] = None,
+                norm: Optional[int] = None,
+                norm_mod: Optional[bool] = None):
+        inter_channels = self.get_inter_channels(mode, self.c1)
+        out_channels = out_channels if out_channels is not None else self.c1
+        bias = bias if bias is not None else self.bias
+        norm = norm if norm is not None else self.norm_mod_1d
+        norm_mod = norm_mod if norm_mod is not None else self.norm_mod
+        return Embedding(in_channels,
+                         out_channels,
+                         inter_channels=inter_channels,
+                         bias=bias,
+                         norm=norm,
+                         norm_mod=norm_mod,
+                         num_point=num_point,
+                         mode=mode)
+
+    def init_emb(self,
+                 mode: int,
+                 num_point: int,
+                 in_channels: int,
+                 out_channels: Optional[int] = None,
+                 bias: Optional[bool] = None,
+                 norm: Optional[int] = None,
+                 norm_mod: Optional[bool] = None):
+        inter_channels = self.get_inter_channels(mode, self.c1)
+        out_channels = out_channels if out_channels is not None else self.c1
+        bias = bias if bias is not None else self.bias
+        norm_mod = norm_mod if norm_mod is not None else self.norm_mod
+        return Embedding(in_channels,
+                         out_channels,
+                         inter_channels=inter_channels,
+                         bias=bias,
+                         norm=norm,
+                         norm_mod=norm_mod,
+                         num_point=num_point,
+                         mode=mode)
 
     def init(self):
         for m in self.modules():
@@ -369,6 +380,12 @@ class SGN(PyTorchModule):
         nn.init.constant_(self.gcn1.w1.block.conv.conv.weight, 0)
         nn.init.constant_(self.gcn2.w1.block.conv.conv.weight, 0)
         nn.init.constant_(self.gcn3.w1.block.conv.conv.weight, 0)
+
+    def get_inter_channels(self, mode: int, ch: int) -> Union[list, int]:
+        if mode == 3:
+            return [ch, ch, ch]
+        else:
+            return ch
 
     def pad_zeros(self, x: Tensor) -> Tensor:
         return torch.cat([x.new(*x.shape[:-1], 1).zero_(), x], dim=-1)
@@ -548,11 +565,11 @@ class DataNorm(PyTorchModule):
 class Embedding(Module):
     def __init__(self,
                  *args,
-                 norm: Optional[Type[PyTorchModule]] = None,
                  inter_channels: Union[list, int] = 0,
+                 norm: Optional[Type[PyTorchModule]] = None,
+                 norm_mod: Type[PyTorchModule] = nn.BatchNorm2d,
                  num_point: int = 25,
                  mode: int = 1,
-                 norm_mod: Type[PyTorchModule] = nn.BatchNorm2d,
                  ** kwargs):
         super(Embedding, self).__init__(*args, **kwargs)
         assert mode in [1, 2, 3]
@@ -811,7 +828,7 @@ if __name__ == '__main__':
 
     batch_size = 64
 
-    model = SGN(seg=20, part=True, motion=True, pt=1,
+    model = SGN(seg=20, part=1, motion=1, pt=1,
                 subject=True, aspp=[0, 1, 5, 9], norm_type='ln')
     inputs = torch.ones(batch_size, 20, 75)
     subjects = torch.ones(batch_size, 20, 1)
