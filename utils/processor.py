@@ -204,7 +204,7 @@ class Processor(object):
         state_dict = self.model.state_dict()
         weights = OrderedDict([[k.split('module.')[-1], v.cpu()]
                                for k, v in state_dict.items()])
-        filename = f'{self.arg.model.split["."][-1]}-{epoch}-{int(self.global_step)}.pt'  # noqa
+        filename = f'{self.arg.model.split(".")[-1]}-{epoch}-{int(self.global_step)}.pt'  # noqa
         weight_path = os.path.join(self.arg.work_dir, 'weight', filename)
         torch.save(weights, weight_path)
 

@@ -3,12 +3,14 @@ import numpy as np
 import os
 import random
 import torch
+from typing import Union
 
 __all__ = [
     'print_arg',
     'init_seed',
     'str2bool',
     'bool2int',
+    'to_int',
     'import_class',
 ]
 
@@ -61,6 +63,17 @@ def bool2int(v):
         return bool2int(str2bool(v))
     else:
         raise ValueError('expects int, bool, str types only')
+
+
+def to_int(x: Union[int, float]):
+    if isinstance(x, int):
+        return x
+    else:
+        assert isinstance(x, float), f"x is {type(x)} instead of float"
+        if (x).is_integer():
+            return int(x)
+        else:
+            raise ValueError("Value is supposed to be int")
 
 
 def import_class(name):

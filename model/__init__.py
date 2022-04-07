@@ -1,3 +1,4 @@
+# used for import_class function
 from .archiv import *
 from . import agcn
 from . import aagcn
@@ -16,3 +17,4 @@ from . import sgn
 from . import sgn_v2
 from . import sgn_v3
 from . import sgn_v4
+from . import sgn_v5

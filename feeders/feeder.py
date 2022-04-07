@@ -217,14 +217,6 @@ class Feeder(Dataset):
         return sum(hit_top_k) * 1.0 / len(hit_top_k)
 
 
-def import_class(name):
-    components = name.split('.')
-    mod = __import__(components[0])
-    for comp in components[1:]:
-        mod = getattr(mod, comp)
-    return mod
-
-
 def test(data_path, label_path, vid=None, graph=None, is_3d=False):
     '''
     vis the samples using matplotlib

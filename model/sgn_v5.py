@@ -6,9 +6,7 @@
 
 # Code refractored
 
-# Continue from on sgn_v2
-
-# CODE FREEZED ON 07.04.2022
+# Continue from on sgn_v4
 
 import torch
 from torch import nn
@@ -171,129 +169,129 @@ class SGN(PyTorchModule):
         # Dynamic Representation -----------------------------------------------
         if self.position > 0:
             _inter_channels = self.get_inter_channels(self.position, self.c1)
-            self.pos_embed = embed(in_channels,
-                                   self.c1,
-                                   inter_channels=_inter_channels,
-                                   bias=bias,
-                                   norm=norm_mod_1d,
-                                   norm_mod=norm_mod,
-                                   num_point=num_point,
-                                   mode=self.position)
+            self.pos_embed = Embedding(in_channels,
+                                       self.c1,
+                                       inter_channels=_inter_channels,
+                                       bias=bias,
+                                       norm=norm_mod_1d,
+                                       norm_mod=norm_mod,
+                                       num_point=num_point,
+                                       mode=self.position)
         if self.velocity > 0:
             _inter_channels = self.get_inter_channels(self.velocity, self.c1)
-            self.vel_embed = embed(in_channels,
-                                   self.c1,
-                                   inter_channels=_inter_channels,
-                                   bias=bias,
-                                   norm=norm_mod_1d,
-                                   norm_mod=norm_mod,
-                                   num_point=num_point,
-                                   mode=self.velocity)
+            self.vel_embed = Embedding(in_channels,
+                                       self.c1,
+                                       inter_channels=_inter_channels,
+                                       bias=bias,
+                                       norm=norm_mod_1d,
+                                       norm_mod=norm_mod,
+                                       num_point=num_point,
+                                       mode=self.velocity)
 
         if self.part > 0:
             _inter_channels = self.get_inter_channels(self.part, self.c1)
-            self.par_embed = embed(in_channels*3,
-                                   self.c1,
-                                   inter_channels=_inter_channels,
-                                   bias=bias,
-                                   norm=norm_mod_1d,
-                                   norm_mod=norm_mod,
-                                   num_point=parts_len,
-                                   mode=self.part)
+            self.par_embed = Embedding(in_channels*3,
+                                       self.c1,
+                                       inter_channels=_inter_channels,
+                                       bias=bias,
+                                       norm=norm_mod_1d,
+                                       norm_mod=norm_mod,
+                                       num_point=parts_len,
+                                       mode=self.part)
 
         if self.motion == 1:
             # diff between mids
-            self.mot_embed = embed(in_channels,
-                                   self.c1,
-                                   inter_channels=self.c1,
-                                   bias=bias,
-                                   norm=norm_mod_1d,
-                                   norm_mod=norm_mod,
-                                   num_point=parts_len,
-                                   mode=1)
+            self.mot_embed = Embedding(in_channels,
+                                       self.c1,
+                                       inter_channels=self.c1,
+                                       bias=bias,
+                                       norm=norm_mod_1d,
+                                       norm_mod=norm_mod,
+                                       num_point=parts_len,
+                                       mode=1)
         elif self.motion == 2:
             # diff between next mid-centered parts with current mid
-            self.mot_embed = embed(in_channels*3,
-                                   self.c1,
-                                   inter_channels=self.c1,
-                                   bias=bias,
-                                   norm=norm_mod_1d,
-                                   norm_mod=norm_mod,
-                                   num_point=parts_len,
-                                   mode=1)
+            self.mot_embed = Embedding(in_channels*3,
+                                       self.c1,
+                                       inter_channels=self.c1,
+                                       bias=bias,
+                                       norm=norm_mod_1d,
+                                       norm_mod=norm_mod,
+                                       num_point=parts_len,
+                                       mode=1)
         elif self.motion == 3:
             # diff between parts centered on mid in the first part
-            self.mot_embed = embed(in_channels*3,
-                                   self.c1,
-                                   inter_channels=self.c1,
-                                   bias=bias,
-                                   norm=norm_mod_1d,
-                                   norm_mod=norm_mod,
-                                   num_point=parts_len,
-                                   mode=1)
+            self.mot_embed = Embedding(in_channels*3,
+                                       self.c1,
+                                       inter_channels=self.c1,
+                                       bias=bias,
+                                       norm=norm_mod_1d,
+                                       norm_mod=norm_mod,
+                                       num_point=parts_len,
+                                       mode=1)
         elif self.motion == 4:
             # diff between parts centered on mid in the first part
             _inter_channels = [self.c1, self.c1, self.c1]
-            self.mot_embed = embed(in_channels*3,
-                                   self.c1,
-                                   inter_channels=_inter_channels,
-                                   bias=bias,
-                                   norm=norm_mod_1d,
-                                   norm_mod=norm_mod,
-                                   num_point=parts_len,
-                                   mode=3)
+            self.mot_embed = Embedding(in_channels*3,
+                                       self.c1,
+                                       inter_channels=_inter_channels,
+                                       bias=bias,
+                                       norm=norm_mod_1d,
+                                       norm_mod=norm_mod,
+                                       num_point=parts_len,
+                                       mode=3)
 
         # Joint Embedding ------------------------------------------------------
         if self.jt > 0:
             _inter_channels = self.get_inter_channels(self.jt, self.c1)
-            self.spa = one_hot(num_point, seg, mode=0)
-            self.spa_embed = embed(num_point,
-                                   self.c1,
-                                   inter_channels=_inter_channels,
-                                   bias=bias,
-                                   norm=None,
-                                   norm_mod=norm_mod,
-                                   num_point=num_point,
-                                   mode=self.jt)
+            self.spa = OneHotTensor(num_point, seg, mode=0)
+            self.spa_embed = Embedding(num_point,
+                                       self.c1,
+                                       inter_channels=_inter_channels,
+                                       bias=bias,
+                                       norm=None,
+                                       norm_mod=norm_mod,
+                                       num_point=num_point,
+                                       mode=self.jt)
 
         # Group Embedding ------------------------------------------------------
         if self.pt > 0:
             _inter_channels = self.get_inter_channels(self.pt, self.c1)
-            self.gro = one_hot(parts_len, seg, mode=0)
-            self.gro_embed = embed(parts_len,
-                                   self.c1,
-                                   inter_channels=_inter_channels,
-                                   bias=bias,
-                                   norm=None,
-                                   norm_mod=norm_mod,
-                                   num_point=parts_len,
-                                   mode=self.pt)
+            self.gro = OneHotTensor(parts_len, seg, mode=0)
+            self.gro_embed = Embedding(parts_len,
+                                       self.c1,
+                                       inter_channels=_inter_channels,
+                                       bias=bias,
+                                       norm=None,
+                                       norm_mod=norm_mod,
+                                       num_point=parts_len,
+                                       mode=self.pt)
 
         # Frame Embedding ------------------------------------------------------
         if self.fi > 0:
             if self.part > 0:
-                self.tem = one_hot(seg, num_point+parts_len, mode=1)
+                self.tem = OneHotTensor(seg, num_point+parts_len, mode=1)
             else:
-                self.tem = one_hot(seg, num_point, mode=1)
+                self.tem = OneHotTensor(seg, num_point, mode=1)
             _inter_channels = self.get_inter_channels(self.fi, self.c1)
-            self.tem_embed = embed(seg,
-                                   self.c3,
-                                   inter_channels=_inter_channels,
-                                   bias=bias,
-                                   norm=None,
-                                   norm_mod=norm_mod,
-                                   num_point=num_point,
-                                   mode=self.fi)
+            self.tem_embed = Embedding(seg,
+                                       self.c3,
+                                       inter_channels=_inter_channels,
+                                       bias=bias,
+                                       norm=None,
+                                       norm_mod=norm_mod,
+                                       num_point=num_point,
+                                       mode=self.fi)
 
         # Subject Embedding ----------------------------------------------------
         if self.subject > 0:
-            self.sub_embed = embed_subject(self.c1,
-                                           self.c3,
-                                           inter_channels=self.c1,
-                                           num_subjects=2,
-                                           bias=bias,
-                                           norm_mod=norm_mod,
-                                           mode=self.subject)
+            self.sub_embed = EmbeddingSubject(self.c1,
+                                              self.c3,
+                                              inter_channels=self.c1,
+                                              num_subjects=2,
+                                              bias=bias,
+                                              norm_mod=norm_mod,
+                                              mode=self.subject)
 
         # Position Embedding ---------------------------------------------------
 
@@ -302,47 +300,47 @@ class SGN(PyTorchModule):
             _in_ch = self.c2
         else:
             _in_ch = self.c1
-        self.compute_g1 = compute_g_spa(_in_ch,
-                                        self.g_proj_dim,
-                                        bias=bias,
-                                        g_proj_shared=g_proj_shared)
-        self.gcn1 = gcn_spa(_in_ch,
-                            self.c2,
-                            bias=bias,
-                            kernel_size=gcn_t_kernel,
-                            padding=gcn_t_kernel//2,
-                            norm_mod=norm_mod)
-        self.gcn2 = gcn_spa(self.c2,
-                            self.c3,
-                            bias=bias,
-                            kernel_size=gcn_t_kernel,
-                            padding=gcn_t_kernel//2,
-                            norm_mod=norm_mod)
-        self.gcn3 = gcn_spa(self.c3,
-                            self.c3,
-                            bias=bias,
-                            kernel_size=gcn_t_kernel,
-                            padding=gcn_t_kernel//2,
-                            norm_mod=norm_mod)
+        self.gcn_g = GCNSpatialG(_in_ch,
+                                 self.g_proj_dim,
+                                 bias=bias,
+                                 g_proj_shared=g_proj_shared)
+        self.gcn1 = GCNSpatial(_in_ch,
+                               self.c2,
+                               bias=bias,
+                               kernel_size=gcn_t_kernel,
+                               padding=gcn_t_kernel//2,
+                               norm_mod=norm_mod)
+        self.gcn2 = GCNSpatial(self.c2,
+                               self.c3,
+                               bias=bias,
+                               kernel_size=gcn_t_kernel,
+                               padding=gcn_t_kernel//2,
+                               norm_mod=norm_mod)
+        self.gcn3 = GCNSpatial(self.c3,
+                               self.c3,
+                               bias=bias,
+                               kernel_size=gcn_t_kernel,
+                               padding=gcn_t_kernel//2,
+                               norm_mod=norm_mod)
 
         # ASPP -----------------------------------------------------------------
         if aspp is None or len(aspp) == 0:
             self.aspp = lambda x: x
         else:
-            self.aspp = atrous_spatial_pyramid_pooling(self.c3,
-                                                       self.c3,
-                                                       bias=bias,
-                                                       dilations=aspp,
-                                                       norm_mod=norm_mod)
+            self.aspp = ASPP(self.c3,
+                             self.c3,
+                             bias=bias,
+                             dilations=aspp,
+                             norm_mod=norm_mod)
 
         # Frame level module ---------------------------------------------------
         self.smp = nn.AdaptiveMaxPool2d((1, seg))
-        self.cnn = local(self.c3,
-                         self.c4,
-                         bias=bias,
-                         t_kernel=t_kernel,
-                         t_max_pool=t_max_pool,
-                         norm_mod=norm_mod)
+        self.cnn = MLPTemporal(self.c3,
+                               self.c4,
+                               bias=bias,
+                               t_kernel=t_kernel,
+                               t_max_pool=t_max_pool,
+                               norm_mod=norm_mod)
         self.tmp = nn.AdaptiveMaxPool2d((1, 1))
         self.do = nn.Dropout(dropout)
 
@@ -490,7 +488,7 @@ class SGN(PyTorchModule):
         else:
             raise ValueError("Unsupported input combination")
 
-        g = self.compute_g1(x)
+        g = self.gcn_g(x)
         x = self.gcn1(x, g)
         x = self.gcn2(x, g)
         x = self.gcn3(x, g)
@@ -513,9 +511,9 @@ class SGN(PyTorchModule):
         return y, g
 
 
-class one_hot(PyTorchModule):
+class OneHotTensor(PyTorchModule):
     def __init__(self, dim_eye: int, dim_length: int, mode: int):
-        super(one_hot, self).__init__()
+        super(OneHotTensor, self).__init__()
         onehot = torch.eye(dim_eye, dim_eye)
         onehot = onehot.unsqueeze(0).unsqueeze(0)
         onehot = onehot.repeat(1, dim_length, 1, 1)
@@ -532,11 +530,11 @@ class one_hot(PyTorchModule):
         return x
 
 
-class norm_data(PyTorchModule):
+class DataNorm(PyTorchModule):
     def __init__(self,
                  dim: int,
                  norm_mod: Type[PyTorchModule] = nn.BatchNorm1d):
-        super(norm_data, self).__init__()
+        super(DataNorm, self).__init__()
         self.bn = norm_mod(dim)  # channel dim * num_point
 
     def forward(self, x: Tensor) -> Tensor:
@@ -547,7 +545,7 @@ class norm_data(PyTorchModule):
         return x
 
 
-class embed(Module):
+class Embedding(Module):
     def __init__(self,
                  *args,
                  norm: Optional[Type[PyTorchModule]] = None,
@@ -556,12 +554,12 @@ class embed(Module):
                  mode: int = 1,
                  norm_mod: Type[PyTorchModule] = nn.BatchNorm2d,
                  ** kwargs):
-        super(embed, self).__init__(*args, **kwargs)
+        super(Embedding, self).__init__(*args, **kwargs)
         assert mode in [1, 2, 3]
         self.mode = mode
 
         if norm is not None:
-            self.norm = norm_data(self.in_channels * num_point, norm)
+            self.norm = DataNorm(self.in_channels * num_point, norm)
         else:
             self.norm = lambda x: x
 
@@ -604,7 +602,7 @@ class embed(Module):
         return x
 
 
-class embed_subject(Module):
+class EmbeddingSubject(Module):
     def __init__(self,
                  *args,
                  inter_channels: Union[list, int] = 0,
@@ -612,7 +610,7 @@ class embed_subject(Module):
                  mode: int = 1,
                  norm_mod: Type[PyTorchModule] = nn.BatchNorm2d,
                  **kwargs):
-        super(embed_subject, self).__init__(*args, **kwargs)
+        super(EmbeddingSubject, self).__init__(*args, **kwargs)
         assert mode in [1, 2, 3, 4]
         self.mode = mode
         if mode == 1:
@@ -672,14 +670,14 @@ class embed_subject(Module):
         return x
 
 
-class local(Module):
+class MLPTemporal(Module):
     def __init__(self,
                  *args,
                  t_kernel: int = 3,
                  t_max_pool: int = 0,
                  norm_mod: Type[PyTorchModule] = nn.BatchNorm2d,
                  **kwargs):
-        super(local, self).__init__(*args, **kwargs)
+        super(MLPTemporal, self).__init__(*args, **kwargs)
         self.t_max_pool = t_max_pool
         if t_max_pool:
             # self.maxp = nn.MaxPool2d(kernel_size=(1, t_kernel),
@@ -712,12 +710,12 @@ class local(Module):
         return x
 
 
-class gcn_spa(Module):
+class GCNSpatial(Module):
     def __init__(self,
                  *args,
                  norm_mod: Type[PyTorchModule] = nn.BatchNorm2d,
                  **kwargs):
-        super(gcn_spa, self).__init__(*args, **kwargs)
+        super(GCNSpatial, self).__init__(*args, **kwargs)
         self.bn = norm_mod(self.out_channels)
         self.relu = nn.ReLU()
         self.w1 = Conv(self.in_channels, self.out_channels, bias=self.bias)
@@ -734,34 +732,34 @@ class gcn_spa(Module):
         return x1
 
 
-class compute_g_spa(Module):
+class GCNSpatialG(Module):
     def __init__(self,
                  *args,
                  g_proj_shared: bool = False,
                  **kwargs):
-        super(compute_g_spa, self).__init__(*args, **kwargs)
-        self.g1 = Conv(self.in_channels, self.out_channels, bias=self.bias)
+        super(GCNSpatialG, self).__init__(*args, **kwargs)
+        self.gcn_g = Conv(self.in_channels, self.out_channels, bias=self.bias)
         if g_proj_shared:
-            self.g2 = self.g1
+            self.g2 = self.gcn_g
         else:
             self.g2 = Conv(self.in_channels, self.out_channels, bias=self.bias)
         self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, x: Tensor) -> Tensor:
-        g1 = self.g1(x).permute(0, 3, 2, 1).contiguous()  # n,t,v,c
+        gcn_g = self.gcn_g(x).permute(0, 3, 2, 1).contiguous()  # n,t,v,c
         g2 = self.g2(x).permute(0, 3, 1, 2).contiguous()  # n,t,c,v
-        g3 = g1.matmul(g2)  # n,t,v,v
+        g3 = gcn_g.matmul(g2)  # n,t,v,v
         g4 = self.softmax(g3)
         return g4
 
 
-class atrous_spatial_pyramid_pooling(Module):
+class ASPP(Module):
     def __init__(self,
                  *args,
                  dilations: list = [1, 3, 5, 7],
                  norm_mod: Type[PyTorchModule] = nn.BatchNorm2d,
                  **kwargs):
-        super(atrous_spatial_pyramid_pooling, self).__init__(*args, **kwargs)
+        super(ASPP, self).__init__(*args, **kwargs)
         self.aspp = torch.nn.ModuleDict()
         self.pool = 0 in dilations
         if self.pool:

@@ -6,7 +6,7 @@
 
 # Code refractored
 
-# CODE FREEZED AT 01.04.2022
+# CODE FREEZED ON 01.04.2022
 
 import torch
 from torch import nn
