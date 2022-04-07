@@ -105,6 +105,7 @@ class SGN(PyTorchModule):
 
                  pe: int = 0,
 
+                 g_shared: bool = True,
                  g_proj_shared: bool = False,
                  g_proj_dim: int = c3,  # c3
 
@@ -144,6 +145,7 @@ class SGN(PyTorchModule):
 
         self.pe = pe
 
+        self.g_shared = g_shared
         self.g_proj_shared = g_proj_shared
         self.g_proj_dim = g_proj_dim
         self.gcn_t_kernel = gcn_t_kernel
@@ -274,10 +276,25 @@ class SGN(PyTorchModule):
             _in_ch = self.c2
         else:
             _in_ch = self.c1
-        self.gcn_g = GCNSpatialG(_in_ch,
-                                 self.g_proj_dim,
-                                 bias=bias,
-                                 g_proj_shared=g_proj_shared)
+        if self.g_shared:
+            self.gcn_g = GCNSpatialG(_in_ch,
+                                     self.g_proj_dim,
+                                     bias=bias,
+                                     g_proj_shared=g_proj_shared)
+        else:
+            self.gcn_g1 = GCNSpatialG(_in_ch,
+                                      self.g_proj_dim,
+                                      bias=bias,
+                                      g_proj_shared=g_proj_shared)
+            self.gcn_g2 = GCNSpatialG(self.c2,
+                                      self.g_proj_dim,
+                                      bias=bias,
+                                      g_proj_shared=g_proj_shared)
+            self.gcn_g3 = GCNSpatialG(self.c3,
+                                      self.g_proj_dim,
+                                      bias=bias,
+                                      g_proj_shared=g_proj_shared)
+
         self.gcn1 = GCNSpatial(_in_ch,
                                self.c2,
                                bias=bias,
@@ -505,10 +522,19 @@ class SGN(PyTorchModule):
         else:
             raise ValueError("Unsupported input combination")
 
-        g = self.gcn_g(x)
-        x = self.gcn1(x, g)
-        x = self.gcn2(x, g)
-        x = self.gcn3(x, g)
+        if self.g_shared:
+            g = self.gcn_g(x)
+            x = self.gcn1(x, g)
+            x = self.gcn2(x, g)
+            x = self.gcn3(x, g)
+        else:
+            g1 = self.gcn_g1(x)
+            x = self.gcn1(x, g1)
+            g2 = self.gcn_g2(x)
+            x = self.gcn2(x, g2)
+            g3 = self.gcn_g3(x)
+            x = self.gcn3(x, g3)
+            g = [g1, g2, g3]
 
         # Frame-level Module ---------------------------------------------------
         if self.fi > 0:
@@ -828,7 +854,7 @@ if __name__ == '__main__':
 
     batch_size = 64
 
-    model = SGN(seg=20, part=1, motion=1, pt=1,
+    model = SGN(seg=20, part=1, motion=1, pt=1, part_type=1, g_shared=False,
                 subject=True, aspp=[0, 1, 5, 9], norm_type='ln')
     inputs = torch.ones(batch_size, 20, 75)
     subjects = torch.ones(batch_size, 20, 1)
