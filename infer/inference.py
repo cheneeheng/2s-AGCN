@@ -44,8 +44,6 @@ def read_xyz(file: str, max_body: int = 4, num_joint: int = 25) -> np.ndarray:
                                        body_joint[j+2]]
             else:
                 pass
-    # openpose
-    data /= 1000.0
     return data  # M, T, V, C
 
 

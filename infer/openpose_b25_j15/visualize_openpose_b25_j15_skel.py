@@ -32,12 +32,12 @@ def read_xyz(file, max_body=4, num_joint=25):
     for m, body_joint in enumerate(skel_data):
         for j in range(0, len(body_joint), 3):
             if m < max_body and j//3 < num_joint:
-                data[m, 0, j//3, :] = [-body_joint[j],
-                                       -body_joint[j+2],
-                                       -body_joint[j+1]]
+                data[m, 0, j//3, :] = [body_joint[j],
+                                       body_joint[j+1],
+                                       body_joint[j+2]]
             else:
                 pass
-    data = np.swapaxes(data, 0, 3)/1000.0   # M, T, V, C > C, T, V, M
+    data = np.swapaxes(data, 0, 3)   # M, T, V, C > C, T, V, M
     return data
 
 
@@ -45,7 +45,7 @@ if __name__ == '__main__':
     # data : C,T,V,M
     print("START")
 
-    joint_path = './data/data_tmp/220324153743'
+    joint_path = '/data/openpose/skeleton/220407165310'
     joint_files = [os.path.join(joint_path, i)
                    for i in sorted(os.listdir(joint_path))]
     data = []
@@ -106,8 +106,9 @@ if __name__ == '__main__':
     #     )
     #     print(f"Idx : {i}")
 
-    with open(f'infer/openpose_b25_j15/result_{joint_path.split("/")[-1]}_ma5_100pads.txt', "r") as f:  # noqa
-        text = f.readlines()
+    #with open(f'infer/openpose_b25_j15/result_{joint_path.split("/")[-1]}_ma5_100pads.txt', "r") as f:  # noqa
+    #    text = f.readlines()
+    text = None
 
     graph = 'graph.openpose_b25_j15.Graph'
     data = data.reshape((1,) + data.shape)
