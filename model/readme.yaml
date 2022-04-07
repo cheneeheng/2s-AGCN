@@ -1293,14 +1293,30 @@ sgn_v4:
                   - 87.76%
         - 220404180001_dimx05:
                   - 91.84%
+        - 220404180001_dimx1:
+                  - 94.48%
         - 220404180001_dimx2:
                   - 94.82%
         - 220404180001_dimx3:
                   - 94.86%
+        - 220404180001_dimx1_epoch60:
+                  - 93.66%
+        - 220404180001_dimx1_epoch60_bsx2:
+                  - 92.11%
+        - 220404180001_gprojdim512:
+                  - 60 epochs
+                  - 93.28%
+        - 220404180001_gprojdim512_rerun:
+                  - 94.11%
 
         # joints 15
         - 220405153001:
                   - 90.67%
+
+sgn_v5:
+        - 220407140001_part1_pt1_mot3_parttype1:
+                  - part type 1 has hands and arms only
+                  - 94.10%
 
 sgn-code:
         - original sgn repo code

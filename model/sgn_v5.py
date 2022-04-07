@@ -97,6 +97,7 @@ class SGN(PyTorchModule):
                  motion: Union[bool, int] = 0,
                  subject: Union[bool, int] = 0,
 
+                 joint_type: int = 0,
                  part_type: int = 0,
 
                  pt: int = 0,
@@ -107,7 +108,7 @@ class SGN(PyTorchModule):
 
                  g_shared: bool = True,
                  g_proj_shared: bool = False,
-                 g_proj_dim: int = c3,  # c3
+                 g_proj_dim: Union[list, int] = c3,  # c3
 
                  gcn_t_kernel: int = 1,
 
@@ -137,6 +138,7 @@ class SGN(PyTorchModule):
 
         self.subject = bool2int(subject)
 
+        self.joint_type = joint_type
         self.part_type = part_type
 
         self.pt = pt
@@ -150,6 +152,9 @@ class SGN(PyTorchModule):
         self.g_proj_dim = g_proj_dim
         self.gcn_t_kernel = gcn_t_kernel
 
+        if not self.g_shared and not isinstance(self.g_proj_dim, list):
+            self.g_proj_dim = [self.g_proj_dim] * 3
+
         self.t_kernel = t_kernel
         self.t_max_pool = bool2int(t_max_pool)
 
@@ -161,6 +166,7 @@ class SGN(PyTorchModule):
         assert self.motion in [0, 1, 2, 3, 4]
         assert self.subject in [0, 1, 2, 3, 4]
 
+        assert self.joint_type in [0, 1]
         assert self.part_type in [0, 1]
 
         assert self.pt in [0, 1, 2, 3]
@@ -272,7 +278,9 @@ class SGN(PyTorchModule):
         # Frame embedding is a form of PE
 
         # GCN ------------------------------------------------------------------
-        if self.jt > 0 or self.pt > 0:
+        if self.joint_type == 1:
+            _in_ch = self.c1
+        elif self.jt > 0 or self.pt > 0:
             _in_ch = self.c2
         else:
             _in_ch = self.c1
@@ -283,15 +291,15 @@ class SGN(PyTorchModule):
                                      g_proj_shared=g_proj_shared)
         else:
             self.gcn_g1 = GCNSpatialG(_in_ch,
-                                      self.g_proj_dim,
+                                      self.g_proj_dim[0],
                                       bias=bias,
                                       g_proj_shared=g_proj_shared)
             self.gcn_g2 = GCNSpatialG(self.c2,
-                                      self.g_proj_dim,
+                                      self.g_proj_dim[1],
                                       bias=bias,
                                       g_proj_shared=g_proj_shared)
             self.gcn_g3 = GCNSpatialG(self.c3,
-                                      self.g_proj_dim,
+                                      self.g_proj_dim[2],
                                       bias=bias,
                                       g_proj_shared=g_proj_shared)
 
@@ -504,7 +512,10 @@ class SGN(PyTorchModule):
         # Joint-level Module ---------------------------------------------------
         if dy1 is not None:
             if self.jt > 0:
-                x0 = torch.cat([dy1, spa1], 1)  # n,c,v,t
+                if self.joint_type == 1:
+                    x0 = dy1 + spa1  # n,c,v,t
+                else:
+                    x0 = torch.cat([dy1, spa1], 1)  # n,c,v,t
             else:
                 x0 = dy1  # n,c,v,t
         if dy2 is not None:
@@ -854,7 +865,9 @@ if __name__ == '__main__':
 
     batch_size = 64
 
-    model = SGN(seg=20, part=1, motion=1, pt=1, part_type=1, g_shared=False,
+    model = SGN(seg=20,
+                # part=1, motion=1, pt=1, part_type=1,
+                joint_type=1,
                 subject=True, aspp=[0, 1, 5, 9], norm_type='ln')
     inputs = torch.ones(batch_size, 20, 75)
     subjects = torch.ones(batch_size, 20, 1)
