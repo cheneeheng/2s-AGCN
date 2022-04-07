@@ -66,8 +66,11 @@ from tqdm import tqdm
 
 LABEL = './data/data/ntu_sgn/processed_data/NTU_CV_test_label.pkl'
 BASE = f'data/data/ntu_result/xview'
-FOLDER = f'220404180001_motionsampler_rerun'
-SCORE = f'{BASE}/sgn_v4/{FOLDER}/epoch106_val_score.pkl'
+
+# FOLDER = f'220404180001_motionsampler_rerun'
+# SCORE = f'{BASE}/sgn_v4/{FOLDER}/epoch107_val_score.pkl'
+FOLDER = f'220404120001_rerun_noinit'
+SCORE = f'{BASE}/sgn_v4/{FOLDER}/epoch101_val_score.pkl'
 
 label = open(LABEL, 'rb')
 label = np.array(pickle.load(label))
@@ -103,7 +106,7 @@ plt.close()
 plt.figure()
 # per_class_acc = cf_matrix.diagonal()/cf_matrix.sum(axis=1)
 per_class_acc = confusion_matrix(l_list, r_list, normalize='true').diagonal()
-plt.bar([i+1 for i in range(60)], per_class_acc*100.0)
+plt.bar([i for i in range(60)], per_class_acc*100.0)
 plt.xlabel('Classes')
 plt.ylabel('Accuracy %')
 plt.ylim(50.0, 100.0)

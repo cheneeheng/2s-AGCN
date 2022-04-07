@@ -629,7 +629,7 @@ class Processor(object):
         )
 
         if save_model and self.rank == 0:
-            self.save_weights(epoch)
+            self.save_weights(epoch + 1)
 
     # --------------------------------------------------------------------------
     # EVALUATION
@@ -697,7 +697,7 @@ class Processor(object):
             accuracy = self.data_loader[ln].dataset.top_k(score, 1)
             if accuracy > self.best_acc:
                 self.best_acc = accuracy
-                self.best_acc_epoch = epoch
+                self.best_acc_epoch = epoch + 1
 
             # 7. logging
             if self.rank == 0:

@@ -23,6 +23,17 @@ from model.module.pos_embedding import *
 from utils.utils import *
 
 
+def to_int(x: Union[int, float]):
+    if isinstance(x, int):
+        return x
+    else:
+        assert isinstance(x, float), f"x is {type(x)} instead of float"
+        if (x).is_integer():
+            return int(x)
+        else:
+            raise ValueError("Value is supposed to be int")
+
+
 class SGN(PyTorchModule):
 
     c1 = 64  # pos,vel,joint embed
@@ -74,7 +85,7 @@ class SGN(PyTorchModule):
                  seg: int = 20,
                  bias: bool = True,
 
-                 c_multiplier: int = 1,
+                 c_multiplier: Union[int, float] = 1,
                  dropout: float = 0.0,
 
                  position: int = 1,
@@ -90,6 +101,8 @@ class SGN(PyTorchModule):
                  pe: int = 0,
 
                  g_proj_shared: bool = False,
+                 g_proj_dim: int = c3,  # c3
+
                  gcn_t_kernel: int = 1,
 
                  t_kernel: int = 3,
@@ -99,10 +112,10 @@ class SGN(PyTorchModule):
                  ):
         super(SGN, self).__init__()
 
-        self.c1 *= c_multiplier  # pos,vel,joint embed
-        self.c2 *= c_multiplier  # G,gcn
-        self.c3 *= c_multiplier  # gcn
-        self.c4 *= c_multiplier  # gcn
+        self.c1 = to_int(self.c1 * c_multiplier)  # pos,vel,joint embed
+        self.c2 = to_int(self.c2 * c_multiplier)  # G,gcn
+        self.c3 = to_int(self.c3 * c_multiplier)  # gcn
+        self.c4 = to_int(self.c4 * c_multiplier)  # gcn
 
         self.num_class = num_class
         self.num_point = num_point
@@ -124,6 +137,7 @@ class SGN(PyTorchModule):
         self.pe = pe
 
         self.g_proj_shared = g_proj_shared
+        self.g_proj_dim = g_proj_dim
         self.gcn_t_kernel = gcn_t_kernel
 
         self.t_kernel = t_kernel
@@ -302,7 +316,7 @@ class SGN(PyTorchModule):
         else:
             _in_ch = self.c1
         self.compute_g1 = compute_g_spa(_in_ch,
-                                        self.c3,
+                                        self.g_proj_dim,
                                         bias=bias,
                                         g_proj_shared=g_proj_shared)
         self.gcn1 = gcn_spa(_in_ch,
