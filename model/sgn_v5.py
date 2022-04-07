@@ -30,7 +30,7 @@ class SGN(PyTorchModule):
     c3 = 256  # gcn
     c4 = 512  # final conv
 
-    # NTU
+    # NTU (from viewer prespective)
     parts_3points_wholebody = [
         # spine
         (1, 0, 16),
@@ -79,6 +79,18 @@ class SGN(PyTorchModule):
         (9, 10, 11),
         (9, 10, 24),
         (10, 11, 23),
+    ]
+    parts_2points_interhandandinterfeet = [
+        # hand
+        (23, 21),
+        (24, 22),
+        (11, 7),
+        (10, 6),
+        (9, 5),
+        # leg
+        (19, 15),
+        (18, 14),
+        (17, 13),
     ]
 
     def __init__(self,
@@ -199,8 +211,11 @@ class SGN(PyTorchModule):
             self.parts_3points = self.parts_3points_wholebody
         elif part_type == 1:
             self.parts_3points = self.parts_3points_armandhand
+        elif part_type == 2:
+            self.parts_3points = self.parts_2points_interhandandinterfeet
 
         parts_len = len(self.parts_3points)
+        parts_dim = len(self.parts_3points[0])
 
         # Dynamic Representation -----------------------------------------------
         if self.position > 0:
@@ -216,7 +231,7 @@ class SGN(PyTorchModule):
         if self.part > 0:
             self.par_embed = self.init_dr(mode=self.part,
                                           num_point=parts_len,
-                                          in_channels=in_channels*3)
+                                          in_channels=in_channels*parts_dim)
 
         if self.motion == 1:
             # diff between mids
@@ -227,17 +242,17 @@ class SGN(PyTorchModule):
             # diff between next mid-centered parts with current mid
             self.mot_embed = self.init_dr(mode=1,
                                           num_point=parts_len,
-                                          in_channels=in_channels*3)
+                                          in_channels=in_channels*parts_dim)
         elif self.motion == 3:
             # diff between parts centered on mid in the first part
             self.mot_embed = self.init_dr(mode=1,
                                           num_point=parts_len,
-                                          in_channels=in_channels*3)
+                                          in_channels=in_channels*parts_dim)
         elif self.motion == 4:
             # diff between parts centered on mid in the first part
             self.mot_embed = self.init_dr(mode=3,
                                           num_point=parts_len,
-                                          in_channels=in_channels*3)
+                                          in_channels=in_channels*parts_dim)
 
         # Joint Embedding ------------------------------------------------------
         if self.jt > 0:
@@ -455,7 +470,9 @@ class SGN(PyTorchModule):
             par = par.view((bs, step, -1, 3, self.in_channels))  # n,t,v+,3,c
             mid = par.mean(dim=-2, keepdim=True)  # n,t,v+,1,c
             par1 = par - mid  # n,t,v+,3,c
-            par = par1.view((bs, step, -1, self.in_channels*3))  # n,t,v+,c+
+            par = par1.view(
+                (bs, step, -1, self.in_channels*len(self.parts_3points[0]))
+            )  # n,t,v+,c+
             par = par.permute(0, 3, 2, 1).contiguous()  # n,c+,v+,t
             par = self.par_embed(par)  # n,c,v+,t
 
@@ -866,8 +883,11 @@ if __name__ == '__main__':
     batch_size = 64
 
     model = SGN(seg=20,
-                # part=1, motion=1, pt=1, part_type=1,
-                joint_type=1,
+                part=1,
+                motion=1,
+                pt=1,
+                part_type=1,
+                # joint_type=1,
                 subject=True, aspp=[0, 1, 5, 9], norm_type='ln')
     inputs = torch.ones(batch_size, 20, 75)
     subjects = torch.ones(batch_size, 20, 1)
