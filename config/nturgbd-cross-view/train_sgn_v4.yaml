@@ -1,5 +1,5 @@
-work_dir: ./data/data/ntu_result/xview/sgn_v4/220404180001_dimx3
-model_saved_name: ./data/data/ntu_result/xview/sgn_v4/220404180001_dimx3/sgn
+work_dir: ./data/data/ntu_result/xview/sgn_v4/220404180001_dimx1_epoch480_bsx025
+# model_saved_name: ./data/data/ntu_result/xview/sgn_v4/220404180001_dimx1_epoch480_bsx025/sgn
 
 phase: train
 save_score: True
@@ -37,7 +37,7 @@ test_dataloader_args:
   dataset: NTU60-CV-SGN
   seg: 20
   multi_test: 5
-  # motion_sampler: 1s
+  # motion_sampler: 1
 
 use_sgn_dataloader: True
 
@@ -49,15 +49,16 @@ model_args:
   in_channels: 3
   seg: 20
   bias: True
-  c_multiplier: 3
+  c_multiplier: 1
   # dropout: 0.0
   # part: 2
   # motion: 0
   # subject: 0
-  # jt: 1
-  # fi: 1
+  # jt: 3
+  # fi: 3
   # gcn_t_kernel: 3
   # g_proj_shared: True
+  # g_proj_dim: 512
   # t_max_pool: True
   # t_kernel: 1
   # aspp: [0, 1, 2, 3]
@@ -69,13 +70,13 @@ label_smoothing: 0.1
 
 # optim
 device: [0]
-batch_size: 64
+batch_size: 16
 test_batch_size: 4
 
 optimizer: Adam
 nesterov: True
-base_lr: 0.001
-step: [60, 90, 110]
+base_lr: 0.0025 # 0.001
+step: [240, 360, 440]
 weight_decay: 0.0001
 # llrd_factor: 1.0
 # scheduler: onecyclelr
@@ -83,7 +84,7 @@ weight_decay: 0.0001
 # eps: 0.0001
 
 start_epoch: 0
-num_epoch: 120
+num_epoch: 480
 warm_up_epoch: 0
 
 only_train_part: False

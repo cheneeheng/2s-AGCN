@@ -146,11 +146,21 @@ class Feeder(Dataset):
                         f, encoding='latin1')
             else:
                 raise ValueError("label data cannot be opened...")
-            # load data
+
+            # load data (n,c,t,v,m)
             if self.use_mmap:
                 self.data = np.load(self.data_path, mmap_mode='r')
             else:
                 self.data = np.load(self.data_path)
+
+            if self.joint_15:
+                data = np.zeros((*self.data.shape[:3], 15, self.data.shape[-1]),
+                                dtype=self.data.dtype)
+                for new_id, old_id in JOINT_MAPPING.items():
+                    data[:, :, :, new_id, :] = \
+                        self.data[:, :, :, old_id-1, :]
+                self.data = data
+
             if self.debug:
                 self.label = self.label[0:100]
                 self.data = self.data[0:100]

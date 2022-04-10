@@ -282,7 +282,10 @@ class SGN(PyTorchModule):
         # Frame Embedding ------------------------------------------------------
         if self.fi > 0:
             if self.part > 0:
-                self.tem = OneHotTensor(seg, num_point+parts_len, mode=1)
+                if self.position == 0 and self.velocity == 0:
+                    self.tem = OneHotTensor(seg, parts_len, mode=1)
+                else:
+                    self.tem = OneHotTensor(seg, num_point+parts_len, mode=1)
             else:
                 self.tem = OneHotTensor(seg, num_point, mode=1)
             self.tem_embed = self.init_emb(mode=self.fi,

@@ -1,4 +1,4 @@
-work_dir: ./data/data/ntu_result/xview/sgn_v5/220407140001_position0_part1_pt1_motion3_parttype2
+work_dir: ./data/data/ntu_result/xview/sgn_v5_j15/220410210001
 
 phase: train
 save_score: True
@@ -14,13 +14,13 @@ feeder: feeders.feeder.Feeder
 num_worker: 8
 train_feeder_args:
   debug: False
-  # data_path: ./data/data/ntu_nopad/xview/train_data_joint.npy
-  # label_path: ./data/data/ntu_nopad/xview/train_label.pkl
-  # dataset: NTU60-CV
-  data_path: ./data/data/ntu_sgn/processed_data/NTU_CV_train.pkl
-  label_path: ./data/data/ntu_sgn/processed_data/NTU_CV_train_label.pkl
-  dataset: NTU60-CV-SGN
-  # joint_15: True
+  data_path: ./data/data/ntu_centerff/xview/train_data_joint.npy
+  label_path: ./data/data/ntu_centerff/xview/train_label.pkl
+  dataset: NTU60-CV
+  # data_path: ./data/data/ntu_sgn/processed_data/NTU_CV_train.pkl
+  # label_path: ./data/data/ntu_sgn/processed_data/NTU_CV_train_label.pkl
+  # dataset: NTU60-CV-SGN
+  joint_15: True
 
 train_dataloader_args:
   seg: 20
@@ -29,13 +29,13 @@ train_dataloader_args:
 
 test_feeder_args:
   debug: False
-  # data_path: ./data/data/ntu_nopad/xview/val_data_joint.npy
-  # label_path: ./data/data/ntu_nopad/xview/val_label.pkl
-  # dataset: NTU60-CV
-  data_path: ./data/data/ntu_sgn/processed_data/NTU_CV_test.pkl
-  label_path: ./data/data/ntu_sgn/processed_data/NTU_CV_test_label.pkl
-  dataset: NTU60-CV-SGN
-  # joint_15: True
+  data_path: ./data/data/ntu_centerff/xview/val_data_joint.npy
+  label_path: ./data/data/ntu_centerff/xview/val_label.pkl
+  dataset: NTU60-CV
+  # data_path: ./data/data/ntu_sgn/processed_data/NTU_CV_test.pkl
+  # label_path: ./data/data/ntu_sgn/processed_data/NTU_CV_test_label.pkl
+  # dataset: NTU60-CV-SGN
+  joint_15: True
 
 test_dataloader_args:
   seg: 20
@@ -48,21 +48,21 @@ use_sgn_dataloader: True
 model: model.sgn_v5.SGN
 model_args:
   num_class: 60
-  num_point: 25
+  num_point: 15
   in_channels: 3
   seg: 20
   bias: True
   c_multiplier: 1
   # dropout: 0.0
-  position: 0
-  velocity: 0
-  part: 1
-  motion: 3
+  # position: 1
+  # velocity: 1
+  # part: 1
+  # motion: 3
   # subject: 0
   # joint_type: 1
-  part_type: 2
-  pt: 1
-  jt: 0
+  # part_type: 2
+  # pt: 1
+  # jt: 1
   # fi: 1
   # g_shared: False
   # g_proj_shared: True
