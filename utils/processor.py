@@ -47,8 +47,7 @@ class Processor(object):
         if save_arg:
             self.save_arg()
         if self.rank == 0:
-            if arg.phase == 'train':
-                self.create_folder_and_writer()
+            self.create_folder_and_writer()
         self.global_step = 0
         self.best_acc = 0
         self.best_acc_epoch = 0
@@ -682,7 +681,7 @@ class Processor(object):
                         if result_file is not None:
                             f_r.write(str(x) + ',' + str(true[i]) + '\n')
                         if x != true[i] and wrong_file is not None:
-                            f_w.write(str(index[i]) + ',' +
+                            f_w.write(str(batch_idx) + ',' +
                                       str(x) + ',' + str(true[i]) + '\n')
 
             # 4. loss
