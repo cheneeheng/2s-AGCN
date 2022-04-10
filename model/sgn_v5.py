@@ -111,6 +111,8 @@ class SGN(PyTorchModule):
 
                  joint_type: int = 0,
                  part_type: int = 0,
+                 joint_fusion_type: Optional[int] = None,
+                 part_fusion_type: int = 0,
 
                  pt: int = 0,
                  jt: int = 1,
@@ -150,8 +152,15 @@ class SGN(PyTorchModule):
 
         self.subject = bool2int(subject)
 
-        self.joint_type = joint_type
         self.part_type = part_type
+
+        # backward compat
+        if joint_fusion_type is None:
+            self.joint_fusion_type = joint_type
+        else:
+            self.joint_fusion_type = joint_fusion_type
+
+        self.part_fusion_type = part_fusion_type
 
         self.pt = pt
         self.jt = jt
@@ -178,7 +187,8 @@ class SGN(PyTorchModule):
         assert self.motion in [0, 1, 2, 3, 4]
         assert self.subject in [0, 1, 2, 3, 4]
 
-        assert self.joint_type in [0, 1]
+        assert self.joint_fusion_type in [0, 1]
+        assert self.part_fusion_type in [0, 1]
         assert self.part_type in [0, 1, 2]
 
         assert self.pt in [0, 1, 2, 3]
@@ -250,6 +260,7 @@ class SGN(PyTorchModule):
                                           in_channels=in_channels*parts_dim)
         elif self.motion == 4:
             # diff between parts centered on mid in the first part
+            # 4x MLP
             self.mot_embed = self.init_dr(mode=3,
                                           num_point=parts_len,
                                           in_channels=in_channels*parts_dim)
@@ -293,7 +304,7 @@ class SGN(PyTorchModule):
         # Frame embedding is a form of PE
 
         # GCN ------------------------------------------------------------------
-        if self.joint_type == 1:
+        if self.joint_fusion_type == 1 or self.part_fusion_type == 1:
             _in_ch = self.c1
         elif self.jt > 0 or self.pt > 0:
             _in_ch = self.c2
@@ -534,7 +545,7 @@ class SGN(PyTorchModule):
         # Joint-level Module ---------------------------------------------------
         if dy1 is not None:
             if self.jt > 0:
-                if self.joint_type == 1:
+                if self.joint_fusion_type == 1:
                     x0 = dy1 + spa1  # n,c,v,t
                 else:
                     x0 = torch.cat([dy1, spa1], 1)  # n,c,v,t
@@ -542,7 +553,10 @@ class SGN(PyTorchModule):
                 x0 = dy1  # n,c,v,t
         if dy2 is not None:
             if self.pt > 0:
-                x1 = torch.cat([dy2, gro1], 1)  # n,c,v',t
+                if self.part_fusion_type == 1:
+                    x1 = dy2 + gro1  # n,c,v',t
+                else:
+                    x1 = torch.cat([dy2, gro1], 1)  # n,c,v',t
             else:
                 x1 = dy2  # n,c,v',t
 

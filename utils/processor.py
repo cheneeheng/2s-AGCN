@@ -442,6 +442,8 @@ class Processor(object):
         if self.arg.phase == 'train':
             assert os.path.exists(self.arg.train_feeder_args['data_path'])
             assert os.path.exists(self.arg.train_feeder_args['label_path'])
+            self.arg.train_dataloader_args['dataset'] = \
+                self.arg.train_feeder_args['dataset']
             data_loader = FeederDataLoader(**self.arg.train_dataloader_args)
             self.data_loader['train'] = data_loader.get_loader(
                 **kwargs,
@@ -452,6 +454,8 @@ class Processor(object):
                 drop_last=True,
                 collate_fn=data_loader.collate_fn_fix_train if self.arg.use_sgn_dataloader else None  # noqa
             )
+        self.arg.test_dataloader_args['dataset'] = \
+            self.arg.test_feeder_args['dataset']
         data_loader = FeederDataLoader(**self.arg.test_dataloader_args)
         if self.arg.test_dataloader_args['multi_test'] > 1:
             self.data_loader['val'] = data_loader.get_loader(

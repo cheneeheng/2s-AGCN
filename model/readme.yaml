@@ -1303,6 +1303,8 @@ sgn_v4:
                   - 93.66%
         - 220404180001_dimx1_epoch60_bsx2:
                   - 92.11%
+        - 220404180001_dimx1_epoch480_bsx025:
+                  - 87.89%
         - 220404180001_gprojdim512:
                   - 60 epochs
                   - 93.28%
@@ -1317,6 +1319,25 @@ sgn_v5:
         - 220407140001_part1_pt1_mot3_parttype1:
                   - part type 1 has hands and arms only
                   - 94.10%
+        - 220407140001_part1_pt1_motion1_parttype2:
+                  - part type 2 is the difference between the L/R arms and legs
+                  - 93.76%
+        - 220407140001_part1_pt1_motion3_parttype2:
+                  - 94.08%
+        - 220407140001_jointtype1:
+                  - uses add instead of concat for jt & dr
+                  - 93.69%
+        - 220407140001_nogshared:
+                  - 94.20%
+        - 220407140001_agcnnopaddata:
+                  - only validated with the first 100 samples....
+                  - 95.00%
+        - 220407140001_agcnnopaddata_rerun:
+                  - 93.64%
+
+        # joints 15
+        - 220410210001:
+                  -
 
 sgn-code:
         - original sgn repo code
