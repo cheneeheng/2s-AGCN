@@ -18,3 +18,4 @@ from . import sgn_v2
 from . import sgn_v3
 from . import sgn_v4
 from . import sgn_v5
+from . import sgn_v6

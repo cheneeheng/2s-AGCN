@@ -1324,6 +1324,8 @@ sgn_v5:
                   - 93.76%
         - 220407140001_part1_pt1_motion3_parttype2:
                   - 94.08%
+        - 220407140001_position0_part1_pt1_motion3_parttype2:
+                  -
         - 220407140001_jointtype1:
                   - uses add instead of concat for jt & dr
                   - 93.69%
@@ -1334,6 +1336,8 @@ sgn_v5:
                   - 95.00%
         - 220407140001_agcnnopaddata_rerun:
                   - 93.64%
+        - 220410210001_centerff:
+                  - 94.46%
 
         # joints 15
         - 220410210001:
