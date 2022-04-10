@@ -7,7 +7,7 @@ def test(Model):
 
     inputs = torch.ones(batch_size, 20, 75)
     subjects = torch.ones(batch_size, 20, 1)
-    for in_position in tqdm([1, 2, 3], position=9, leave=False):
+    for in_position in tqdm([0, 1, 2, 3], position=9, leave=False):
         for in_velocity in tqdm([0, 1, 2, 3], position=8, leave=False):
             for in_part in tqdm([0, 1, 2, 3], position=7, leave=False):
                 for in_part_type in tqdm([0, 1, 2], position=6, leave=False):  # noqa

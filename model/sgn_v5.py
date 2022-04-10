@@ -8,6 +8,8 @@
 
 # Continue from on sgn_v4
 
+# CODE FREEZED ON 10.04.2022
+
 import torch
 from torch import nn
 from torch import Tensor
