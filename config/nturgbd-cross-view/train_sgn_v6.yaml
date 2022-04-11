@@ -1,0 +1,110 @@
+work_dir: ./data/data/ntu_result/xview/sgn_v6/220411120001
+
+phase: train
+save_score: True
+
+seed: 1337
+log_interval: 100 # iter
+save_interval: 2 # epoch
+eval_interval: 1 # epoch
+print_log: true
+
+## feeder
+feeder: feeders.feeder.Feeder
+num_worker: 8
+train_feeder_args:
+  debug: False
+  # data_path: ./data/data/ntu_nopad/xview/train_data_joint.npy
+  # label_path: ./data/data/ntu_nopad/xview/train_label.pkl
+  # dataset: NTU60-CV
+  data_path: ./data/data/ntu_sgn/processed_data/NTU_CV_train.pkl
+  label_path: ./data/data/ntu_sgn/processed_data/NTU_CV_train_label.pkl
+  dataset: NTU60-CV-SGN
+  # joint_15: True
+
+train_dataloader_args:
+  seg: 20
+  multi_test: 1
+  # motion_sampler: 1
+
+test_feeder_args:
+  debug: False
+  # data_path: ./data/data/ntu_nopad/xview/val_data_joint.npy
+  # label_path: ./data/data/ntu_nopad/xview/val_label.pkl
+  # dataset: NTU60-CV
+  data_path: ./data/data/ntu_sgn/processed_data/NTU_CV_test.pkl
+  label_path: ./data/data/ntu_sgn/processed_data/NTU_CV_test_label.pkl
+  dataset: NTU60-CV-SGN
+  # joint_15: True
+
+test_dataloader_args:
+  seg: 20
+  multi_test: 5
+  # motion_sampler: 1s
+
+use_sgn_dataloader: True
+
+## model
+model: model.sgn_v6.SGN
+model_args:
+  ## main args
+  num_class: 60
+  num_point: 25
+  num_segment: 20
+  in_channels: 3
+  bias: 1
+  dropout: 0.0
+  c_multiplier: 1
+  norm_type: bn
+  ## input args
+  in_position: 1
+  in_velocity: 1
+  in_part_type: 0
+  in_part: 0
+  in_motion: 0
+  ## secondary input args
+  subject: 0
+  ## semantic args
+  sem_par_fusion: 0
+  sem_pos_fusion: 0
+  sem_part: 0
+  sem_position: 1
+  sem_frame: 1
+  ## GCN args
+  g_shared: True
+  g_proj_shared: False
+  g_proj_dim: 256
+  gcn_t_kernel: 3
+  ## Temporal MLP args
+  t_kernel: 3
+  t_max_pool: 0
+  aspp: [0, 1, 2, 3]
+
+label_smoothing: 0.1
+
+# weights: ./data/data/ntu_result/xview/sgn_v2/220327213001_1337/sgn-119-70560.pt
+
+## optim
+device: [0]
+batch_size: 64
+test_batch_size: 4
+
+optimizer: Adam
+nesterov: True
+base_lr: 0.001
+step: [60, 90, 110]
+weight_decay: 0.0001
+# llrd_factor: 1.0
+# scheduler: onecyclelr
+# anneal_strategy: cos
+# eps: 0.0001
+
+start_epoch: 0
+num_epoch: 120
+warm_up_epoch: 0
+
+only_train_part: False
+only_train_epoch: 5
+
+world_size: 1
+ddp: False

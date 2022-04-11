@@ -41,9 +41,10 @@ class SGN(PyTorchModule):
                  num_point: int = 25,
                  num_segment: int = 20,
                  in_channels: int = 3,
-                 bias: bool = True,
+                 bias: int = 1,
                  dropout: float = 0.0,
                  c_multiplier: Union[int, float] = 1,
+                 norm_type: str = 'bn',
 
                  in_position: int = 1,
                  in_velocity: int = 1,
@@ -69,7 +70,6 @@ class SGN(PyTorchModule):
                  t_max_pool: int = 0,
                  aspp: list = None,
 
-                 norm_type: str = 'bn'
                  ):
         super(SGN, self).__init__()
 
@@ -307,7 +307,7 @@ class SGN(PyTorchModule):
                  num_point: int,
                  in_channels: int,
                  out_channels: Optional[int] = None,
-                 bias: Optional[bool] = None,
+                 bias: Optional[int] = None,
                  norm: Optional[int] = None,
                  norm_mod: Optional[bool] = None):
         inter_channels = self.get_inter_channels(mode, self.c1)

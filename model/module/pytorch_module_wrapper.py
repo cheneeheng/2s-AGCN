@@ -16,7 +16,7 @@ class Module(PyTorchModule):
                  kernel_size: int = 1,
                  padding: int = 0,
                  dilation: int = 1,
-                 bias: bool = False,
+                 bias: int = 0,
                  deterministic: Optional[bool] = None,
                  dropout: Optional[Type[PyTorchModule]] = None,
                  activation: Optional[Type[PyTorchModule]] = None,
@@ -61,7 +61,7 @@ class Conv1xN(Module):
                            kernel_size=(1, self.kernel_size),
                            padding=(0, self.padding),
                            dilation=self.dilation,
-                           bias=self.bias)
+                           bias=bool(self.bias))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if not self.deterministic:
