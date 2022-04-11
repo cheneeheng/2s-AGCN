@@ -172,7 +172,7 @@ class SGN(PyTorchModule):
         if self.sem_pos_fusion == 1 or self.sem_par_fusion == 1:
             gcn_in_ch = self.c1
         elif self.sem_position > 0 or self.sem_part > 0:
-            gcn_in_ch = self.c2
+            gcn_in_ch = self.c1 * 2
         else:
             gcn_in_ch = self.c1
 
@@ -849,12 +849,13 @@ if __name__ == '__main__':
     inputs = torch.ones(batch_size, 20, 75)
     subjects = torch.ones(batch_size, 20, 1)
     model = SGN(num_segment=20,
-                in_part=1,
-                in_motion=1,
-                subject=1,
-                sem_part=1,
-                sem_fra_fusion=1,
-                subject_fusion=101
+                # in_part=1,
+                # in_motion=1,
+                # subject=1,
+                # sem_part=1,
+                # sem_fra_fusion=1,
+                # subject_fusion=101
+                c_multiplier=[1, 0.5, 0.25, 0.125]
                 )
     model(inputs, subjects)
     # print(model)
