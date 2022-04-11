@@ -52,12 +52,14 @@ class SGN(PyTorchModule):
                  in_part_type: int = 0,
                  in_motion: int = 0,
 
-                 sem_par_fusion: int = 0,
-                 sem_pos_fusion: int = 0,
-
                  sem_part: int = 0,
                  sem_position: int = 1,
                  sem_frame: int = 1,
+
+                 sem_par_fusion: int = 0,
+                 sem_pos_fusion: int = 0,
+                 sem_fra_fusion: int = 1,
+                 subject_fusion: int = 1,
 
                  subject: int = 0,
 
@@ -92,6 +94,8 @@ class SGN(PyTorchModule):
 
         self.sem_pos_fusion = sem_pos_fusion
         self.sem_par_fusion = sem_par_fusion
+        self.sem_fra_fusion = sem_fra_fusion
+        self.subject_fusion = subject_fusion
 
         self.sem_part = sem_part
         self.sem_position = sem_position
@@ -124,6 +128,9 @@ class SGN(PyTorchModule):
         # 0 = concat, 1 = add
         assert self.sem_pos_fusion in [0, 1]
         assert self.sem_par_fusion in [0, 1]
+        # 1 = add after GCN, 101 = add before GCN
+        assert self.sem_fra_fusion in [1, 101]
+        assert self.subject_fusion in [1, 101]
 
         sem_modes = [0, 1, 2, 3]
         assert self.sem_part in sem_modes
@@ -155,6 +162,13 @@ class SGN(PyTorchModule):
 
         parts_len = len(self.parts_3points)
         parts_dim = len(self.parts_3points[0])
+
+        if self.sem_pos_fusion == 1 or self.sem_par_fusion == 1:
+            gcn_in_ch = self.c1
+        elif self.sem_position > 0 or self.sem_part > 0:
+            gcn_in_ch = self.c2
+        else:
+            gcn_in_ch = self.c1
 
         # Dynamic Representation -----------------------------------------------
         if self.in_position > 0:
@@ -202,39 +216,48 @@ class SGN(PyTorchModule):
                 else:
                     self.tem = OneHotTensor(num_segment, num_point, mode=1)
 
-            self.tem_embed = self.init_emb(mode=self.sem_frame,
-                                           num_point=num_point,
-                                           in_channels=num_segment,
-                                           out_channels=self.c3)
+            if self.sem_fra_fusion == 1:
+                self.tem_embed = self.init_emb(mode=self.sem_frame,
+                                               num_point=num_point,
+                                               in_channels=num_segment,
+                                               out_channels=self.c3)
+            elif self.sem_fra_fusion == 101:
+                self.tem_embed = self.init_emb(mode=self.sem_frame,
+                                               num_point=num_point,
+                                               in_channels=num_segment,
+                                               out_channels=gcn_in_ch)
 
         # Subject Embedding ----------------------------------------------------
         if self.subject > 0:
             inter_channels = self.get_inter_channels(self.subject, self.c1)
-            self.sub_embed = EmbeddingSubject(self.c1,
-                                              self.c3,
-                                              inter_channels=inter_channels,
-                                              num_subjects=2,
-                                              bias=bias,
-                                              norm_mod=self.norm_mod,
-                                              mode=self.subject)
+            if self.subject_fusion == 1:
+                self.sub_embed = EmbeddingSubject(self.c1,
+                                                  self.c3,
+                                                  inter_channels=inter_channels,
+                                                  num_subjects=2,
+                                                  bias=bias,
+                                                  norm_mod=self.norm_mod,
+                                                  mode=self.subject)
+            elif self.subject_fusion == 101:
+                self.sub_embed = EmbeddingSubject(self.c1,
+                                                  gcn_in_ch,
+                                                  inter_channels=inter_channels,
+                                                  num_subjects=2,
+                                                  bias=bias,
+                                                  norm_mod=self.norm_mod,
+                                                  mode=self.subject)
 
         # Position Embedding ---------------------------------------------------
         # Frame embedding is a form of PE
 
         # GCN ------------------------------------------------------------------
-        if self.sem_pos_fusion == 1 or self.sem_par_fusion == 1:
-            _in_ch = self.c1
-        elif self.sem_position > 0 or self.sem_part > 0:
-            _in_ch = self.c2
-        else:
-            _in_ch = self.c1
         if self.g_shared:
-            self.gcn_g = GCNSpatialG(_in_ch,
+            self.gcn_g = GCNSpatialG(gcn_in_ch,
                                      self.g_proj_dim,
                                      bias=bias,
                                      g_proj_shared=g_proj_shared)
         else:
-            self.gcn_g1 = GCNSpatialG(_in_ch,
+            self.gcn_g1 = GCNSpatialG(gcn_in_ch,
                                       self.g_proj_dim[0],
                                       bias=bias,
                                       g_proj_shared=g_proj_shared)
@@ -247,7 +270,7 @@ class SGN(PyTorchModule):
                                       bias=bias,
                                       g_proj_shared=g_proj_shared)
 
-        self.gcn1 = GCNSpatial(_in_ch,
+        self.gcn1 = GCNSpatial(gcn_in_ch,
                                self.c2,
                                bias=bias,
                                kernel_size=gcn_t_kernel,
@@ -456,6 +479,13 @@ class SGN(PyTorchModule):
         else:
             raise ValueError("Unsupported input combination")
 
+        # Frame-level-input 1 --------------------------------------------------
+        if self.sem_frame > 0 and self.sem_fra_fusion == 101:
+            x = x + tem1
+        if self.subject > 0 and self.subject_fusion == 101:
+            x = x + sub1
+
+        # GCN ------------------------------------------------------------------
         if self.g_shared:
             g = self.gcn_g(x)
             x = self.gcn1(x, g)
@@ -470,11 +500,13 @@ class SGN(PyTorchModule):
             x = self.gcn3(x, g3)
             g = [g1, g2, g3]
 
-        # Frame-level Module ---------------------------------------------------
-        if self.sem_frame > 0:
+        # Frame-level-input 2 --------------------------------------------------
+        if self.sem_frame > 0 and self.sem_fra_fusion == 1:
             x = x + tem1
-        if self.subject > 0:
+        if self.subject > 0 and self.subject_fusion == 1:
             x = x + sub1
+
+        # Frame-level Module ---------------------------------------------------
         x = self.smp(x)
         x = self.aspp(x)
         x = self.cnn(x)
@@ -800,14 +832,24 @@ if __name__ == '__main__':
 
     batch_size = 64
 
-    from model.resource.tests import test_sgn6
-    test_sgn6(SGN)
+    # from model.resource.tests import test_sgn6
+    # test_sgn6(SGN)
 
+    # exit(1)
+
+    inputs = torch.ones(batch_size, 20, 75)
+    subjects = torch.ones(batch_size, 20, 1)
+    model = SGN(num_segment=20,
+                in_part=1,
+                in_motion=1,
+                subject=1,
+                sem_part=1,
+                sem_fra_fusion=1,
+                subject_fusion=101
+                )
+    model(inputs, subjects)
+    # print(model)
     exit(1)
-
-    model = SGN(num_segment=20, in_part=True, in_motion=True,
-                subject=True, aspp=[0, 1, 5, 9])
-    print(model)
 
     model = SGN(num_segment=20, in_part=True, in_motion=True,
                 subject=True, aspp=[0, 1, 5, 9]).cuda()
