@@ -142,7 +142,7 @@ class SGN(PyTorchModule):
         if self.in_part == 0 and self.sem_part > 0:
             raise ValueError("in_part is 0 but sem_part is not")
 
-        assert self.t_kernel > 0
+        assert self.t_kernel >= 0
         assert self.t_max_pool >= 0
         assert self.norm_type in ['bn', 'ln']
 
@@ -310,7 +310,10 @@ class SGN(PyTorchModule):
         self.tmp = nn.AdaptiveMaxPool2d((1, 1))
         self.do = nn.Dropout(dropout)
 
-        self.fc = nn.Linear(self.c4, num_class)
+        if t_kernel == 0:
+            self.fc = nn.Linear(self.c3, num_class)
+        else:
+            self.fc = nn.Linear(self.c4, num_class)
 
         self.init()
 
