@@ -3,36 +3,46 @@ from tqdm import tqdm
 
 
 def test(Model):
-    batch_size = 64
+    bs = 64
+    seg = 20
 
-    inputs = torch.ones(batch_size, 20, 75)
-    subjects = torch.ones(batch_size, 20, 1)
-    for in_position in tqdm([0, 1, 2, 3], position=9, leave=False):
-        for in_velocity in tqdm([0, 1, 2, 3], position=8, leave=False):
-            for in_part in tqdm([0, 1, 2, 3], position=7, leave=False):
-                for in_part_type in tqdm([0, 1, 2], position=6, leave=False):  # noqa
-                    for in_motion in tqdm([0, 1, 2, 3], position=5, leave=False):  # noqa
-                        for in_par_mot_fusion in tqdm([0, 1], position=4, leave=False):  # noqa
-                            for in_pos_vel_fusion in tqdm([0, 1], position=3, leave=False):  # noqa
-                                for sem_part in tqdm([0, 1, 2, 3], position=2, leave=False):  # noqa
-                                    for sem_position in tqdm([0, 1, 2, 3], position=1, leave=False):  # noqa
-                                        for sem_frame in tqdm([0, 1, 2, 3], position=0, leave=False):  # noqa
+    inputs = torch.ones(bs, seg, 75)
+    subjects = torch.ones(bs, seg, 1)
+
+    c = 0
+    for in_position in bs[0, 1, 2, 3]:
+        for in_velocity in bs[0, 1, 2, 3]:
+            for in_part in bs[0, 1, 2, 3]:
+                for in_part_type in bs[0, 1, 2]:
+                    for in_motion in bs[0, 1, 2, 3]:
+                        for in_par_mot_fusion in bs[0, 1]:
+                            for in_pos_vel_fusion in bs[0, 1]:
+                                for sem_part in bs[0, 1, 2, 3]:
+                                    for sem_position in bs[0, 1, 2, 3]:
+                                        for sem_frame in bs[0, 1, 2, 3]:
+                                            # all inputs are zero
                                             if in_position == 0 and in_velocity == 0 and in_part == 0 and in_motion == 0:  # noqa
                                                 continue
+                                            # need xyz for semantic
                                             if in_position == 0 and sem_position > 0:  # noqa
                                                 continue
+                                            # need parts for semantic
                                             if in_part == 0 and sem_part > 0:  # noqa
                                                 continue
+                                            # currently the fusion methods must be the same  # noqa
                                             if in_pos_vel_fusion != 0 and in_par_mot_fusion == 0:  # noqa
                                                 continue
+                                            # currently the fusion methods must be the same  # noqa
                                             if in_par_mot_fusion != 0 and in_pos_vel_fusion == 0:  # noqa
                                                 continue
-                                            if in_pos_vel_fusion == 0 and (in_part == 0 or in_motion == 0):  # noqa
+                                            # if concat, the part needs to be concat also   # noqa
+                                            if in_pos_vel_fusion == 0 and ((in_part == 0 and in_motion != 0) or (in_part != 0 and in_motion == 0)):  # noqa
                                                 continue
-                                            if in_par_mot_fusion == 0 and (in_position == 0 or in_velocity == 0):  # noqa
+                                            # if concat, the xyz needs to be concat also   # noqa
+                                            if in_par_mot_fusion == 0 and ((in_position == 0 and in_velocity != 0) or (in_position != 0 and in_velocity == 0)):  # noqa
                                                 continue
                                             model = Model(
-                                                num_segment=20,
+                                                num_segment=seg,
                                                 in_position=in_position,
                                                 in_velocity=in_velocity,
                                                 in_part=in_part,
@@ -45,6 +55,9 @@ def test(Model):
                                                 sem_frame=sem_frame,
                                             )
                                             model(inputs, subjects)
+                                            print(f"Finished {c}")
+                                            c += 1
+
     # for g_shared in tqdm([True, False], position=3, leave=False):
     #     for g_proj_shared in tqdm([True, False], position=2, leave=False):
     #         for g_proj_dim in tqdm([32, 512], position=1, leave=False):  # noqa
@@ -55,6 +68,7 @@ def test(Model):
     #                             g_proj_dim=g_proj_dim,
     #                             gcn_t_kernel=gcn_t_kernel)
     #                 model(inputs, subjects)
+
     # for subject in tqdm([0, 1, 2, 3], position=4, leave=False):
     #     for t_kernel in tqdm([1, 5], position=3, leave=False):
     #         for t_max_pool in tqdm([0, 2], position=2, leave=False):

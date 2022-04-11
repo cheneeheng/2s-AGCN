@@ -1325,7 +1325,8 @@ sgn_v5:
         - 220407140001_part1_pt1_motion3_parttype2:
                   - 94.08%
         - 220407140001_position0_part1_pt1_motion3_parttype2:
-                  -
+                  - no xyz inputs, only difference between the L/R arms and legs
+                  - 79.13%
         - 220407140001_jointtype1:
                   - uses add instead of concat for jt & dr
                   - 93.69%
@@ -1341,7 +1342,7 @@ sgn_v5:
 
         # joints 15
         - 220410210001:
-                  -
+                  - 93.28%
 
 sgn-code:
         - original sgn repo code
