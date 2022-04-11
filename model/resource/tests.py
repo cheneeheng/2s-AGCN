@@ -2,7 +2,7 @@ import torch
 from tqdm import tqdm
 
 
-def test(Model):
+def test_sgn6(Model):
     bs = 64
     seg = 20
 
@@ -10,16 +10,16 @@ def test(Model):
     subjects = torch.ones(bs, seg, 1)
 
     c = 0
-    for in_position in bs[0, 1, 2, 3]:
-        for in_velocity in bs[0, 1, 2, 3]:
-            for in_part in bs[0, 1, 2, 3]:
-                for in_part_type in bs[0, 1, 2]:
-                    for in_motion in bs[0, 1, 2, 3]:
-                        for in_par_mot_fusion in bs[0, 1]:
-                            for in_pos_vel_fusion in bs[0, 1]:
-                                for sem_part in bs[0, 1, 2, 3]:
-                                    for sem_position in bs[0, 1, 2, 3]:
-                                        for sem_frame in bs[0, 1, 2, 3]:
+    for in_position in [0, 1, 2, 3]:
+        for in_velocity in [0, 1, 2, 3]:
+            for in_part in [0, 1, 2, 3]:
+                for in_part_type in [0, 1, 2]:
+                    for in_motion in [0, 1, 2, 3]:
+                        for in_par_mot_fusion in [0, 1]:
+                            for in_pos_vel_fusion in [0, 1]:
+                                for sem_part in [0, 1, 2, 3]:
+                                    for sem_position in [0, 1, 2, 3]:
+                                        for sem_frame in [0, 1, 2, 3]:
                                             # all inputs are zero
                                             if in_position == 0 and in_velocity == 0 and in_part == 0 and in_motion == 0:  # noqa
                                                 continue

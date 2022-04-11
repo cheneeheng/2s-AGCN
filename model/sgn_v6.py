@@ -796,8 +796,8 @@ if __name__ == '__main__':
 
     batch_size = 64
 
-    from model.resource.tests import test
-    test(SGN)
+    from model.resource.tests import test_sgn6
+    test_sgn6(SGN)
 
     exit(1)
 
