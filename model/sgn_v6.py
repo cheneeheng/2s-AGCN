@@ -51,8 +51,8 @@ class SGN(PyTorchModule):
                  in_part_type: int = 0,
                  in_motion: int = 0,
 
-                 in_par_mot_fusion: int = 0,
-                 in_pos_vel_fusion: int = 0,
+                 sem_par_fusion: int = 0,
+                 sem_pos_fusion: int = 0,
 
                  sem_part: int = 0,
                  sem_position: int = 1,
@@ -90,8 +90,8 @@ class SGN(PyTorchModule):
         self.in_part_type = in_part_type
         self.in_motion = in_motion
 
-        self.in_pos_vel_fusion = in_pos_vel_fusion
-        self.in_par_mot_fusion = in_par_mot_fusion
+        self.sem_pos_fusion = sem_pos_fusion
+        self.sem_par_fusion = sem_par_fusion
 
         self.sem_part = sem_part
         self.sem_position = sem_position
@@ -122,8 +122,8 @@ class SGN(PyTorchModule):
         assert self.in_motion in dr_modes
 
         # 0 = concat, 1 = add
-        assert self.in_pos_vel_fusion in [0, 1]
-        assert self.in_par_mot_fusion in [0, 1]
+        assert self.sem_pos_fusion in [0, 1]
+        assert self.sem_par_fusion in [0, 1]
 
         sem_modes = [0, 1, 2, 3]
         assert self.sem_part in sem_modes
@@ -222,7 +222,7 @@ class SGN(PyTorchModule):
         # Frame embedding is a form of PE
 
         # GCN ------------------------------------------------------------------
-        if self.in_pos_vel_fusion == 1 or self.in_par_mot_fusion == 1:
+        if self.sem_pos_fusion == 1 or self.sem_par_fusion == 1:
             _in_ch = self.c1
         elif self.sem_position > 0 or self.sem_part > 0:
             _in_ch = self.c2
@@ -431,7 +431,7 @@ class SGN(PyTorchModule):
         # Joint-level Module ---------------------------------------------------
         if dy1 is not None:
             if self.sem_position > 0:
-                if self.in_pos_vel_fusion == 1:
+                if self.sem_pos_fusion == 1:
                     x0 = dy1 + spa1  # n,c,v,t
                 else:
                     x0 = torch.cat([dy1, spa1], 1)  # n,c,v,t
@@ -440,7 +440,7 @@ class SGN(PyTorchModule):
 
         if dy2 is not None:
             if self.sem_part > 0:
-                if self.in_par_mot_fusion == 1:
+                if self.sem_par_fusion == 1:
                     x1 = dy2 + gro1  # n,c,v',t
                 else:
                     x1 = torch.cat([dy2, gro1], 1)  # n,c,v',t

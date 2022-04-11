@@ -3,7 +3,7 @@ from tqdm import tqdm
 
 
 def test_sgn6(Model):
-    bs = 64
+    bs = 4
     seg = 20
 
     inputs = torch.ones(bs, seg, 75)
@@ -15,11 +15,19 @@ def test_sgn6(Model):
             for in_part in [0, 1, 2, 3]:
                 for in_part_type in [0, 1, 2]:
                     for in_motion in [0, 1, 2, 3]:
-                        for in_par_mot_fusion in [0, 1]:
-                            for in_pos_vel_fusion in [0, 1]:
+                        for sem_par_fusion in [0, 1]:
+                            for sem_pos_fusion in [0, 1]:
                                 for sem_part in [0, 1, 2, 3]:
                                     for sem_position in [0, 1, 2, 3]:
                                         for sem_frame in [0, 1, 2, 3]:
+
+                                            print(f"Processing {c}")
+                                            c += 1
+
+                                            # if c < 64772:
+                                            #     continue
+                                            # print(in_position, in_velocity, in_part, in_part_type, in_motion, sem_par_fusion, sem_pos_fusion, sem_part, sem_position, sem_frame)  # noqa
+
                                             # all inputs are zero
                                             if in_position == 0 and in_velocity == 0 and in_part == 0 and in_motion == 0:  # noqa
                                                 continue
@@ -30,17 +38,18 @@ def test_sgn6(Model):
                                             if in_part == 0 and sem_part > 0:  # noqa
                                                 continue
                                             # currently the fusion methods must be the same  # noqa
-                                            if in_pos_vel_fusion != 0 and in_par_mot_fusion == 0:  # noqa
+                                            if sem_pos_fusion != 0 and sem_par_fusion == 0:  # noqa
                                                 continue
                                             # currently the fusion methods must be the same  # noqa
-                                            if in_par_mot_fusion != 0 and in_pos_vel_fusion == 0:  # noqa
+                                            if sem_par_fusion != 0 and sem_pos_fusion == 0:  # noqa
                                                 continue
-                                            # if concat, the part needs to be concat also   # noqa
-                                            if in_pos_vel_fusion == 0 and ((in_part == 0 and in_motion != 0) or (in_part != 0 and in_motion == 0)):  # noqa
-                                                continue
-                                            # if concat, the xyz needs to be concat also   # noqa
-                                            if in_par_mot_fusion == 0 and ((in_position == 0 and in_velocity != 0) or (in_position != 0 and in_velocity == 0)):  # noqa
-                                                continue
+
+                                            # if concat
+                                            if sem_pos_fusion == 0:
+                                                # the part needs to be concat also   # noqa
+                                                if (in_position > 0 or in_velocity > 0) and (in_part > 0 or in_motion > 0) and ((sem_position == 0 or sem_part != 0) or (sem_position != 0 or sem_part == 0)):  # noqa
+                                                    continue
+
                                             model = Model(
                                                 num_segment=seg,
                                                 in_position=in_position,
@@ -48,15 +57,13 @@ def test_sgn6(Model):
                                                 in_part=in_part,
                                                 in_part_type=in_part_type,
                                                 in_motion=in_motion,
-                                                in_par_mot_fusion=in_par_mot_fusion,  # noqa
-                                                in_pos_vel_fusion=in_pos_vel_fusion,  # noqa
+                                                sem_par_fusion=sem_par_fusion,  # noqa
+                                                sem_pos_fusion=sem_pos_fusion,  # noqa
                                                 sem_part=sem_part,
                                                 sem_position=sem_position,
                                                 sem_frame=sem_frame,
                                             )
                                             model(inputs, subjects)
-                                            print(f"Finished {c}")
-                                            c += 1
 
     # for g_shared in tqdm([True, False], position=3, leave=False):
     #     for g_proj_shared in tqdm([True, False], position=2, leave=False):
