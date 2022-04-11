@@ -5,7 +5,6 @@ import os
 import time
 import yaml
 
-from collections import OrderedDict
 from functools import partial
 from typing import Tuple
 
@@ -17,34 +16,6 @@ from feeders.loader import NTUDataLoaders
 from infer.data_preprocess import DataPreprocessor
 from utils.parser import get_parser as get_default_parser
 from utils.utils import import_class
-
-
-def parse_arg(parser: argparse.ArgumentParser) -> argparse.Namespace:
-    [p, _] = parser.parse_known_args()
-    with open(os.path.join(p.weight_path, 'config.yaml'), 'r') as f:
-        default_arg = yaml.safe_load(f)
-    key = vars(p).keys()
-    for k in default_arg.keys():
-        if k not in key:
-            print(f'WRONG ARG: {k}')
-            assert (k in key)
-    parser.set_defaults(**default_arg)
-    return parser.parse_known_args()
-
-
-def read_xyz(file: str, max_body: int = 4, num_joint: int = 25) -> np.ndarray:
-    skel_data = np.loadtxt(file, delimiter=',')
-    data = np.zeros((max_body, 1, num_joint, 3))
-    for m, body_joint in enumerate(skel_data):
-        for j in range(0, len(body_joint), 3):
-            if m < max_body and j//3 < num_joint:
-                # x subject right, y to camera, z up
-                data[m, 0, j//3, :] = [body_joint[j],
-                                       body_joint[j+1],
-                                       body_joint[j+2]]
-            else:
-                pass
-    return data  # M, T, V, C
 
 
 def filter_logits(logits: list) -> Tuple[list, list]:
@@ -70,6 +41,34 @@ def filter_logits(logits: list) -> Tuple[list, list]:
     return sort_idx, new_logits
 
 
+def read_xyz(file: str, max_body: int = 4, num_joint: int = 25) -> np.ndarray:
+    skel_data = np.loadtxt(file, delimiter=',')
+    data = np.zeros((max_body, 1, num_joint, 3))
+    for m, body_joint in enumerate(skel_data):
+        for j in range(0, len(body_joint), 3):
+            if m < max_body and j//3 < num_joint:
+                # x subject right, y to camera, z up
+                data[m, 0, j//3, :] = [body_joint[j],
+                                       body_joint[j+1],
+                                       body_joint[j+2]]
+            else:
+                pass
+    return data  # M, T, V, C
+
+
+def parse_arg(parser: argparse.ArgumentParser) -> argparse.Namespace:
+    [p, _] = parser.parse_known_args()
+    with open(os.path.join(p.weight_path, 'config.yaml'), 'r') as f:
+        default_arg = yaml.safe_load(f)
+    key = vars(p).keys()
+    for k in default_arg.keys():
+        if k not in key:
+            print(f'WRONG ARG: {k}')
+            assert (k in key)
+    parser.set_defaults(**default_arg)
+    return parser.parse_known_args()
+
+
 def get_parser() -> argparse.ArgumentParser:
     parser = get_default_parser()
     # parser.add_argument('--max-person', type=int, default=2)
@@ -87,21 +86,25 @@ def get_parser() -> argparse.ArgumentParser:
         type=str,
         default='/data/openpose/skeleton/'
     )
+
+    J15_MODEL_PATH = '/data/2s-agcn/model/ntu_15j'
+    J25_MODEL_PATH = '/data/2s-agcn/model/ntu_25j'
     parser.add_argument(
         '--model-path',
         type=str,
-        default='/data/2s-agcn/model/ntu_15j/'
+        default=J15_MODEL_PATH
     )
     parser.add_argument(
         '--weight-path',
         type=str,
-        # default='./data/model/ntu_25j/'
-        # default='/data/2s-agcn/model/ntu_15j/xview/220405153001/'  # ntu15j sgn
-        # default='/data/2s-agcn/model/ntu_15j/xview/220327213001_1337/'
-        default='/data/2s-agcn/model/ntu_15j/xview/211130150001/'
-        # default='/data/2s-agcn/model/ntu_15j/xview/220314100001/'
-        # default='/data/2s-agcn/model/ntu_15j/xsub/220314090001/'
-        # default='/data/2s-agcn/model/ntu_15j/xview/220405153001/'
+        # AAGCN
+        # default=J15_MODEL_PATH + '/xview/211130150001'
+        # default=J15_MODEL_PATH + '/xview/220314100001'
+        # default=J15_MODEL_PATH + '/xsub/220314090001'
+        # SGN
+        default=J15_MODEL_PATH + '/xview/220410210001'  # v5
+        # default=J15_MODEL_PATH + '/xview/220405153001'  # v4
+        # default=J15_MODEL_PATH + '/xview/220327213001_1337'  # v2
     )
     parser.add_argument(
         '--out-folder',
@@ -169,7 +172,6 @@ def model_inference(arg: argparse.Namespace,
                     input_data: np.ndarray
                     ) -> Tuple[torch.Tensor, torch.Tensor]:
     with torch.no_grad():
-
         if arg.gpu:
             output, _ = model(torch.from_numpy(input_data).cuda(0))
             if 'sgn' in arg.model:
@@ -179,7 +181,6 @@ def model_inference(arg: argparse.Namespace,
             _, predict_label = torch.max(output, 1)
             output = output.data.cpu()
             predict_label = predict_label.data.cpu()
-
         else:
             output, _ = Model(torch.from_numpy(input_data))
             if 'sgn' in arg.model:
@@ -187,7 +188,6 @@ def model_inference(arg: argparse.Namespace,
                 output = output.mean(1)
             output = F.softmax(output, 1)
             _, predict_label = torch.max(output, 1)
-
     return output, predict_label
 
 
