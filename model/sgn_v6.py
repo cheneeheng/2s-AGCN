@@ -663,35 +663,39 @@ class MLPTemporal(Module):
                  norm_mod: Type[PyTorchModule] = nn.BatchNorm2d,
                  **kwargs):
         super(MLPTemporal, self).__init__(*args, **kwargs)
+        self.t_kernel = t_kernel
         self.t_max_pool = t_max_pool
-        if t_max_pool:
-            # self.maxp = nn.MaxPool2d(kernel_size=(1, t_kernel),
-            #                          padding=(0, t_kernel//2))
-            self.maxp = nn.MaxPool2d(kernel_size=(1, t_kernel),
-                                     stride=(1, t_max_pool))
-        else:
-
-            self.cnn1 = Conv(self.in_channels,
-                             self.in_channels,
-                             kernel_size=t_kernel,
-                             padding=t_kernel//2,
-                             bias=self.bias,
-                             activation=nn.ReLU,
-                             normalization=lambda: norm_mod(self.in_channels),
-                             dropout=lambda: nn.Dropout2d(0.2))
-        self.cnn2 = Conv(self.in_channels,
-                         self.out_channels,
-                         bias=self.bias,
-                         activation=nn.ReLU,
-                         normalization=lambda: norm_mod(self.out_channels))
+        if self.t_kernel > 0:
+            if t_max_pool:
+                self.maxp = nn.MaxPool2d(kernel_size=(1, t_kernel),
+                                         stride=(1, t_max_pool))
+            else:
+                self.cnn1 = Conv(
+                    self.in_channels,
+                    self.in_channels,
+                    kernel_size=t_kernel,
+                    padding=t_kernel//2,
+                    bias=self.bias,
+                    activation=nn.ReLU,
+                    normalization=lambda: norm_mod(self.in_channels),
+                    dropout=lambda: nn.Dropout2d(0.2)
+                )
+            self.cnn2 = Conv(
+                self.in_channels,
+                self.out_channels,
+                bias=self.bias,
+                activation=nn.ReLU,
+                normalization=lambda: norm_mod(self.out_channels)
+            )
 
     def forward(self, x: Tensor) -> Tensor:
         # x: n,c,v,t ; v=1 due to SMP
-        if self.t_max_pool:
-            x = self.maxp(x)
-        else:
-            x = self.cnn1(x)
-        x = self.cnn2(x)
+        if self.t_kernel > 0:
+            if self.t_max_pool:
+                x = self.maxp(x)
+            else:
+                x = self.cnn1(x)
+            x = self.cnn2(x)
         return x
 
 
