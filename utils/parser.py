@@ -1,14 +1,16 @@
-
-import argparse as ap
+import argparse
+import json
+import yaml
 from utils.utils import str2bool
 
 __all__ = ['get_parser']
 
 
-def get_parser() -> ap.ArgumentParser:
+def get_parser() -> argparse.ArgumentParser:
 
     # parameter priority: command line > config > default
-    p = ap.ArgumentParser(description='Skeleton-based action recognition')
+    p = argparse.ArgumentParser(
+        description='Skeleton-based action recognition')
 
     p.add_argument('--config',
                    default='./config/nturgbd-cross-view/test_bone.yaml',
@@ -195,3 +197,40 @@ def get_parser() -> ap.ArgumentParser:
                    help='which Top K accuracy will be shown')
 
     return p
+
+
+def load_parser_args_from_config(parser: argparse.ArgumentParser
+                                 ) -> argparse.Namespace:
+    """Load arguments from a config file
+
+    Args:
+        parser (argparse.ArgumentParser): argparse.parser object
+
+    Raises:
+        ValueError: If config has keys that are not in parser.
+
+    Returns:
+        argparse.Namespace: arguments from the parser.
+    """
+    p = parser.parse_args()
+
+    if p.config is not None:
+        if ".yaml" in p.config:
+            with open(p.config, 'r') as f:
+                default_arg = yaml.safe_load(f)
+        elif ".json" in p.config:
+            with open(p.config, 'r') as f:
+                default_arg = json.load(f)
+            default_arg = {k: v
+                           for _, kv in default_arg.items()
+                           for k, v in kv.items()}
+        else:
+            raise ValueError("Unknown config format...")
+
+        key = vars(p).keys()
+        for k in default_arg.keys():
+            assert k in key, f'WRONG ARG: {k}'
+        parser.set_defaults(**default_arg)
+
+    args = parser.parse_args()
+    return args

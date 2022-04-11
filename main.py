@@ -14,8 +14,9 @@ from torch.utils import tensorboard
 import torch.distributed as dist
 import torch.multiprocessing as mp
 
-from utils.parser import *
-from utils.processor import *
+from utils.parser import get_parser
+from utils.parser import load_parser_args_from_config
+from utils.processor import Processor
 from utils.utils import *
 
 # os.environ["TORCH_DISTRIBUTED_DEBUG"] = "INFO"
@@ -46,30 +47,7 @@ def train_model(rank, args):
 
 if __name__ == '__main__':
     parser = get_parser()
-
-    # load arg form config file
-    p = parser.parse_args()
-    if p.config is not None:
-        if ".yaml" in p.config:
-            with open(p.config, 'r') as f:
-                default_arg = yaml.safe_load(f)
-        elif ".json" in p.config:
-            with open(p.config, 'r') as f:
-                default_arg = json.load(f)
-            default_arg = {k: v
-                           for _, kv in default_arg.items()
-                           for k, v in kv.items()}
-        else:
-            raise ValueError("Unknown config format...")
-
-        key = vars(p).keys()
-        for k in default_arg.keys():
-            if k not in key:
-                print(f'WRONG ARG: {k}')
-                assert (k in key)
-        parser.set_defaults(**default_arg)
-
-    args = parser.parse_args()
+    args = load_parser_args_from_config(parser)
 
     if args.ddp:
         # this is responsible for spawning 'nprocs' number of processes of the
