@@ -1344,6 +1344,12 @@ sgn_v5:
         - 220410210001:
                   - 93.28%
 
+sgn_v6:
+        - 220411120001_gcntkernel3:
+        - 220411120001_gcntkernel3_tkernel0:
+        - 220411120001_gcntkernel3_fipregcn:
+        - 220411120001_gcntkernel3_tkernel0_fipregcn:
+
 sgn-code:
         - original sgn repo code
         - 220324170001:

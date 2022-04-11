@@ -43,7 +43,7 @@ class SGN(PyTorchModule):
                  in_channels: int = 3,
                  bias: int = 1,
                  dropout: float = 0.0,
-                 c_multiplier: Union[int, float] = 1,
+                 c_multiplier: Union[int, float, list] = 1,
                  norm_type: str = 'bn',
 
                  in_position: int = 1,
@@ -75,10 +75,16 @@ class SGN(PyTorchModule):
                  ):
         super(SGN, self).__init__()
 
-        self.c1 = to_int(self.c1 * c_multiplier)  # pos,vel,joint embed
-        self.c2 = to_int(self.c2 * c_multiplier)  # G,gcn
-        self.c3 = to_int(self.c3 * c_multiplier)  # gcn
-        self.c4 = to_int(self.c4 * c_multiplier)  # gcn
+        if isinstance(c_multiplier, (int, float)):
+            c_multiplier = [c_multiplier for _ in range(4)]
+        elif isinstance(c_multiplier, list):
+            c_multiplier = c_multiplier
+        else:
+            raise ValueError("Unknown c_multiplier type")
+        self.c1 = to_int(self.c1 * c_multiplier[0])  # pos,vel,joint embed
+        self.c2 = to_int(self.c2 * c_multiplier[1])  # G,gcn
+        self.c3 = to_int(self.c3 * c_multiplier[2])  # gcn
+        self.c4 = to_int(self.c4 * c_multiplier[3])  # gcn
 
         self.num_class = num_class
         self.num_point = num_point
