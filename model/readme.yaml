@@ -1359,6 +1359,8 @@ sgn_v6:
                   - 92.26%
         - 220411120001_cmulti11105:
                   - 93.89%
+        - 220411220001_motionsampler1_motionnorm1:
+                  - 94.17%
 
 sgn-code:
         - original sgn repo code

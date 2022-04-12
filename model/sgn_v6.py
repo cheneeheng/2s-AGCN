@@ -56,6 +56,7 @@ class SGN(PyTorchModule):
                  sem_position: int = 1,
                  sem_frame: int = 1,
 
+                 par_pos_fusion: int = 0,
                  sem_par_fusion: int = 0,
                  sem_pos_fusion: int = 0,
                  sem_fra_fusion: int = 1,
@@ -98,6 +99,7 @@ class SGN(PyTorchModule):
         self.in_part_type = in_part_type
         self.in_motion = in_motion
 
+        self.par_pos_fusion = par_pos_fusion
         self.sem_pos_fusion = sem_pos_fusion
         self.sem_par_fusion = sem_par_fusion
         self.sem_fra_fusion = sem_fra_fusion
@@ -131,6 +133,10 @@ class SGN(PyTorchModule):
         assert self.in_part_type in [0, 1, 2]
         assert self.in_motion in dr_modes
 
+        # 0 = concat before sgn, 1 = concat after sgn
+        assert self.par_pos_fusion in [0, 1]
+        if par_pos_fusion == 1:
+            assert self.in_part > 0 or self.in_motion > 0
         # 0 = concat, 1 = add
         assert self.sem_pos_fusion in [0, 1]
         assert self.sem_par_fusion in [0, 1]
@@ -241,7 +247,7 @@ class SGN(PyTorchModule):
                                                   self.c3,
                                                   inter_channels=inter_channels,
                                                   num_subjects=2,
-                                                  bias=bias,
+                                                  bias=self.bias,
                                                   norm_mod=self.norm_mod,
                                                   mode=self.subject)
             elif self.subject_fusion == 101:
@@ -249,7 +255,7 @@ class SGN(PyTorchModule):
                                                   gcn_in_ch,
                                                   inter_channels=inter_channels,
                                                   num_subjects=2,
-                                                  bias=bias,
+                                                  bias=self.bias,
                                                   norm_mod=self.norm_mod,
                                                   mode=self.subject)
 
@@ -260,40 +266,77 @@ class SGN(PyTorchModule):
         if self.g_shared:
             self.gcn_g = GCNSpatialG(gcn_in_ch,
                                      self.g_proj_dim,
-                                     bias=bias,
-                                     g_proj_shared=g_proj_shared)
+                                     bias=self.bias,
+                                     g_proj_shared=self.g_proj_shared)
+            if self.par_pos_fusion == 1:
+                self.gcn_g_par = GCNSpatialG(gcn_in_ch,
+                                             self.g_proj_dim,
+                                             bias=self.bias,
+                                             g_proj_shared=self.g_proj_shared)
         else:
             self.gcn_g1 = GCNSpatialG(gcn_in_ch,
                                       self.g_proj_dim[0],
-                                      bias=bias,
-                                      g_proj_shared=g_proj_shared)
+                                      bias=self.bias,
+                                      g_proj_shared=self.g_proj_shared)
             self.gcn_g2 = GCNSpatialG(self.c2,
                                       self.g_proj_dim[1],
-                                      bias=bias,
-                                      g_proj_shared=g_proj_shared)
+                                      bias=self.bias,
+                                      g_proj_shared=self.g_proj_shared)
             self.gcn_g3 = GCNSpatialG(self.c3,
                                       self.g_proj_dim[2],
-                                      bias=bias,
-                                      g_proj_shared=g_proj_shared)
+                                      bias=self.bias,
+                                      g_proj_shared=self.g_proj_shared)
+            if self.par_pos_fusion == 1:
+                self.gcn_g_par1 = GCNSpatialG(gcn_in_ch,
+                                              self.g_proj_dim[0],
+                                              bias=self.bias,
+                                              g_proj_shared=self.g_proj_shared)
+                self.gcn_g_par2 = GCNSpatialG(self.c2,
+                                              self.g_proj_dim[1],
+                                              bias=self.bias,
+                                              g_proj_shared=self.g_proj_shared)
+                self.gcn_g_par3 = GCNSpatialG(self.c3,
+                                              self.g_proj_dim[2],
+                                              bias=self.bias,
+                                              g_proj_shared=self.g_proj_shared)
 
         self.gcn1 = GCNSpatial(gcn_in_ch,
                                self.c2,
-                               bias=bias,
-                               kernel_size=gcn_t_kernel,
-                               padding=gcn_t_kernel//2,
+                               bias=self.bias,
+                               kernel_size=self.gcn_t_kernel,
+                               padding=self.gcn_t_kernel//2,
                                norm_mod=self.norm_mod)
         self.gcn2 = GCNSpatial(self.c2,
                                self.c3,
-                               bias=bias,
-                               kernel_size=gcn_t_kernel,
-                               padding=gcn_t_kernel//2,
+                               bias=self.bias,
+                               kernel_size=self.gcn_t_kernel,
+                               padding=self.gcn_t_kernel//2,
                                norm_mod=self.norm_mod)
         self.gcn3 = GCNSpatial(self.c3,
                                self.c3,
-                               bias=bias,
-                               kernel_size=gcn_t_kernel,
-                               padding=gcn_t_kernel//2,
+                               bias=self.bias,
+                               kernel_size=self.gcn_t_kernel,
+                               padding=self.gcn_t_kernel//2,
                                norm_mod=self.norm_mod)
+        if self.par_pos_fusion == 1:
+            self.gcn_par1 = GCNSpatial(gcn_in_ch,
+                                       self.c2,
+                                       bias=self.bias,
+                                       kernel_size=self.gcn_t_kernel,
+                                       padding=self.gcn_t_kernel//2,
+                                       norm_mod=self.norm_mod)
+            self.gcn_par2 = GCNSpatial(self.c2,
+                                       self.c3,
+                                       bias=self.bias,
+                                       kernel_size=self.gcn_t_kernel,
+                                       padding=self.gcn_t_kernel//2,
+                                       norm_mod=self.norm_mod)
+            self.gcn_par3 = GCNSpatial(self.c3,
+                                       self.c3,
+                                       bias=self.bias,
+                                       kernel_size=self.gcn_t_kernel,
+                                       padding=self.gcn_t_kernel//2,
+                                       norm_mod=self.norm_mod)
 
         # ASPP -----------------------------------------------------------------
         if aspp is None or len(aspp) == 0:
@@ -301,7 +344,7 @@ class SGN(PyTorchModule):
         else:
             self.aspp = ASPP(self.c3,
                              self.c3,
-                             bias=bias,
+                             bias=self.bias,
                              dilations=aspp,
                              norm_mod=self.norm_mod)
 
@@ -309,7 +352,7 @@ class SGN(PyTorchModule):
         self.smp = nn.AdaptiveMaxPool2d((1, num_segment))
         self.cnn = MLPTemporal(self.c3,
                                self.c4,
-                               bias=bias,
+                               bias=self.bias,
                                t_kernel=t_kernel,
                                t_max_pool=t_max_pool,
                                norm_mod=self.norm_mod)
@@ -321,7 +364,7 @@ class SGN(PyTorchModule):
         else:
             self.fc = nn.Linear(self.c4, num_class)
 
-        self.init()
+        self.init_weight()
 
         if self.in_part > 0 or self.in_motion > 0:
             self.register_buffer(
@@ -355,7 +398,8 @@ class SGN(PyTorchModule):
                          num_point=num_point,
                          mode=mode)
 
-    def init(self):
+    def init_weight(self):
+        """Follows the weight initialization from the original SGN codebase."""
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
@@ -479,20 +523,27 @@ class SGN(PyTorchModule):
             else:
                 x1 = dy2  # n,c,v',t
 
-        if dy1 is not None and dy2 is not None:
-            x = torch.cat([x0, x1], 2)  # n,c,v'+v,t
-        elif dy1 is not None:
+        if self.par_pos_fusion == 1:
             x = x0
-        elif dy2 is not None:
-            x = x1
         else:
-            raise ValueError("Unsupported input combination")
+            if dy1 is not None and dy2 is not None:
+                x = torch.cat([x0, x1], 2)  # n,c,v'+v,t
+            elif dy1 is not None:
+                x = x0
+            elif dy2 is not None:
+                x = x1
+            else:
+                raise ValueError("Unsupported input combination")
 
         # Frame-level-input 1 --------------------------------------------------
         if self.sem_frame > 0 and self.sem_fra_fusion == 101:
             x = x + tem1
+            if self.par_pos_fusion == 1:
+                x1 = x1 + tem1
         if self.subject > 0 and self.subject_fusion == 101:
             x = x + sub1
+            if self.par_pos_fusion == 1:
+                x1 = x1 + sub1
 
         # GCN ------------------------------------------------------------------
         if self.g_shared:
@@ -500,6 +551,7 @@ class SGN(PyTorchModule):
             x = self.gcn1(x, g)
             x = self.gcn2(x, g)
             x = self.gcn3(x, g)
+            g_out = g
         else:
             g1 = self.gcn_g1(x)
             x = self.gcn1(x, g1)
@@ -507,9 +559,34 @@ class SGN(PyTorchModule):
             x = self.gcn2(x, g2)
             g3 = self.gcn_g3(x)
             x = self.gcn3(x, g3)
-            g = [g1, g2, g3]
+            g_out = [g1, g2, g3]
+        if self.par_pos_fusion == 1:
+            if self.g_shared:
+                g = self.gcn_g_par(x1)
+                x1 = self.gcn_par1(x1, g)
+                x1 = self.gcn_par2(x1, g)
+                x1 = self.gcn_par3(x1, g)
+                g_out = g
+            else:
+                g1 = self.gcn_g_par1(x1)
+                x1 = self.gcn_par1(x1, g1)
+                g2 = self.gcn_g_par2(x1)
+                x1 = self.gcn_par2(x1, g2)
+                g3 = self.gcn_g_par3(x1)
+                x1 = self.gcn_par3(x1, g3)
+                g_out += [g1, g2, g3]
 
         # Frame-level-input 2 --------------------------------------------------
+        if self.par_pos_fusion == 1:
+            if dy1 is not None and dy2 is not None:
+                x = torch.cat([x, x1], 2)  # n,c,v'+v,t
+            elif dy1 is not None:
+                x = x
+            elif dy2 is not None:
+                x = x1
+            else:
+                raise ValueError("Unsupported input combination")
+
         if self.sem_frame > 0 and self.sem_fra_fusion == 1:
             x = x + tem1
         if self.subject > 0 and self.subject_fusion == 1:
@@ -526,7 +603,7 @@ class SGN(PyTorchModule):
         y = self.do(y)
         y = self.fc(y)
 
-        return y, g
+        return y, g_out
 
 
 class OneHotTensor(PyTorchModule):
@@ -849,16 +926,17 @@ if __name__ == '__main__':
     inputs = torch.ones(batch_size, 20, 75)
     subjects = torch.ones(batch_size, 20, 1)
     model = SGN(num_segment=20,
-                # in_part=1,
-                # in_motion=1,
+                in_part=1,
+                in_motion=1,
                 # subject=1,
-                # sem_part=1,
+                sem_part=1,
+                par_pos_fusion=1,
                 # sem_fra_fusion=1,
                 # subject_fusion=101
-                c_multiplier=[1, 0.5, 0.25, 0.125]
+                # c_multiplier=[1, 0.5, 0.25, 0.125]
                 )
     model(inputs, subjects)
-    # print(model)
+    print(model)
     exit(1)
 
     model = SGN(num_segment=20, in_part=True, in_motion=True,
