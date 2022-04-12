@@ -31,15 +31,14 @@ class NTUDataset(Dataset):
 
 class NTUDataLoaders(object):
     def __init__(self,
-                 dataset: str = 'NTU',
-                 case: int = 0,
+                 dataset: str = 'NTU60-CV',
                  aug: int = 1,
                  seg: int = 30,
                  multi_test: int = 5,
                  motion_sampler: int = 0,
-                 motion_norm: int = 0):
+                 motion_norm: int = 0,
+                 **kwargs):
         self.dataset = dataset
-        self.case = case
         self.aug = aug
         self.seg = seg
         self.train_set, self.val_set, self.test_set = None, None, None
@@ -155,9 +154,9 @@ class NTUDataLoaders(object):
                                             sort_data=True)
         # data augmentation
         if 'NTU60' in self.dataset:
-            if self.case == 0:
+            if 'CS' in self.dataset:
                 theta = 0.3
-            elif self.case == 1:
+            elif 'CV' in self.dataset:
                 theta = 0.5
         elif 'NTU120' in self.dataset:
             theta = 0.3
@@ -298,20 +297,8 @@ class NTUDataLoaders(object):
 
 
 class FeederDataLoader(NTUDataLoaders):
-    def __init__(self,
-                 dataset: str = 'NTU60-CV',
-                 aug: int = 1,
-                 seg: int = 30,
-                 multi_test: int = 5,
-                 motion_sampler: int = 0):
-        if 'CS' in dataset:
-            case = 0
-        elif 'CV' in dataset:
-            case = 1
-        else:
-            case = -1
-        super(FeederDataLoader, self).__init__(
-            dataset, case, aug, seg, multi_test, motion_sampler)
+    def __init__(self, **kwargs):
+        super(FeederDataLoader, self).__init__(**kwargs)
 
     def get_loader(self,
                    feeder: Dataset,
