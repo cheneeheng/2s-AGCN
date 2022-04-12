@@ -27,10 +27,7 @@ from utils.utils import *
 
 class SGN(PyTorchModule):
 
-    c1 = 64  # pos,vel,joint embed
-    c2 = 128  # G,gcn
-    c3 = 256  # gcn
-    c4 = 512  # final conv
+    c1, c2, c3, c4 = c1, c2, c3, c4
 
     parts_3points_wholebody = parts_3points_wholebody
     parts_3points_armandhand = parts_3points_armandhand

@@ -2,11 +2,13 @@ from collections import OrderedDict
 from typing import Tuple, Optional, Union, Type
 
 import torch
-from torch.nn import Conv2d
+from torch import nn
+from torch.nn import functional as F
 from torch.nn import Module as PyTorchModule
 from torch.nn import Sequential
 
-__all__ = ['Module', 'Conv1xN', 'Conv', 'Pool']
+
+__all__ = ['Module', 'Conv1xN', 'Conv', 'Pool', 'ASPP']
 
 
 class Module(PyTorchModule):
@@ -56,12 +58,12 @@ class Conv1xN(Module):
         assert isinstance(self.kernel_size, int)
         assert isinstance(self.padding, int)
         assert isinstance(self.dilation, int)
-        self.conv = Conv2d(self.in_channels,
-                           self.out_channels,
-                           kernel_size=(1, self.kernel_size),
-                           padding=(0, self.padding),
-                           dilation=self.dilation,
-                           bias=bool(self.bias))
+        self.conv = nn.Conv2d(self.in_channels,
+                              self.out_channels,
+                              kernel_size=(1, self.kernel_size),
+                              padding=(0, self.padding),
+                              dilation=self.dilation,
+                              bias=bool(self.bias))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if not self.deterministic:
@@ -101,3 +103,57 @@ class Pool(Module):
         })
         block = self.update_block_dict(block)
         self.block = Sequential(block)
+
+
+class ASPP(Module):
+    def __init__(self,
+                 *args,
+                 dilations: list = [1, 3, 5, 7],
+                 norm_mod: Type[PyTorchModule] = nn.BatchNorm2d,
+                 **kwargs):
+        super(ASPP, self).__init__(*args, **kwargs)
+        self.aspp = torch.nn.ModuleDict()
+        self.pool = 0 in dilations
+        if self.pool:
+            self.aspp.update({
+                'aspp_pool': Pool(self.in_channels,
+                                  self.out_channels,
+                                  bias=self.bias,
+                                  pooling=nn.AdaptiveAvgPool2d(1),
+                                  activation=nn.ReLU)
+            })
+        for dil in dilations:
+            if dil == 0:
+                continue
+            self.aspp.update({
+                f'aspp_{dil}': Conv(
+                    self.in_channels,
+                    self.out_channels,
+                    kernel_size=3,
+                    padding=dil,
+                    dilation=dil,
+                    bias=self.bias,
+                    activation=nn.ReLU,
+                    normalization=lambda: norm_mod(self.out_channels),
+                    deterministic=False
+                )
+            })
+        self.proj = Conv(self.out_channels * len(dilations),
+                         self.out_channels,
+                         bias=self.bias,
+                         normalization=lambda: norm_mod(self.out_channels),
+                         dropout=lambda: nn.Dropout2d(0.2))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x: n,c,v,t
+        res = []
+        for _, block in self.aspp.items():
+            res.append(block(x))
+        if self.pool:
+            res[0] = F.interpolate(res[0],
+                                   size=x.shape[-2:],
+                                   mode="bilinear",
+                                   align_corners=False)
+        res = torch.cat(res, dim=1)
+        x = self.proj(res)
+        return x

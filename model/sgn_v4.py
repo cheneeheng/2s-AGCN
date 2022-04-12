@@ -22,52 +22,17 @@ from typing import Tuple, Optional, Union, Type
 
 from model.module.pytorch_module_wrapper import *
 from model.module.pos_embedding import *
+from model.resource.common_ntu import *
+
 from utils.utils import *
 
 
 class SGN(PyTorchModule):
 
-    c1 = 64  # pos,vel,joint embed
-    c2 = 128  # G,gcn
-    c3 = 256  # gcn
-    c4 = 512  # final conv
+    c1, c2, c3, c4 = c1, c2, c3, c4
 
     # NTU
-    parts_3points = [
-        (1, 0, 16),
-        (1, 0, 12),
-        (16, 0, 12),
-        (20, 1, 0),
-        (3, 2, 20),
-
-        (20, 4, 5),
-        (4, 5, 6),
-        (5, 6, 7),
-        (5, 6, 22),
-        (6, 7, 21),
-
-        (20, 8, 9),
-        (8, 9, 10),
-        (9, 10, 11),
-        (9, 10, 24),
-        (10, 11, 23),
-
-        (0, 12, 13),
-        (12, 13, 14),
-        (13, 14, 15),
-
-        (0, 16, 17),
-        (16, 17, 18),
-        (17, 18, 19),
-
-        (2, 20, 1),
-        (2, 20, 8),
-        (2, 20, 4),
-
-        (8, 20, 4),
-        (1, 20, 8),
-        (1, 20, 4),
-    ]
+    parts_3points_wholebody = parts_3points_wholebody
 
     def __init__(self,
                  num_class: int = 60,
@@ -329,11 +294,11 @@ class SGN(PyTorchModule):
         if aspp is None or len(aspp) == 0:
             self.aspp = lambda x: x
         else:
-            self.aspp = atrous_spatial_pyramid_pooling(self.c3,
-                                                       self.c3,
-                                                       bias=bias,
-                                                       dilations=aspp,
-                                                       norm_mod=norm_mod)
+            self.aspp = ASPP(self.c3,
+                             self.c3,
+                             bias=bias,
+                             dilations=aspp,
+                             norm_mod=norm_mod)
 
         # Frame level module ---------------------------------------------------
         self.smp = nn.AdaptiveMaxPool2d((1, seg))
@@ -753,60 +718,6 @@ class compute_g_spa(Module):
         g3 = g1.matmul(g2)  # n,t,v,v
         g4 = self.softmax(g3)
         return g4
-
-
-class atrous_spatial_pyramid_pooling(Module):
-    def __init__(self,
-                 *args,
-                 dilations: list = [1, 3, 5, 7],
-                 norm_mod: Type[PyTorchModule] = nn.BatchNorm2d,
-                 **kwargs):
-        super(atrous_spatial_pyramid_pooling, self).__init__(*args, **kwargs)
-        self.aspp = torch.nn.ModuleDict()
-        self.pool = 0 in dilations
-        if self.pool:
-            self.aspp.update({
-                'aspp_pool': Pool(self.in_channels,
-                                  self.out_channels,
-                                  bias=self.bias,
-                                  pooling=nn.AdaptiveAvgPool2d(1),
-                                  activation=nn.ReLU)
-            })
-        for dil in dilations:
-            if dil == 0:
-                continue
-            self.aspp.update({
-                f'aspp_{dil}': Conv(
-                    self.in_channels,
-                    self.out_channels,
-                    kernel_size=3,
-                    padding=dil,
-                    dilation=dil,
-                    bias=self.bias,
-                    activation=nn.ReLU,
-                    normalization=lambda: norm_mod(self.out_channels),
-                    deterministic=False
-                )
-            })
-        self.proj = Conv(self.out_channels * len(dilations),
-                         self.out_channels,
-                         bias=self.bias,
-                         normalization=lambda: norm_mod(self.out_channels),
-                         dropout=lambda: nn.Dropout2d(0.2))
-
-    def forward(self, x: Tensor) -> Tensor:
-        # x: n,c,v,t
-        res = []
-        for _, block in self.aspp.items():
-            res.append(block(x))
-        if self.pool:
-            res[0] = F.interpolate(res[0],
-                                   size=x.shape[-2:],
-                                   mode="bilinear",
-                                   align_corners=False)
-        res = torch.cat(res, dim=1)
-        x = self.proj(res)
-        return x
 
 
 if __name__ == '__main__':

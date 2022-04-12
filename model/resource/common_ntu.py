@@ -1,3 +1,10 @@
+# Channels
+c1 = 64  # pos,vel,joint embed
+c2 = 128  # G,gcn
+c3 = 256  # gcn
+c4 = 512  # final conv
+
+
 # NTU (from viewer prespective)
 parts_3points_wholebody = [
     # spine

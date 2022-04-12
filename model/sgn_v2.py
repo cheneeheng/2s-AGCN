@@ -19,7 +19,7 @@ from collections import OrderedDict
 from tqdm import tqdm
 from typing import Tuple, Optional, Union
 
-
+from model.resource.common_ntu import *
 from utils.utils import *
 
 
@@ -42,47 +42,10 @@ class Module(nn.Module):
 
 class SGN(nn.Module):
 
-    c1 = 64  # pos,vel,joint embed
-    c2 = 128  # G,gcn
-    c3 = 256  # gcn
-    c4 = 512  # final conv
+    c1, c2, c3, c4 = c1, c2, c3, c4
 
     # NTU
-    parts_3points = [
-        (1, 0, 16),
-        (1, 0, 12),
-        (16, 0, 12),
-        (20, 1, 0),
-        (3, 2, 20),
-
-        (20, 4, 5),
-        (4, 5, 6),
-        (5, 6, 7),
-        (5, 6, 22),
-        (6, 7, 21),
-
-        (20, 8, 9),
-        (8, 9, 10),
-        (9, 10, 11),
-        (9, 10, 24),
-        (10, 11, 23),
-
-        (0, 12, 13),
-        (12, 13, 14),
-        (13, 14, 15),
-
-        (0, 16, 17),
-        (16, 17, 18),
-        (17, 18, 19),
-
-        (2, 20, 1),
-        (2, 20, 8),
-        (2, 20, 4),
-
-        (8, 20, 4),
-        (1, 20, 8),
-        (1, 20, 4),
-    ]
+    parts_3points_wholebody = parts_3points_wholebody
 
     def __init__(self,
                  num_class: int = 60,
