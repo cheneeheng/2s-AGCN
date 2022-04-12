@@ -1,12 +1,7 @@
 #!/usr/bin/env python
 # from __future__ import print_function
 
-import argparse
-import json
 import os
-import random
-import sys
-import yaml
 
 import torch
 from torch.utils import tensorboard

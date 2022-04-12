@@ -1,6 +1,7 @@
 import numpy as np
 import random
 from scipy import interpolate
+from typing import Tuple
 
 import torch
 
@@ -312,16 +313,24 @@ def torch_transform(data_torch: torch.Tensor, theta: float) -> torch.Tensor:
     return data_torch
 
 
-def split_array_using_auc(data_numpy: np.ndarray, num_segments: int):
+def cumulative_auc(data_numpy: np.ndarray, norm: bool = False) -> np.ndarray:
+    # cumulative area under the curve using trapezoid rule
+    assert data_numpy.ndim == 2 or data_numpy.ndim == 1
+    if norm:
+        data_numpy = np.linalg.norm(data_numpy, axis=1)
+    return (np.cumsum(data_numpy[:-1]) + np.cumsum(data_numpy[1:])) / 2
+
+
+def split_idx_using_auc(data_numpy: np.ndarray,
+                        num_segments: int) -> Tuple[np.ndarray, float]:
     N, C = data_numpy.shape
     assert data_numpy.ndim == 2 and N >= num_segments
 
     if N == num_segments:
         return list(range(num_segments+1))
 
-    data_numpy = np.linalg.norm(data_numpy, axis=1)
     # trapezoid [N-1]
-    cum_auc = (np.cumsum(data_numpy[:-1]) + np.cumsum(data_numpy[1:])) / 2
+    cum_auc = cumulative_auc(data_numpy, norm=True)
     seg_area = cum_auc[-1] / num_segments
     # segment lower bounds [N-1]
     seg_idx, seg_lbs = np.unique((cum_auc / seg_area).astype(int),
@@ -363,9 +372,10 @@ def split_array_using_auc(data_numpy: np.ndarray, num_segments: int):
                     )
                 c += 1
 
+    # lower bound is valid
     seg_lbs[1:-1] += 1
     seg_lbs[-1] = N
-    return seg_lbs  # lower bound is valid
+    return seg_lbs, cum_auc[-1]
 
 
 # ##############################################################################
@@ -389,6 +399,6 @@ def split_array_using_auc(data_numpy: np.ndarray, num_segments: int):
 #                  1, 1, 111, 2, 33, 2, 1, 2, 1, 100, 33, 2, 1, 1])
 # xarr = np.expand_dims(xarr, -1)
 # print("shape :", xarr.shape)
-# splits = split_array_using_auc(xarr, 10)
+# splits = split_idx_using_auc(xarr, 10)
 # print("split idx :", splits, len(splits))
 # # print("split diff :", (splits[1:]-splits[:-1]).sum())

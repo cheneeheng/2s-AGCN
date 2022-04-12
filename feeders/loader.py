@@ -36,7 +36,8 @@ class NTUDataLoaders(object):
                  aug: int = 1,
                  seg: int = 30,
                  multi_test: int = 5,
-                 motion_sampler: int = 0):
+                 motion_sampler: int = 0,
+                 motion_norm: int = 0):
         self.dataset = dataset
         self.case = case
         self.aug = aug
@@ -44,6 +45,7 @@ class NTUDataLoaders(object):
         self.train_set, self.val_set, self.test_set = None, None, None
         self.multi_test = multi_test
         self.motion_sampler = motion_sampler
+        self.motion_norm = motion_norm
 
     def get_train_loader(self, batch_size: int, num_workers: int):
         if self.aug == 0:
@@ -230,7 +232,7 @@ class NTUDataLoaders(object):
 
         # sampling based on ~equal motion using AUC.
         if self.motion_sampler == 1:
-            intervals = tools.split_array_using_auc(skeleton_seq, self.seg)
+            intervals, _ = tools.split_idx_using_auc(skeleton_seq, self.seg)
             intervals_range = intervals[1:] - intervals[:-1]
             random_intervals_range_fn = partial(np.random.randint,
                                                 low=0,
@@ -249,7 +251,10 @@ class NTUDataLoaders(object):
         for _ in range(sampling_frequency):
             offsets = intervals + random_intervals_range_fn()
             assert len(offsets) == self.seg, f"{len(offsets)} =/= {self.seg}"
-            skeleton_seqs.append(skeleton_seq[offsets])
+            ske = skeleton_seq[offsets]
+            if self.motion_norm == 1:
+                ske /= tools.cumulative_auc(ske, norm=True)[-1]
+            skeleton_seqs.append(ske)
             subject_seqs.append(subject_seq[offsets])
         return skeleton_seqs, subject_seqs
 
