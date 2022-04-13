@@ -211,7 +211,7 @@ class SGN(PyTorchModule):
         self.tmp = nn.AdaptiveMaxPool2d((1, 1))
         self.do = nn.Dropout(dropout)
 
-        if self.t_kernel == 0:
+        if self.t_mode == 0:
             self.fc = nn.Linear(self.c3, num_class)
         else:
             self.fc = nn.Linear(self.c4, num_class)
@@ -876,19 +876,24 @@ class MLPTemporal(PyTorchModule):
                          kernel_size=kernel_sizes[i],
                          padding=paddings[i],
                          bias=biases[i],
-                         residual=residuals[i],
                          activation=activations[i],
                          normalization=lambda: normalizations[i](
                              channels[i+1]),
                          dropout=dropouts[i])
                     )
+            if residuals[i] == 0:
+                setattr(self, f'res{i+1}', lambda x: 0)
+            elif residuals[i] == 1:
+                setattr(self, f'res{i+1}', Conv(channels[i], channels[i+1],
+                                                bias=biases[i]))
+            else:
+                raise ValueError('Unknown residual mode...')
 
     def forward(self, x: Tensor) -> Tensor:
         # x: n,c,v,t ; v=1 due to SMP
         x = self.pool(x)
-        x = self.cnn1(x)
         for i in range(self.num_layers):
-            x = getattr(self, f'cnn{i+1}')(x)
+            x = getattr(self, f'cnn{i+1}')(x) + getattr(self, f'res{i+1}')(x)
         return x
 
 
@@ -1053,7 +1058,7 @@ if __name__ == '__main__':
                 # sem_fra_fusion=1,
                 # subject_fusion=101
                 # c_multiplier=[1, 0.5, 0.25, 0.125],
-                t_mode=5
+                t_mode=2
                 )
     model(inputs, subjects)
     # print(model)

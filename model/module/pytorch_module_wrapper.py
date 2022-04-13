@@ -19,7 +19,6 @@ class Module(PyTorchModule):
                  padding: int = 0,
                  dilation: Union[int, list] = 1,
                  bias: int = 0,
-                 residual: int = 0,
                  deterministic: Optional[bool] = None,
                  dropout: Optional[Type[PyTorchModule]] = None,
                  activation: Optional[Type[PyTorchModule]] = None,
@@ -32,7 +31,6 @@ class Module(PyTorchModule):
         self.padding = padding
         self.dilation = dilation
         self.bias = bias
-        self.residual = residual
         if deterministic is None:
             self.deterministic = torch.backends.cudnn.deterministic
         else:
@@ -51,12 +49,7 @@ class Module(PyTorchModule):
         return block
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        if self.residual == 0:
-            return self.block(x)
-        elif self.residual == 1:
-            return self.block(x) + x
-        else:
-            raise ValueError("Unknown residual mode...")
+        return self.block(x)
 
 
 class Conv1xN(Module):
@@ -105,7 +98,6 @@ class Conv(Module):
                  padding: int = 0,
                  dilation: int = 1,
                  bias: int = 0,
-                 residual: int = 0,
                  deterministic: Optional[bool] = None,
                  dropout: Optional[Type[PyTorchModule]] = None,
                  activation: Optional[Type[PyTorchModule]] = None,
@@ -117,7 +109,6 @@ class Conv(Module):
                                    padding=padding,
                                    dilation=dilation,
                                    bias=bias,
-                                   residual=residual,
                                    deterministic=deterministic,
                                    dropout=dropout,
                                    activation=activation,
