@@ -70,6 +70,7 @@ class SGN(PyTorchModule):
 
                  g_proj_shared: bool = False,
                  g_proj_dim: Union[list, int] = c3,  # c3
+                 g_residual: List[int] = [0, 0, 0],
                  gcn_t_kernel: int = 1,
 
                  t_mode: int = 1,
@@ -119,6 +120,7 @@ class SGN(PyTorchModule):
 
         self.g_proj_shared = g_proj_shared
         self.g_proj_dim = g_proj_dim
+        self.g_residual = g_residual
         self.gcn_t_kernel = gcn_t_kernel
 
         self.t_mode = t_mode
@@ -376,7 +378,8 @@ class SGN(PyTorchModule):
             gcn_dims=[self.c2, self.c3, self.c3],
             g_proj_dim=self.g_proj_dim,
             g_proj_shared=self.g_proj_shared,
-            g_activation=self.g_activation_fn
+            g_activation=self.g_activation_fn,
+            g_residual=self.g_residual
         )
         if self.par_pos_fusion == 1:
             self.gcn_spatial_part = GCNSpatialBlock(
@@ -390,7 +393,8 @@ class SGN(PyTorchModule):
                 gcn_dims=[self.c2, self.c3, self.c3],
                 g_proj_dim=self.g_proj_dim,
                 g_proj_shared=self.g_proj_shared,
-                g_activation=self.g_activation_fn
+                g_activation=self.g_activation_fn,
+                g_residual=self.g_residual
             )
 
     def init_temporal_mlp(self):
@@ -884,8 +888,11 @@ class MLPTemporal(PyTorchModule):
             if residuals[i] == 0:
                 setattr(self, f'res{i+1}', lambda x: 0)
             elif residuals[i] == 1:
-                setattr(self, f'res{i+1}', Conv(channels[i], channels[i+1],
-                                                bias=biases[i]))
+                if channels[i] == channels[i+1]:
+                    setattr(self, f'res{i+1}', lambda x: x)
+                else:
+                    setattr(self, f'res{i+1}', Conv(channels[i], channels[i+1],
+                                                    bias=biases[i]))
             else:
                 raise ValueError('Unknown residual mode...')
 
@@ -959,7 +966,6 @@ class GCNSpatialUnit(Module):
 
 class GCNSpatialBlock(Module):
     def __init__(self,
-                 in_channels: int,
                  *args,
                  kernel_size: int = 1,
                  padding: int = 0,
@@ -970,9 +976,9 @@ class GCNSpatialBlock(Module):
                  g_proj_dim: Tuple[int, list],
                  g_proj_shared: bool = False,
                  g_activation: T1 = nn.Softmax,
+                 g_residual: List[int] = [0, 0, 0],
                  ):
-        super(GCNSpatialBlock, self).__init__(in_channels,
-                                              *args,
+        super(GCNSpatialBlock, self).__init__(*args,
                                               kernel_size=kernel_size,
                                               padding=padding,
                                               bias=bias,
@@ -980,64 +986,75 @@ class GCNSpatialBlock(Module):
                                               normalization=normalization)
         self.g_shared = isinstance(g_proj_dim, int)
         if self.g_shared:
-            self.gcn_g = GCNSpatialG(self.in_channels,
+            self.gcn_g = GCNSpatialG(gcn_dims[0],
                                      g_proj_dim,
                                      bias=self.bias,
                                      activation=g_activation,
                                      g_proj_shared=g_proj_shared)
         else:
-            self.gcn_g1 = GCNSpatialG(self.in_channels,
+            self.gcn_g1 = GCNSpatialG(gcn_dims[0],
                                       g_proj_dim[0],
                                       bias=self.bias,
                                       activation=g_activation,
                                       g_proj_shared=g_proj_shared)
-            self.gcn_g2 = GCNSpatialG(gcn_dims[0],
+            self.gcn_g2 = GCNSpatialG(gcn_dims[1],
                                       g_proj_dim[1],
                                       bias=self.bias,
                                       activation=g_activation,
                                       g_proj_shared=g_proj_shared)
-            self.gcn_g3 = GCNSpatialG(gcn_dims[1],
+            self.gcn_g3 = GCNSpatialG(gcn_dims[2],
                                       g_proj_dim[2],
                                       bias=self.bias,
                                       activation=g_activation,
                                       g_proj_shared=g_proj_shared)
 
-        self.gcn1 = GCNSpatialUnit(self.in_channels,
-                                   gcn_dims[0],
-                                   bias=self.bias,
-                                   kernel_size=self.kernel_size,
-                                   padding=self.padding,
-                                   activation=self.activation,
-                                   normalization=self.normalization)
-        self.gcn2 = GCNSpatialUnit(gcn_dims[0],
+        self.gcn1 = GCNSpatialUnit(gcn_dims[0],
                                    gcn_dims[1],
                                    bias=self.bias,
                                    kernel_size=self.kernel_size,
                                    padding=self.padding,
                                    activation=self.activation,
                                    normalization=self.normalization)
-        self.gcn3 = GCNSpatialUnit(gcn_dims[1],
+        self.gcn2 = GCNSpatialUnit(gcn_dims[1],
                                    gcn_dims[2],
                                    bias=self.bias,
                                    kernel_size=self.kernel_size,
                                    padding=self.padding,
                                    activation=self.activation,
                                    normalization=self.normalization)
+        self.gcn3 = GCNSpatialUnit(gcn_dims[2],
+                                   gcn_dims[3],
+                                   bias=self.bias,
+                                   kernel_size=self.kernel_size,
+                                   padding=self.padding,
+                                   activation=self.activation,
+                                   normalization=self.normalization)
+
+        for i, r in enumerate(g_residual):
+            if r == 0:
+                setattr(self, f'res{i+1}', lambda x: 0)
+            elif r == 1:
+                if gcn_dims[i] == gcn_dims[i]:
+                    setattr(self, f'res{i+1}', lambda x: x)
+                else:
+                    setattr(self, f'res{i+1}', Conv(bias=self.bias))
+            else:
+                raise ValueError("Unknown residual modes...")
 
     def forward(self, x: Tensor) -> Tensor:
         if self.g_shared:
             g = self.gcn_g(x)
-            x = self.gcn1(x, g)
-            x = self.gcn2(x, g)
-            x = self.gcn3(x, g)
+            x = self.gcn1(x, g) + self.res1(x)
+            x = self.gcn2(x, g) + self.res2(x)
+            x = self.gcn3(x, g) + self.res3(x)
         else:
             g1 = self.gcn_g1(x)
-            x = self.gcn1(x, g1)  # noqa
+            x = self.gcn1(x, g1) + self.res1(x)
             g2 = self.gcn_g2(x)
-            x = self.gcn2(x, g2)  # noqa
+            x = self.gcn2(x, g2) + self.res1(x)
             g3 = self.gcn_g3(x)
-            x = self.gcn3(x, g3)  # noqa
-            g = [g1, g2, g3]  # noqa
+            x = self.gcn3(x, g3) + self.res1(x)
+            g = [g1, g2, g3]
         return x, g
 
 
