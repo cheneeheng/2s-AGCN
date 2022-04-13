@@ -14,12 +14,16 @@ from torch import Tensor
 from torch.nn import Module as PyTorchModule
 
 import math
-from typing import Tuple, Optional, Union, Type
+from typing import Tuple, Optional, Union, Type, List
 
 from model.module import *
 from model.resource.common_ntu import *
 
 from utils.utils import *
+
+
+T1 = Type[PyTorchModule]
+T2 = List[Optional[Type[PyTorchModule]]]
 
 
 class SGN(PyTorchModule):
@@ -68,8 +72,9 @@ class SGN(PyTorchModule):
                  g_proj_dim: Union[list, int] = c3,  # c3
                  gcn_t_kernel: int = 1,
 
+                 t_mode: int = 1,
                  t_kernel: int = 3,
-                 t_max_pool_stride: int = 0,
+                 t_maxpool_kwargs: Optional[dict] = None,
                  aspp: list = None,
 
                  ):
@@ -116,8 +121,10 @@ class SGN(PyTorchModule):
         self.g_proj_dim = g_proj_dim
         self.gcn_t_kernel = gcn_t_kernel
 
+        self.t_mode = t_mode
         self.t_kernel = t_kernel
-        self.t_max_pool_stride = t_max_pool_stride
+        self.t_maxpool_kwargs = t_maxpool_kwargs
+        self.aspp = aspp
 
         self.norm_type = norm_type
 
@@ -152,7 +159,7 @@ class SGN(PyTorchModule):
             raise ValueError("in_part is 0 but sem_part is not")
 
         assert self.t_kernel >= 0
-        assert self.t_max_pool_stride >= 0
+
         assert self.norm_type in ['bn', 'ln']
 
         if self.norm_type == 'bn':
@@ -198,7 +205,7 @@ class SGN(PyTorchModule):
 
         # ASPP -----------------------------------------------------------------
         # Frame level module ---------------------------------------------------
-        self.init_temporal_mlp(aspp=aspp)
+        self.init_temporal_mlp()
 
         self.smp = nn.AdaptiveMaxPool2d((1, num_segment))
         self.tmp = nn.AdaptiveMaxPool2d((1, 1))
@@ -237,10 +244,10 @@ class SGN(PyTorchModule):
                  in_channels: int,
                  out_channels: Optional[int] = None,
                  bias: Optional[int] = None,
-                 dropout: Optional[Type[PyTorchModule]] = None,
-                 activation: Optional[Type[PyTorchModule]] = None,
-                 normalization: Optional[Type[PyTorchModule]] = None,
-                 in_norm: Optional[Type[PyTorchModule]] = None) -> Module:
+                 dropout: Optional[T1] = None,
+                 activation: Optional[T1] = None,
+                 normalization: Optional[T1] = None,
+                 in_norm: Optional[T1] = None) -> Module:
         inter_channels = self.get_inter_channels(mode, self.c1)
         out_channels = out_channels if out_channels is not None else self.c1
         bias = bias if bias is not None else self.bias
@@ -386,26 +393,81 @@ class SGN(PyTorchModule):
                 g_activation=self.g_activation_fn
             )
 
-    def init_temporal_mlp(self, aspp: list):
-        if aspp is None or len(aspp) == 0:
+    def init_temporal_mlp(self):
+        if self.aspp is None or len(self.aspp) == 0:
             self.aspp = lambda x: x
         else:
             self.aspp = ASPP(self.c3,
                              self.c3,
                              bias=self.bias,
-                             dilation=aspp,
+                             dilation=self.aspp,
                              dropout=self.dropout_fn,
                              activation=self.activation,
                              normalization=self.normalization_fn)
-        self.cnn = MLPTemporal(self.c3,
-                               self.c4,
-                               kernel_size=self.t_kernel,
-                               padding=self.t_kernel//2,
-                               bias=self.bias,
-                               dropout=self.dropout_fn,
-                               activation=self.activation_fn,
-                               normalization=self.normalization_fn,
-                               max_pool_stride=self.t_max_pool_stride)
+        # skip
+        if self.t_mode == 0:
+            self.cnn = lambda x: x
+        # original sgn
+        elif self.t_mode == 1:
+            idx = 2
+            channels = [self.c3, self.c3, self.c4]
+            kernel_sizes = [self.t_kernel, 1]
+            paddings = [self.t_kernel//2, 0]
+            residuals = [0 for _ in range(idx)]
+            dropouts = [self.dropout_fn, None]
+        # original sgn with residual
+        elif self.t_mode == 2:
+            idx = 2
+            channels = [self.c3, self.c3, self.c4]
+            kernel_sizes = [self.t_kernel, 1]
+            paddings = [self.t_kernel//2, 0]
+            residuals = [1 for _ in range(idx)]
+            dropouts = [self.dropout_fn, None]
+        # all 3x3
+        elif self.t_mode == 3:
+            idx = 2
+            channels = [self.c3, self.c3, self.c4]
+            kernel_sizes = [self.t_kernel for _ in range(2)]
+            paddings = [self.t_kernel//2 for _ in range(2)]
+            residuals = [0 for _ in range(2)]
+            dropouts = [self.dropout_fn, None]
+        # all 3x3 with residual
+        elif self.t_mode == 4:
+            idx = 2
+            channels = [self.c3, self.c3, self.c4]
+            kernel_sizes = [self.t_kernel for _ in range(2)]
+            paddings = [self.t_kernel//2 for _ in range(2)]
+            residuals = [1 for _ in range(2)]
+            dropouts = [self.dropout_fn, None]
+        # 3 layers
+        elif self.t_mode == 5:
+            idx = 3
+            channels = [self.c3, self.c3, self.c3, self.c4]
+            kernel_sizes = [self.t_kernel, 1, 1]
+            paddings = [self.t_kernel//2, 0, 0]
+            residuals = [0 for _ in range(3)]
+            dropouts = [self.dropout_fn, None, None]
+        # 3 layers with residual
+        elif self.t_mode == 6:
+            idx = 3
+            channels = [self.c3, self.c3, self.c3, self.c4]
+            kernel_sizes = [self.t_kernel, 1, 1]
+            paddings = [self.t_kernel//2, 0, 0]
+            residuals = [1 for _ in range(3)]
+            dropouts = [self.dropout_fn, None, None]
+        else:
+            raise ValueError("Unknown t_mode...")
+        self.cnn = MLPTemporal(
+            channels=channels,
+            kernel_sizes=kernel_sizes,
+            paddings=paddings,
+            biases=[self.bias for _ in range(idx)],
+            residuals=residuals,
+            dropouts=dropouts,
+            activations=[self.activation_fn for _ in range(idx)],
+            normalizations=[self.normalization_fn for _ in range(idx)],
+            maxpool_kwargs=self.t_maxpool_kwargs
+        )
 
     def get_dy1(self, x: Tensor):
         bs, step, dim = x.shape
@@ -469,7 +531,13 @@ class SGN(PyTorchModule):
 
         return dy2
 
-    def get_emb(self, x: Tensor):
+    def get_emb(self,
+                x: Tensor,
+                s: Optional[Tensor] = None
+                ) -> Tuple[Optional[Tensor],
+                           Optional[Tensor],
+                           Optional[Tensor],
+                           Optional[Tensor]]:
         spa1, gro1, tem1, sub1 = None, None, None, None
         bs, step, dim = x.shape
         if self.sem_position > 0:
@@ -487,7 +555,7 @@ class SGN(PyTorchModule):
     def forward(self,
                 x: Tensor,
                 s: Optional[Tensor] = None
-                ) -> Tuple[Tensor, Tensor]:
+                ) -> Tuple[Tensor, list]:
         """Model forward pass.
 
         Args:
@@ -507,7 +575,7 @@ class SGN(PyTorchModule):
         assert dy1 is not None or dy2 is not None
 
         # Joint and frame embeddings -------------------------------------------
-        spa1, gro1, tem1, sub1 = self.get_emb(x)
+        spa1, gro1, tem1, sub1 = self.get_emb(x, s)
 
         # Joint-level Module ---------------------------------------------------
         # xyz embeddings
@@ -616,7 +684,7 @@ class OneHotTensor(PyTorchModule):
 class DataNorm(PyTorchModule):
     def __init__(self,
                  dim: int,
-                 normalization: Type[PyTorchModule] = nn.BatchNorm1d):
+                 normalization: T1 = nn.BatchNorm1d):
         super(DataNorm, self).__init__()
         self.bn = normalization(dim)  # channel dim * num_point
 
@@ -633,10 +701,10 @@ class Embedding(Module):
                  in_channels: int,
                  out_channels: int,
                  bias: int = 0,
-                 dropout: Type[PyTorchModule] = nn.Dropout2d,
-                 activation: Type[PyTorchModule] = nn.ReLU,
-                 normalization: Type[PyTorchModule] = nn.BatchNorm2d,
-                 in_norm: Optional[Type[PyTorchModule]] = None,
+                 dropout: T1 = nn.Dropout2d,
+                 activation: T1 = nn.ReLU,
+                 normalization: T1 = nn.BatchNorm2d,
+                 in_norm: Optional[T1] = None,
                  inter_channels: Union[list, int] = 0,
                  num_point: int = 25,
                  mode: int = 1
@@ -674,24 +742,26 @@ class Embedding(Module):
                              dropout=self.dropout)
         elif mode == 3:
             assert isinstance(inter_channels, list)
-            inter_channels = \
+            layer_channels = \
                 [self.in_channels] + inter_channels + [self.out_channels]
-            for i in range(len(inter_channels)-1):
-                setattr(self, f'cnn{i+1}', Conv(inter_channels[i],
-                                                inter_channels[i+1],
+            self.num_layers = len(layer_channels)-1
+            for i in range(self.num_layers):
+                setattr(self, f'cnn{i+1}', Conv(layer_channels[i],
+                                                layer_channels[i+1],
                                                 bias=self.bias,
                                                 activation=self.activation))
 
     def forward(self, x: Tensor) -> Tensor:
         # x: n,c,v,t
         x = self.norm(x)
-        x = self.cnn1(x)
         if self.mode == 1:
+            x = self.cnn1(x)
             x = self.cnn2(x)
+        elif self.mode == 2:
+            x = self.cnn1(x)
         elif self.mode == 3:
-            x = self.cnn2(x)
-            x = self.cnn3(x)
-            x = self.cnn4(x)
+            for i in range(self.num_layers):
+                x = getattr(self, f'cnn{i+1}')(x)
         return x
 
 
@@ -700,9 +770,9 @@ class EmbeddingSubject(Module):
                  in_channels: int,
                  out_channels: int,
                  bias: int = 0,
-                 dropout: Type[PyTorchModule] = nn.Dropout2d,
-                 activation: Type[PyTorchModule] = nn.ReLU,
-                 normalization: Type[PyTorchModule] = nn.BatchNorm2d,
+                 dropout: T1 = nn.Dropout2d,
+                 activation: T1 = nn.ReLU,
+                 normalization: T1 = nn.BatchNorm2d,
                  inter_channels: Union[list, int] = 0,
                  num_subjects: int = 2,
                  mode: int = 1,
@@ -738,11 +808,12 @@ class EmbeddingSubject(Module):
             # 4x MLP
             self.in_dim = self.in_channels
             assert isinstance(inter_channels, list)
-            inter_channels = \
+            layer_channels = \
                 [self.in_channels] + inter_channels + [self.out_channels]
-            for i in range(len(inter_channels)-1):
-                setattr(self, f'cnn{i+1}', Conv(inter_channels[i],
-                                                inter_channels[i+1],
+            self.num_layers = len(layer_channels)-1
+            for i in range(self.num_layers):
+                setattr(self, f'cnn{i+1}', Conv(layer_channels[i],
+                                                layer_channels[i+1],
                                                 bias=self.bias,
                                                 activation=self.activation))
         elif mode == 4:
@@ -771,66 +842,53 @@ class EmbeddingSubject(Module):
             x = self.norm(x)
             x = self.drop(x)
         elif self.mode == 3:
-            x = self.cnn1(x)
-            x = self.cnn2(x)
-            x = self.cnn3(x)
-            x = self.cnn4(x)
+            for i in range(self.num_layers):
+                x = getattr(self, f'cnn{i+1}')(x)
         elif self.mode == 4:
             x = self.cnn1(x)
         return x
 
 
-class MLPTemporal(Module):
+class MLPTemporal(PyTorchModule):
     def __init__(self,
-                 in_channels: int,
-                 out_channels: int,
-                 kernel_size: int = 1,
-                 padding: int = 0,
-                 bias: int = 0,
-                 dropout: Type[PyTorchModule] = nn.Dropout2d,
-                 activation: Type[PyTorchModule] = nn.ReLU,
-                 normalization: Type[PyTorchModule] = nn.BatchNorm2d,
-                 max_pool_stride: int = 0):
-        super(MLPTemporal, self).__init__(in_channels,
-                                          out_channels,
-                                          kernel_size=kernel_size,
-                                          padding=padding,
-                                          bias=bias,
-                                          dropout=dropout,
-                                          activation=activation,
-                                          normalization=normalization)
-        self.max_pool_stride = max_pool_stride
-        if self.kernel_size > 0:
-            if self.max_pool_stride > 0:
-                self.pool = nn.MaxPool2d(kernel_size=(1, self.kernel_size),
-                                         stride=(1, max_pool_stride))
-            else:
-                self.cnn1 = Conv(
-                    self.in_channels,
-                    self.in_channels,
-                    kernel_size=self.kernel_size,
-                    padding=self.padding,
-                    bias=self.bias,
-                    activation=self.activation,
-                    normalization=lambda: self.normalization(self.in_channels),
-                    dropout=self.dropout
-                )
-            self.cnn2 = Conv(
-                self.in_channels,
-                self.out_channels,
-                bias=self.bias,
-                activation=self.activation,
-                normalization=lambda: self.normalization(self.out_channels)
-            )
+                 channels: List[int],
+                 kernel_sizes: List[int] = [3, 1],
+                 paddings: List[int] = [1, 0],
+                 biases: List[int] = [0, 0],
+                 residuals: List[int] = [0, 0],
+                 dropouts: T2 = [nn.Dropout2d, None],
+                 activations: T2 = [nn.ReLU, nn.ReLU],
+                 normalizations: T2 = [nn.BatchNorm2d, nn.BatchNorm2d],
+                 maxpool_kwargs: Optional[dict] = None):
+        super(MLPTemporal, self).__init__()
+        if maxpool_kwargs is not None:
+            # self.pool = nn.MaxPool2d(kernel_size=(1, self.kernel_size),
+            #                          stride=(1, max_pool_stride))
+            self.pool = nn.MaxPool2d(**maxpool_kwargs)
+        else:
+            self.pool = lambda x: x
+        self.num_layers = len(channels) - 1
+        for i in range(self.num_layers):
+            setattr(self,
+                    f'cnn{i+1}',
+                    Conv(channels[i],
+                         channels[i+1],
+                         kernel_size=kernel_sizes[i],
+                         padding=paddings[i],
+                         bias=biases[i],
+                         residual=residuals[i],
+                         activation=activations[i],
+                         normalization=lambda: normalizations[i](
+                             channels[i+1]),
+                         dropout=dropouts[i])
+                    )
 
     def forward(self, x: Tensor) -> Tensor:
         # x: n,c,v,t ; v=1 due to SMP
-        if self.kernel_size > 0:
-            if self.max_pool_stride > 0:
-                x = self.pool(x)
-            else:
-                x = self.cnn1(x)
-            x = self.cnn2(x)
+        x = self.pool(x)
+        x = self.cnn1(x)
+        for i in range(self.num_layers):
+            x = getattr(self, f'cnn{i+1}')(x)
         return x
 
 
@@ -839,7 +897,7 @@ class GCNSpatialG(Module):
                  in_channels: int,
                  out_channels: int,
                  bias: int = 0,
-                 activation: Type[PyTorchModule] = nn.Softmax,
+                 activation: T1 = nn.Softmax,
                  g_proj_shared: bool = False,
                  ):
         super(GCNSpatialG, self).__init__(in_channels,
@@ -868,8 +926,8 @@ class GCNSpatialUnit(Module):
                  kernel_size: int = 1,
                  padding: int = 0,
                  bias: int = 0,
-                 activation: Type[PyTorchModule] = nn.ReLU,
-                 normalization: Type[PyTorchModule] = nn.BatchNorm2d
+                 activation: T1 = nn.ReLU,
+                 normalization: T1 = nn.BatchNorm2d
                  ):
         super(GCNSpatialUnit, self).__init__(in_channels,
                                              out_channels,
@@ -901,12 +959,12 @@ class GCNSpatialBlock(Module):
                  kernel_size: int = 1,
                  padding: int = 0,
                  bias: int = 0,
-                 activation: Type[PyTorchModule] = nn.ReLU,
-                 normalization: Type[PyTorchModule] = nn.BatchNorm2d,
+                 activation: T1 = nn.ReLU,
+                 normalization: T1 = nn.BatchNorm2d,
                  gcn_dims: list,
                  g_proj_dim: Tuple[int, list],
                  g_proj_shared: bool = False,
-                 g_activation: Type[PyTorchModule] = nn.Softmax,
+                 g_activation: T1 = nn.Softmax,
                  ):
         super(GCNSpatialBlock, self).__init__(in_channels,
                                               *args,
@@ -994,7 +1052,8 @@ if __name__ == '__main__':
                 # par_pos_fusion=1,
                 # sem_fra_fusion=1,
                 # subject_fusion=101
-                # c_multiplier=[1, 0.5, 0.25, 0.125]
+                # c_multiplier=[1, 0.5, 0.25, 0.125],
+                t_mode=5
                 )
     model(inputs, subjects)
     # print(model)
