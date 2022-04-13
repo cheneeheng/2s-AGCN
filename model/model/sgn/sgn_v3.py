@@ -10,12 +10,10 @@
 import torch
 from torch import nn
 
-from model.model.sgn.sgn_v2 import SGN as SGNBase
-from model.model.sgn.sgn_v2 import embed
-from model.model.sgn.sgn_v2 import gcn_spa
+from model import sgn_v2
 
 
-class SGN(SGNBase):
+class SGN(sgn_v2.SGN):
 
     def __init__(self,
                  gcn_t_kernel: int = 3,
@@ -23,27 +21,27 @@ class SGN(SGNBase):
 
         super(SGN, self).__init__(**kwargs)
 
-        self.tem_embed = embed(self.seg,
-                               self.c2,
-                               inter_channels=self.c1,
-                               num_point=self.num_point,
-                               norm=False,
-                               bias=self.bias)
-        self.gcn1 = gcn_spa(self.c2,
-                            self.c2,
-                            bias=self.bias,
-                            kernel_size=gcn_t_kernel,
-                            padding=gcn_t_kernel//2)
-        self.gcn2 = gcn_spa(self.c2,
-                            self.c3,
-                            bias=self.bias,
-                            kernel_size=gcn_t_kernel,
-                            padding=gcn_t_kernel//2)
-        self.gcn3 = gcn_spa(self.c3,
-                            self.c4,
-                            bias=self.bias,
-                            kernel_size=gcn_t_kernel,
-                            padding=gcn_t_kernel//2)
+        self.tem_embed = sgn_v2.embed(self.seg,
+                                      self.c2,
+                                      inter_channels=self.c1,
+                                      num_point=self.num_point,
+                                      norm=False,
+                                      bias=self.bias)
+        self.gcn1 = sgn_v2.gcn_spa(self.c2,
+                                   self.c2,
+                                   bias=self.bias,
+                                   kernel_size=gcn_t_kernel,
+                                   padding=gcn_t_kernel//2)
+        self.gcn2 = sgn_v2.gcn_spa(self.c2,
+                                   self.c3,
+                                   bias=self.bias,
+                                   kernel_size=gcn_t_kernel,
+                                   padding=gcn_t_kernel//2)
+        self.gcn3 = sgn_v2.gcn_spa(self.c3,
+                                   self.c4,
+                                   bias=self.bias,
+                                   kernel_size=gcn_t_kernel,
+                                   padding=gcn_t_kernel//2)
         self.fc = nn.Linear(self.c4, self.num_class)
 
         del self.cnn

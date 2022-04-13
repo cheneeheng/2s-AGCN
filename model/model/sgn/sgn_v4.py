@@ -13,15 +13,13 @@
 import torch
 from torch import nn
 from torch import Tensor
-from torch.nn import functional as F
 from torch.nn import Module as PyTorchModule
 from torch.profiler import profile, ProfilerActivity
 
 import math
 from typing import Tuple, Optional, Union, Type
 
-from model.module.pytorch_module_wrapper import *
-from model.module.embedding.pos_embedding import *
+from model.module import *
 from model.resource.common_ntu import *
 
 from utils.utils import *

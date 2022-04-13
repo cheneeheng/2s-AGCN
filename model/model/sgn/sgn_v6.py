@@ -8,17 +8,17 @@
 
 # Continue from on sgn_v5
 
+# CODE FREEZED ON 13.04.2022
+
 import torch
 from torch import nn
 from torch import Tensor
-from torch.nn import functional as F
 from torch.nn import Module as PyTorchModule
-from torch.profiler import profile, ProfilerActivity
 
 import math
 from typing import Tuple, Optional, Union, Type
 
-from model import module as local_module
+from model.module import *
 from model.resource.common_ntu import *
 
 from utils.utils import *
@@ -340,11 +340,11 @@ class SGN(PyTorchModule):
         if aspp is None or len(aspp) == 0:
             self.aspp = lambda x: x
         else:
-            self.aspp = local_module.ASPP(self.c3,
-                                          self.c3,
-                                          bias=self.bias,
-                                          dilations=aspp,
-                                          norm_mod=self.norm_mod)
+            self.aspp = ASPP(self.c3,
+                             self.c3,
+                             bias=self.bias,
+                             dilations=aspp,
+                             norm_mod=self.norm_mod)
 
         # Frame level module ---------------------------------------------------
         self.smp = nn.AdaptiveMaxPool2d((1, num_segment))
@@ -638,7 +638,7 @@ class DataNorm(PyTorchModule):
         return x
 
 
-class Embedding(local_module.Module):
+class Embedding(Module):
     def __init__(self,
                  *args,
                  inter_channels: Union[list, int] = 0,
@@ -657,22 +657,21 @@ class Embedding(local_module.Module):
             self.norm = lambda x: x
 
         if mode == 1:
-            self.cnn1 = local_module.Conv(self.in_channels,
-                                          inter_channels,
-                                          bias=self.bias,
-                                          activation=nn.ReLU)
-            self.cnn2 = local_module.Conv(inter_channels,
-                                          self.out_channels,
-                                          bias=self.bias,
-                                          activation=nn.ReLU)
+            self.cnn1 = Conv(self.in_channels,
+                             inter_channels,
+                             bias=self.bias,
+                             activation=nn.ReLU)
+            self.cnn2 = Conv(inter_channels,
+                             self.out_channels,
+                             bias=self.bias,
+                             activation=nn.ReLU)
         elif mode == 2:
             # bert style
-            self.cnn1 = local_module.Conv(self.in_channels,
-                                          self.out_channels,
-                                          bias=self.bias,
-                                          normalization=lambda: norm_mod(
-                                              self.out_channels),
-                                          dropout=lambda: nn.Dropout2d(0.2))
+            self.cnn1 = Conv(self.in_channels,
+                             self.out_channels,
+                             bias=self.bias,
+                             normalization=lambda: norm_mod(self.out_channels),
+                             dropout=lambda: nn.Dropout2d(0.2))
         elif mode == 3:
             assert isinstance(inter_channels, list)
             inter_channels = \
@@ -680,10 +679,10 @@ class Embedding(local_module.Module):
             for i in range(len(inter_channels)-1):
                 setattr(self,
                         f'cnn{i+1}',
-                        local_module.Conv(inter_channels[i],
-                                          inter_channels[i+1],
-                                          bias=self.bias,
-                                          activation=nn.ReLU))
+                        Conv(inter_channels[i],
+                             inter_channels[i+1],
+                             bias=self.bias,
+                             activation=nn.ReLU))
 
     def forward(self, x: Tensor) -> Tensor:
         # x: n,c,v,t
@@ -698,7 +697,7 @@ class Embedding(local_module.Module):
         return x
 
 
-class EmbeddingSubject(local_module.Module):
+class EmbeddingSubject(Module):
     def __init__(self,
                  *args,
                  inter_channels: Union[list, int] = 0,
@@ -712,14 +711,14 @@ class EmbeddingSubject(local_module.Module):
         if mode == 1:
             # 2x MLP
             self.in_dim = self.in_channels
-            self.cnn1 = local_module.Conv(self.in_channels,
-                                          inter_channels,
-                                          bias=self.bias,
-                                          activation=nn.ReLU)
-            self.cnn2 = local_module.Conv(inter_channels,
-                                          self.out_channels,
-                                          bias=self.bias,
-                                          activation=nn.ReLU)
+            self.cnn1 = Conv(self.in_channels,
+                             inter_channels,
+                             bias=self.bias,
+                             activation=nn.ReLU)
+            self.cnn2 = Conv(inter_channels,
+                             self.out_channels,
+                             bias=self.bias,
+                             activation=nn.ReLU)
         elif mode == 2:
             # bert style
             self.in_dim = self.out_channels
@@ -737,20 +736,20 @@ class EmbeddingSubject(local_module.Module):
             for i in range(len(inter_channels)-1):
                 setattr(self,
                         f'cnn{i+1}',
-                        local_module.Conv(inter_channels[i],
-                                          inter_channels[i+1],
-                                          bias=self.bias,
-                                          activation=nn.ReLU))
+                        Conv(inter_channels[i],
+                             inter_channels[i+1],
+                             bias=self.bias,
+                             activation=nn.ReLU))
         elif mode == 4:
             # bert style and a m.Conv
             self.in_dim = self.in_channels
             embedding = torch.empty(num_subjects, self.in_channels)
             nn.init.normal_(embedding, std=0.02)  # bert
             self.embedding = nn.Parameter(embedding)
-            self.cnn1 = local_module.Conv(self.in_channels,
-                                          self.out_channels,
-                                          bias=self.bias,
-                                          activation=nn.ReLU)
+            self.cnn1 = Conv(self.in_channels,
+                             self.out_channels,
+                             bias=self.bias,
+                             activation=nn.ReLU)
 
     def forward(self, x: Tensor) -> Tensor:
         bs, _, _, step = x.shape  # n,c,v,t => n,1,1,t
@@ -776,7 +775,7 @@ class EmbeddingSubject(local_module.Module):
         return x
 
 
-class MLPTemporal(local_module.Module):
+class MLPTemporal(Module):
     def __init__(self,
                  *args,
                  t_kernel: int = 3,
@@ -791,7 +790,7 @@ class MLPTemporal(local_module.Module):
                 self.maxp = nn.MaxPool2d(kernel_size=(1, t_kernel),
                                          stride=(1, t_max_pool))
             else:
-                self.cnn1 = local_module.Conv(
+                self.cnn1 = Conv(
                     self.in_channels,
                     self.in_channels,
                     kernel_size=t_kernel,
@@ -801,7 +800,7 @@ class MLPTemporal(local_module.Module):
                     normalization=lambda: norm_mod(self.in_channels),
                     dropout=lambda: nn.Dropout2d(0.2)
                 )
-            self.cnn2 = local_module.Conv(
+            self.cnn2 = Conv(
                 self.in_channels,
                 self.out_channels,
                 bias=self.bias,
@@ -820,7 +819,7 @@ class MLPTemporal(local_module.Module):
         return x
 
 
-class GCNSpatial(local_module.Module):
+class GCNSpatial(Module):
     def __init__(self,
                  *args,
                  norm_mod: Type[PyTorchModule] = nn.BatchNorm2d,
@@ -828,14 +827,14 @@ class GCNSpatial(local_module.Module):
         super(GCNSpatial, self).__init__(*args, **kwargs)
         self.bn = norm_mod(self.out_channels)
         self.relu = nn.ReLU()
-        self.w1 = local_module.Conv(self.in_channels,
-                                    self.out_channels,
-                                    bias=self.bias)
-        self.w2 = local_module.Conv(self.in_channels,
-                                    self.out_channels,
-                                    bias=self.bias,
-                                    kernel_size=self.kernel_size,
-                                    padding=self.padding)
+        self.w1 = Conv(self.in_channels,
+                       self.out_channels,
+                       bias=self.bias)
+        self.w2 = Conv(self.in_channels,
+                       self.out_channels,
+                       bias=self.bias,
+                       kernel_size=self.kernel_size,
+                       padding=self.padding)
 
     def forward(self, x: Tensor, g: Tensor) -> Tensor:
         x1 = x.permute(0, 3, 2, 1).contiguous()  # n,t,v,c
@@ -847,19 +846,17 @@ class GCNSpatial(local_module.Module):
         return x1
 
 
-class GCNSpatialG(local_module.Module):
+class GCNSpatialG(Module):
     def __init__(self,
                  *args,
                  g_proj_shared: bool = False,
                  **kwargs):
         super(GCNSpatialG, self).__init__(*args, **kwargs)
-        self.g1 = local_module.Conv(
-            self.in_channels, self.out_channels, bias=self.bias)
+        self.g1 = Conv(self.in_channels, self.out_channels, bias=self.bias)
         if g_proj_shared:
             self.g2 = self.g1
         else:
-            self.g2 = local_module.Conv(self.in_channels,
-                                        self.out_channels, bias=self.bias)
+            self.g2 = Conv(self.in_channels, self.out_channels, bias=self.bias)
         self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, x: Tensor) -> Tensor:
