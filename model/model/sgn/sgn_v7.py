@@ -8,7 +8,6 @@
 
 # Continue from on sgn_v6
 
-from ast import Mod
 import torch
 from torch import nn
 from torch import Tensor
@@ -28,7 +27,7 @@ class SGN(PyTorchModule):
     g_activation_fn = nn.Softmax
 
     activation_fn = nn.ReLU
-    dropout_fn = nn.Dropout2d
+    # dropout_fn = nn.Dropout2d
 
     c1, c2, c3, c4 = c1, c2, c3, c4
 
@@ -43,6 +42,7 @@ class SGN(PyTorchModule):
                  in_channels: int = 3,
                  bias: int = 1,
                  dropout: float = 0.0,
+                 dropout2d: float = 0.0,
                  c_multiplier: Union[int, float, list] = 1,
                  norm_type: str = 'bn',
 
@@ -69,11 +69,13 @@ class SGN(PyTorchModule):
                  gcn_t_kernel: int = 1,
 
                  t_kernel: int = 3,
-                 t_max_pool: int = 0,
+                 t_max_pool_stride: int = 0,
                  aspp: list = None,
 
                  ):
         super(SGN, self).__init__()
+
+        self.dropout_fn = lambda: nn.Dropout2d(dropout2d)
 
         if isinstance(c_multiplier, (int, float)):
             c_multiplier = [c_multiplier for _ in range(4)]
@@ -115,7 +117,7 @@ class SGN(PyTorchModule):
         self.gcn_t_kernel = gcn_t_kernel
 
         self.t_kernel = t_kernel
-        self.t_max_pool = t_max_pool
+        self.t_max_pool_stride = t_max_pool_stride
 
         self.norm_type = norm_type
 
@@ -150,7 +152,7 @@ class SGN(PyTorchModule):
             raise ValueError("in_part is 0 but sem_part is not")
 
         assert self.t_kernel >= 0
-        assert self.t_max_pool >= 0
+        assert self.t_max_pool_stride >= 0
         assert self.norm_type in ['bn', 'ln']
 
         if self.norm_type == 'bn':
@@ -215,55 +217,63 @@ class SGN(PyTorchModule):
                 torch.tensor(self.parts_3points, dtype=torch.int).reshape(-1)
             )
 
-    def init_temporal_mlp(self, aspp: list):
-        if aspp is None or len(aspp) == 0:
-            self.aspp = lambda x: x
+    def get_inter_channels(self, mode: int, ch: int) -> Union[list, int]:
+        if mode == 3:
+            return [ch, ch, ch]
         else:
-            self.aspp = ASPP(self.c3,
-                             self.c3,
-                             bias=self.bias,
-                             dilation=aspp,
-                             dropout=self.dropout_fn,
-                             activation=self.activation,
-                             normalization=self.normalization_fn)
-        self.cnn = MLPTemporal(self.c3,
-                               self.c4,
-                               kernel_size=self.t_kernel,
-                               padding=self.t_kernel//2,
-                               bias=self.bias,
-                               dropout=self.dropout_fn,
-                               activation=self.activation_fn,
-                               normalization=self.normalization_fn,
-                               t_max_pool=self.t_max_pool)
+            return ch
 
-    def init_spatial_gcn(self):
-        self.gcn_spatial = GCNSpatialBlock(
-            self.gcn_in_ch,
-            0,
-            kernel_size=self.gcn_t_kernel,
-            padding=self.gcn_t_kernel//2,
-            bias=self.bias,
-            activation=self.activation_fn,
-            normalization=self.normalization_fn,
-            gcn_dims=[self.c2, self.c3, self.c3],
-            g_proj_dim=self.g_proj_dim,
-            g_proj_shared=self.g_proj_shared,
-            g_activation=self.g_activation_fn
-        )
+    def pad_zeros(self, x: Tensor) -> Tensor:
+        return torch.cat([x.new(*x.shape[:-1], 1).zero_(), x], dim=-1)
+
+    def init_dr(self, *args, **kwargs) -> Module:
+        in_norm = kwargs.get('in_norm', None)
+        in_norm = in_norm if in_norm is not None else self.normalization_fn_1d
+        return self.init_emb(*args, in_norm=in_norm, **kwargs)
+
+    def init_emb(self,
+                 mode: int,
+                 num_point: int,
+                 in_channels: int,
+                 out_channels: Optional[int] = None,
+                 bias: Optional[int] = None,
+                 dropout: Optional[Type[PyTorchModule]] = None,
+                 activation: Optional[Type[PyTorchModule]] = None,
+                 normalization: Optional[Type[PyTorchModule]] = None,
+                 in_norm: Optional[Type[PyTorchModule]] = None) -> Module:
+        inter_channels = self.get_inter_channels(mode, self.c1)
+        out_channels = out_channels if out_channels is not None else self.c1
+        bias = bias if bias is not None else self.bias
+        dropout = dropout if dropout is not None else self.dropout_fn
+        activation = activation if activation is not None else self.activation_fn  # noqa
+        normalization = normalization if normalization is not None else self.normalization_fn  # noqa
+        return Embedding(in_channels,
+                         out_channels,
+                         bias=bias,
+                         dropout=dropout,
+                         activation=activation,
+                         normalization=normalization,
+                         in_norm=in_norm,
+                         inter_channels=inter_channels,
+                         num_point=num_point,
+                         mode=mode)
+
+    def init_weight(self):
+        """Follows the weight initialization from the original SGN codebase."""
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+                m.weight.data.normal_(0, math.sqrt(2. / n))
+
+        def _init_0(x: Tensor): return nn.init.constant_(x, 0)
+
+        _init_0(self.gcn_spatial.gcn1.w1.block.conv.conv.weight)
+        _init_0(self.gcn_spatial.gcn2.w1.block.conv.conv.weight)
+        _init_0(self.gcn_spatial.gcn3.w1.block.conv.conv.weight)
         if self.par_pos_fusion == 1:
-            self.gcn_spatial_part = GCNSpatialBlock(
-                self.gcn_in_ch,
-                0,
-                kernel_size=self.gcn_t_kernel,
-                padding=self.gcn_t_kernel//2,
-                bias=self.bias,
-                activation=self.activation_fn,
-                normalization=self.normalization_fn,
-                gcn_dims=[self.c2, self.c3, self.c3],
-                g_proj_dim=self.g_proj_dim,
-                g_proj_shared=self.g_proj_shared,
-                g_activation=self.g_activation_fn
-            )
+            _init_0(self.gcn_spatial_part.gcn1.w1.block.conv.conv.weight)
+            _init_0(self.gcn_spatial_part.gcn2.w1.block.conv.conv.weight)
+            _init_0(self.gcn_spatial_part.gcn3.w1.block.conv.conv.weight)
 
     def init_input_dr(self):
         if self.in_position > 0:
@@ -347,63 +357,55 @@ class SGN(PyTorchModule):
                                            in_channels=self.num_segment,
                                            out_channels=out_channels)
 
-    def init_dr(self, *args, **kwargs) -> Module:
-        in_norm = kwargs.get('in_norm', None)
-        in_norm = in_norm if in_norm is not None else self.normalization_fn_1d
-        return self.init_emb(*args, in_norm=in_norm, **kwargs)
-
-    def init_emb(self,
-                 mode: int,
-                 num_point: int,
-                 in_channels: int,
-                 out_channels: Optional[int] = None,
-                 bias: Optional[int] = None,
-                 dropout: Optional[Type[PyTorchModule]] = None,
-                 activation: Optional[Type[PyTorchModule]] = None,
-                 normalization: Optional[Type[PyTorchModule]] = None,
-                 in_norm: Optional[Type[PyTorchModule]] = None) -> Module:
-        inter_channels = self.get_inter_channels(mode, self.c1)
-        out_channels = out_channels if out_channels is not None else self.c1
-        bias = bias if bias is not None else self.bias
-        dropout = dropout if dropout is not None else self.dropout_fn
-        activation = activation if activation is not None else self.activation_fn  # noqa
-        normalization = normalization if normalization is not None else self.normalization_fn  # noqa
-        return Embedding(in_channels,
-                         out_channels,
-                         bias=bias,
-                         dropout=dropout,
-                         activation=activation,
-                         normalization=normalization,
-                         in_norm=in_norm,
-                         inter_channels=inter_channels,
-                         num_point=num_point,
-                         mode=mode)
-
-    def init_weight(self):
-        """Follows the weight initialization from the original SGN codebase."""
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-                m.weight.data.normal_(0, math.sqrt(2. / n))
-
-        def _init_0(x: Tensor): return nn.init.constant_(x, 0)
-
-        _init_0(self.gcn_spatial.gcn1.w1.block.conv.conv.weight)
-        _init_0(self.gcn_spatial.gcn2.w1.block.conv.conv.weight)
-        _init_0(self.gcn_spatial.gcn3.w1.block.conv.conv.weight)
+    def init_spatial_gcn(self):
+        self.gcn_spatial = GCNSpatialBlock(
+            self.gcn_in_ch,
+            0,
+            kernel_size=self.gcn_t_kernel,
+            padding=self.gcn_t_kernel//2,
+            bias=self.bias,
+            activation=self.activation_fn,
+            normalization=self.normalization_fn,
+            gcn_dims=[self.c2, self.c3, self.c3],
+            g_proj_dim=self.g_proj_dim,
+            g_proj_shared=self.g_proj_shared,
+            g_activation=self.g_activation_fn
+        )
         if self.par_pos_fusion == 1:
-            _init_0(self.gcn_spatial_part.gcn1.w1.block.conv.conv.weight)
-            _init_0(self.gcn_spatial_part.gcn2.w1.block.conv.conv.weight)
-            _init_0(self.gcn_spatial_part.gcn3.w1.block.conv.conv.weight)
+            self.gcn_spatial_part = GCNSpatialBlock(
+                self.gcn_in_ch,
+                0,
+                kernel_size=self.gcn_t_kernel,
+                padding=self.gcn_t_kernel//2,
+                bias=self.bias,
+                activation=self.activation_fn,
+                normalization=self.normalization_fn,
+                gcn_dims=[self.c2, self.c3, self.c3],
+                g_proj_dim=self.g_proj_dim,
+                g_proj_shared=self.g_proj_shared,
+                g_activation=self.g_activation_fn
+            )
 
-    def get_inter_channels(self, mode: int, ch: int) -> Union[list, int]:
-        if mode == 3:
-            return [ch, ch, ch]
+    def init_temporal_mlp(self, aspp: list):
+        if aspp is None or len(aspp) == 0:
+            self.aspp = lambda x: x
         else:
-            return ch
-
-    def pad_zeros(self, x: Tensor) -> Tensor:
-        return torch.cat([x.new(*x.shape[:-1], 1).zero_(), x], dim=-1)
+            self.aspp = ASPP(self.c3,
+                             self.c3,
+                             bias=self.bias,
+                             dilation=aspp,
+                             dropout=self.dropout_fn,
+                             activation=self.activation,
+                             normalization=self.normalization_fn)
+        self.cnn = MLPTemporal(self.c3,
+                               self.c4,
+                               kernel_size=self.t_kernel,
+                               padding=self.t_kernel//2,
+                               bias=self.bias,
+                               dropout=self.dropout_fn,
+                               activation=self.activation_fn,
+                               normalization=self.normalization_fn,
+                               max_pool_stride=self.t_max_pool_stride)
 
     def get_dy1(self, x: Tensor):
         bs, step, dim = x.shape
@@ -496,8 +498,7 @@ class SGN(PyTorchModule):
             y (Tensor): logits.
             g (Tensor): Attention matrix for GCN.
         """
-        bs, step, dim = x.shape
-        assert dim % 3 == 0, "Only support input of xyz coordinates only."
+        assert x.shape[-1] % 3 == 0, "Only support input of xyz only."
 
         # Dynamic Representation -----------------------------------------------
         dy1 = self.get_dy1(x)
@@ -670,7 +671,7 @@ class Embedding(Module):
                              bias=self.bias,
                              normalization=lambda: self.normalization(
                                  self.out_channels),
-                             dropout=lambda: self.dropout(0.2))
+                             dropout=self.dropout)
         elif mode == 3:
             assert isinstance(inter_channels, list)
             inter_channels = \
@@ -732,7 +733,7 @@ class EmbeddingSubject(Module):
             nn.init.normal_(embedding, std=0.02)  # bert
             self.embedding = nn.Parameter(embedding)
             self.norm = self.normalization(self.out_channels)
-            self.drop = self.dropout(0.2)
+            self.drop = self.dropout()
         elif mode == 3:
             # 4x MLP
             self.in_dim = self.in_channels
@@ -789,7 +790,7 @@ class MLPTemporal(Module):
                  dropout: Type[PyTorchModule] = nn.Dropout2d,
                  activation: Type[PyTorchModule] = nn.ReLU,
                  normalization: Type[PyTorchModule] = nn.BatchNorm2d,
-                 t_max_pool: int = 0):
+                 max_pool_stride: int = 0):
         super(MLPTemporal, self).__init__(in_channels,
                                           out_channels,
                                           kernel_size=kernel_size,
@@ -798,11 +799,11 @@ class MLPTemporal(Module):
                                           dropout=dropout,
                                           activation=activation,
                                           normalization=normalization)
-        self.t_max_pool = t_max_pool
+        self.max_pool_stride = max_pool_stride
         if self.kernel_size > 0:
-            if t_max_pool == 1:
-                self.maxp = nn.MaxPool2d(kernel_size=(1, self.kernel_size),
-                                         stride=(1, t_max_pool))
+            if self.max_pool_stride > 0:
+                self.pool = nn.MaxPool2d(kernel_size=(1, self.kernel_size),
+                                         stride=(1, max_pool_stride))
             else:
                 self.cnn1 = Conv(
                     self.in_channels,
@@ -812,7 +813,7 @@ class MLPTemporal(Module):
                     bias=self.bias,
                     activation=self.activation,
                     normalization=lambda: self.normalization(self.in_channels),
-                    dropout=lambda: self.dropout(0.2)
+                    dropout=self.dropout
                 )
             self.cnn2 = Conv(
                 self.in_channels,
@@ -825,8 +826,8 @@ class MLPTemporal(Module):
     def forward(self, x: Tensor) -> Tensor:
         # x: n,c,v,t ; v=1 due to SMP
         if self.kernel_size > 0:
-            if self.t_max_pool == 1:
-                x = self.maxp(x)
+            if self.max_pool_stride > 0:
+                x = self.pool(x)
             else:
                 x = self.cnn1(x)
             x = self.cnn2(x)
@@ -984,10 +985,12 @@ if __name__ == '__main__':
     inputs = torch.ones(batch_size, 20, 75)
     subjects = torch.ones(batch_size, 20, 1)
     model = SGN(num_segment=20,
-                # in_part=1,
-                # in_motion=1,
+                in_part=1,
+                in_motion=1,
+                in_part_type=2,
+                par_pos_fusion=1,
                 # subject=1,
-                # sem_part=1,
+                sem_part=1,
                 # par_pos_fusion=1,
                 # sem_fra_fusion=1,
                 # subject_fusion=101
