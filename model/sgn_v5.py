@@ -33,6 +33,8 @@ class SGN(PyTorchModule):
 
     # NTU (from viewer prespective)
     parts_3points_wholebody = parts_3points_wholebody
+    parts_3points_armandhand = parts_3points_armandhand
+    parts_2points_interhandandinterfeet = parts_2points_interhandandinterfeet
 
     def __init__(self,
                  num_class: int = 60,

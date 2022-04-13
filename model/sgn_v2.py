@@ -45,7 +45,7 @@ class SGN(nn.Module):
     c1, c2, c3, c4 = c1, c2, c3, c4
 
     # NTU
-    parts_3points_wholebody = parts_3points_wholebody
+    parts_3points = parts_3points_wholebody
 
     def __init__(self,
                  num_class: int = 60,
