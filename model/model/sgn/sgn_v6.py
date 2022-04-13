@@ -343,7 +343,7 @@ class SGN(PyTorchModule):
             self.aspp = ASPP(self.c3,
                              self.c3,
                              bias=self.bias,
-                             dilations=aspp,
+                             dilation=aspp,
                              norm_mod=self.norm_mod)
 
         # Frame level module ---------------------------------------------------

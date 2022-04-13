@@ -10,7 +10,7 @@
 import torch
 from torch import nn
 
-from model import sgn_v2
+from model.model.sgn import sgn_v2
 
 
 class SGN(sgn_v2.SGN):

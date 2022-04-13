@@ -17,7 +17,7 @@ class Module(PyTorchModule):
                  out_channels: int,
                  kernel_size: int = 1,
                  padding: int = 0,
-                 dilation: int = 1,
+                 dilation: Union[int, list] = 1,
                  bias: int = 0,
                  deterministic: Optional[bool] = None,
                  dropout: Optional[Type[PyTorchModule]] = None,
@@ -53,8 +53,22 @@ class Module(PyTorchModule):
 
 
 class Conv1xN(Module):
-    def __init__(self, *args, **kwargs):
-        super(Conv1xN, self).__init__(*args, **kwargs)
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 kernel_size: int = 1,
+                 padding: int = 0,
+                 dilation: int = 1,
+                 bias: int = 0,
+                 deterministic: Optional[bool] = None,
+                 ):
+        super(Conv1xN, self).__init__(in_channels,
+                                      out_channels,
+                                      kernel_size=kernel_size,
+                                      padding=padding,
+                                      dilation=dilation,
+                                      bias=bias,
+                                      deterministic=deterministic)
         assert isinstance(self.kernel_size, int)
         assert isinstance(self.padding, int)
         assert isinstance(self.dilation, int)
@@ -77,8 +91,28 @@ class Conv1xN(Module):
 
 
 class Conv(Module):
-    def __init__(self, *args, **kwargs):
-        super(Conv, self).__init__(*args, **kwargs)
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 kernel_size: int = 1,
+                 padding: int = 0,
+                 dilation: int = 1,
+                 bias: int = 0,
+                 deterministic: Optional[bool] = None,
+                 dropout: Optional[Type[PyTorchModule]] = None,
+                 activation: Optional[Type[PyTorchModule]] = None,
+                 normalization: Optional[Type[PyTorchModule]] = None,
+                 ):
+        super(Conv, self).__init__(in_channels,
+                                   out_channels,
+                                   kernel_size=kernel_size,
+                                   padding=padding,
+                                   dilation=dilation,
+                                   bias=bias,
+                                   deterministic=deterministic,
+                                   dropout=dropout,
+                                   activation=activation,
+                                   normalization=normalization)
         block = OrderedDict({
             'conv': Conv1xN(self.in_channels,
                             self.out_channels,
@@ -93,8 +127,29 @@ class Conv(Module):
 
 
 class Pool(Module):
-    def __init__(self, *args, pooling: PyTorchModule, **kwargs):
-        super(Pool, self).__init__(*args, **kwargs)
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 pooling: PyTorchModule,
+                 kernel_size: int = 1,
+                 padding: int = 0,
+                 dilation: int = 1,
+                 bias: int = 0,
+                 deterministic: Optional[bool] = None,
+                 dropout: Optional[Type[PyTorchModule]] = None,
+                 activation: Optional[Type[PyTorchModule]] = None,
+                 normalization: Optional[Type[PyTorchModule]] = None,
+                 ):
+        super(Pool, self).__init__(in_channels,
+                                   out_channels,
+                                   kernel_size=kernel_size,
+                                   padding=padding,
+                                   dilation=dilation,
+                                   bias=bias,
+                                   deterministic=deterministic,
+                                   dropout=dropout,
+                                   activation=activation,
+                                   normalization=normalization)
         block = OrderedDict({
             'pool': pooling,
             'conv': Conv1xN(self.in_channels,
@@ -107,42 +162,55 @@ class Pool(Module):
 
 class ASPP(Module):
     def __init__(self,
-                 *args,
-                 dilations: list = [1, 3, 5, 7],
-                 norm_mod: Type[PyTorchModule] = nn.BatchNorm2d,
-                 **kwargs):
-        super(ASPP, self).__init__(*args, **kwargs)
+                 in_channels: int,
+                 out_channels: int,
+                 kernel_size: int = 3,
+                 dilation: list = [1, 3, 5, 7],
+                 bias: int = 0,
+                 dropout: Type[PyTorchModule] = nn.Dropout2d,
+                 activation: Type[PyTorchModule] = nn.ReLU,
+                 normalization: Type[PyTorchModule] = nn.BatchNorm2d):
+        super(ASPP, self).__init__(in_channels,
+                                   out_channels,
+                                   kernel_size=kernel_size,
+                                   dilation=dilation,
+                                   bias=bias,
+                                   dropout=dropout,
+                                   activation=activation,
+                                   normalization=normalization)
         self.aspp = torch.nn.ModuleDict()
-        self.pool = 0 in dilations
+        self.pool = 0 in self.dilation
         if self.pool:
             self.aspp.update({
                 'aspp_pool': Pool(self.in_channels,
                                   self.out_channels,
                                   bias=self.bias,
                                   pooling=nn.AdaptiveAvgPool2d(1),
-                                  activation=nn.ReLU)
+                                  activation=self.activation)
             })
-        for dil in dilations:
+        for dil in self.dilation:
             if dil == 0:
                 continue
             self.aspp.update({
                 f'aspp_{dil}': Conv(
                     self.in_channels,
                     self.out_channels,
-                    kernel_size=3,
+                    kernel_size=self.kernel_size,
                     padding=dil,
                     dilation=dil,
                     bias=self.bias,
-                    activation=nn.ReLU,
-                    normalization=lambda: norm_mod(self.out_channels),
+                    activation=self.activation,
+                    normalization=lambda: self.normalization(
+                        self.out_channels),
                     deterministic=False
                 )
             })
-        self.proj = Conv(self.out_channels * len(dilations),
+        self.proj = Conv(self.out_channels * len(self.dilation),
                          self.out_channels,
                          bias=self.bias,
-                         normalization=lambda: norm_mod(self.out_channels),
-                         dropout=lambda: nn.Dropout2d(0.2))
+                         normalization=lambda: self.normalization(
+                             self.out_channels),
+                         dropout=lambda: self.dropout(0.2))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: n,c,v,t
