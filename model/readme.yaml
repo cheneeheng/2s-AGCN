@@ -1310,6 +1310,8 @@ sgn_v4:
                   - 93.28%
         - 220404180001_gprojdim512_rerun:
                   - 94.11%
+        - 220404180001_gprojdim128:
+        - 220404180001_gprojdim64:
 
         # joints 15
         - 220405153001:
@@ -1353,6 +1355,8 @@ sgn_v6:
                   - 93.83%
         - 220411120001_gcntkernel3_tkernel0_fipregcn:
                   - 92.86%
+        - 220411220001_fipregcn:
+
         - 220411120001_all64dim:
                   - 87.61%
         - 220411120001_cmulti1105025:
@@ -1361,6 +1365,13 @@ sgn_v6:
                   - 93.89%
         - 220411220001_motionsampler1_motionnorm1:
                   - 94.17%
+        - 220411220001_par_pos_fusion1:
+                  - 93.94%
+        - grid_cmulti:
+                  - order of dim priority (high to low) = c3,c4,c1,c2
+        - grid_seg:
+                  - tested sampling freq (seg) from 5 to 50
+                  - 20 is the best
 
 sgn-code:
         - original sgn repo code
