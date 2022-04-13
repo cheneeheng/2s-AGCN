@@ -1,4 +1,4 @@
-work_dir: ./data/data/ntu_result/xview/sgn_v6/220411120001
+work_dir: ./data/data/ntu_result/xview/sgn_v6/220411220001_par_pos_fusion1
 
 phase: train
 save_score: True
@@ -25,7 +25,8 @@ train_feeder_args:
 train_dataloader_args:
   seg: 20
   multi_test: 1
-  # motion_sampler: 1
+  motion_sampler: 1
+  motion_norm: 1
 
 test_feeder_args:
   debug: False
@@ -40,7 +41,8 @@ test_feeder_args:
 test_dataloader_args:
   seg: 20
   multi_test: 5
-  # motion_sampler: 1s
+  motion_sampler: 1
+  motion_norm: 1
 
 use_sgn_dataloader: True
 
@@ -54,31 +56,34 @@ model_args:
   in_channels: 3
   bias: 1
   dropout: 0.0
-  c_multiplier: 1
+  # c_multiplier: [1.0, 1.0, 1.0, 1.0]
   norm_type: bn
   ## input args
   in_position: 1
   in_velocity: 1
-  in_part_type: 0
-  in_part: 0
-  in_motion: 0
-  ## secondary input args
-  subject: 0
-  ## semantic args
+  in_part_type: 2
+  in_part: 1
+  in_motion: 1
+  # ## secondary input args
+  # subject: 0
+  # ## semantic args
+  par_pos_fusion: 1
   sem_par_fusion: 0
   sem_pos_fusion: 0
-  sem_part: 0
+  sem_fra_fusion: 1
+  # subject_fusion: 1
+  sem_part: 1
   sem_position: 1
   sem_frame: 1
-  ## GCN args
-  g_shared: True
-  g_proj_shared: False
-  g_proj_dim: 256
-  gcn_t_kernel: 3
-  ## Temporal MLP args
-  t_kernel: 3
-  t_max_pool: 0
-  aspp: [0, 1, 2, 3]
+  # ## GCN args
+  # g_shared: True
+  # g_proj_shared: False
+  # g_proj_dim: 256
+  # gcn_t_kernel: 3
+  # ## Temporal MLP args
+  # t_kernel: 0
+  # t_max_pool: 0
+  # aspp: [0, 1, 2, 3]
 
 label_smoothing: 0.1
 

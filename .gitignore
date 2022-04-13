@@ -119,3 +119,5 @@ sam
 run.sh
 update_git
 confusion_matrix.py
+config/nturgbd-cross-view/grid
+*local.py
