@@ -1034,10 +1034,11 @@ class GCNSpatialBlock(Module):
             if r == 0:
                 setattr(self, f'res{i+1}', lambda x: 0)
             elif r == 1:
-                if gcn_dims[i] == gcn_dims[i]:
+                if gcn_dims[i] == gcn_dims[i+1]:
                     setattr(self, f'res{i+1}', lambda x: x)
                 else:
-                    setattr(self, f'res{i+1}', Conv(bias=self.bias))
+                    setattr(self, f'res{i+1}', Conv(gcn_dims[i], gcn_dims[i+1],
+                                                    bias=self.bias))
             else:
                 raise ValueError("Unknown residual modes...")
 
