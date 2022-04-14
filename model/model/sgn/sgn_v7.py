@@ -399,9 +399,15 @@ class SGN(PyTorchModule):
             )
 
     def init_spatial_fusion(self):
+        if self.par_pos_fusion in [0, 2, 4]:
+            in_channels = self.c2
+            out_channels = self.c2
+        elif self.par_pos_fusion in [1, 3, 5]:
+            in_channels = self.c3
+            out_channels = self.c3
         self.fuse_spatial = SpatialFusion(
-            in_channels=self.c2,
-            out_channels=self.c2,
+            in_channels=in_channels,
+            out_channels=out_channels,
             bias=self.bias,
             dropout=self.dropout_fn,
             activation=self.activation_fn,
@@ -1156,7 +1162,7 @@ if __name__ == '__main__':
                 in_part=1,
                 in_motion=1,
                 in_part_type=2,
-                par_pos_fusion=2,
+                par_pos_fusion=5,
                 # subject=1,
                 sem_part=1,
                 # par_pos_fusion=1,
