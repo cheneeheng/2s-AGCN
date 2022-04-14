@@ -368,14 +368,14 @@ class SGN(PyTorchModule):
 
     def init_spatial_gcn(self):
         self.gcn_spatial = GCNSpatialBlock(
-            self.gcn_in_ch,
+            0,
             0,
             kernel_size=self.gcn_t_kernel,
             padding=self.gcn_t_kernel//2,
             bias=self.bias,
             activation=self.activation_fn,
             normalization=self.normalization_fn,
-            gcn_dims=[self.c2, self.c3, self.c3],
+            gcn_dims=[self.gcn_in_ch, self.c2, self.c3, self.c3],
             g_proj_dim=self.g_proj_dim,
             g_proj_shared=self.g_proj_shared,
             g_activation=self.g_activation_fn,
@@ -383,14 +383,14 @@ class SGN(PyTorchModule):
         )
         if self.par_pos_fusion == 1:
             self.gcn_spatial_part = GCNSpatialBlock(
-                self.gcn_in_ch,
+                0,
                 0,
                 kernel_size=self.gcn_t_kernel,
                 padding=self.gcn_t_kernel//2,
                 bias=self.bias,
                 activation=self.activation_fn,
                 normalization=self.normalization_fn,
-                gcn_dims=[self.c2, self.c3, self.c3],
+                gcn_dims=[self.gcn_in_ch, self.c2, self.c3, self.c3],
                 g_proj_dim=self.g_proj_dim,
                 g_proj_shared=self.g_proj_shared,
                 g_activation=self.g_activation_fn,
@@ -556,6 +556,30 @@ class SGN(PyTorchModule):
             sub1 = self.sub_embed(s)
         return spa1, gro1, tem1, sub1
 
+    def get_spatial_fused_emd(self,
+                              x_pos: Optional[Tensor],
+                              x_par: Optional[Tensor],
+                              mode: int = 0):
+        # spatial fusion pre gcn
+        if mode == 0:
+            if self.par_pos_fusion == 1:
+                assert x_pos is not None and x_par is not None
+                x = [x_pos, x_par]
+            elif x_pos is not None and x_par is not None:
+                x = torch.cat([x_pos, x_par], 2)  # n,c,v'+v,t
+            elif x_pos is not None:
+                x = x_pos
+            elif x_par is not None:
+                x = x_par
+            else:
+                raise ValueError("Unsupported input combination")
+        # spatial fusion post gcn
+        elif mode == 1:
+            if self.par_pos_fusion == 1:
+                # x_pos here is already a list with x_par
+                x = torch.cat(x_pos, 2)  # n,c,v'+v,t
+        return x
+
     def forward(self,
                 x: Tensor,
                 s: Optional[Tensor] = None
@@ -607,17 +631,7 @@ class SGN(PyTorchModule):
                     x_par = torch.cat([dy2, gro1], 1)  # n,c,v',t
 
         # spatial fusion pre gcn
-        if self.par_pos_fusion == 1:
-            assert x_pos is not None and x_par is not None
-            x = [x_pos, x_par]
-        elif x_pos is not None and x_par is not None:
-            x = torch.cat([x_pos, x_par], 2)  # n,c,v'+v,t
-        elif x_pos is not None:
-            x = x_pos
-        elif x_par is not None:
-            x = x_par
-        else:
-            raise ValueError("Unsupported input combination")
+        x = self.get_spatial_fused_emd(x_pos=x_pos, x_par=x_par, mode=0)
 
         # temporal fusion pre gcn
         if self.sem_frame > 0 and self.sem_fra_fusion == 101:
@@ -643,14 +657,14 @@ class SGN(PyTorchModule):
 
         # Frame-level Module ---------------------------------------------------
         # spatial fusion post gcn
-        if self.par_pos_fusion == 1:
-            x = torch.cat(x, 2)  # n,c,v'+v,t
+        x = self.get_spatial_fused_emd(x_pos=x, x_par=None, mode=1)
 
         # temporal fusion post gcn
-        if self.par_pos_fusion == 0:
-            if self.sem_frame > 0 and self.sem_fra_fusion == 1:
+        if self.sem_frame > 0 and self.sem_fra_fusion == 1:
+            if self.par_pos_fusion == 0:
                 x = x + tem1
-            if self.subject > 0 and self.subject_fusion == 1:
+        if self.subject > 0 and self.subject_fusion == 1:
+            if self.par_pos_fusion == 0:
                 x = x + sub1
 
         x = self.smp(x)
@@ -863,7 +877,8 @@ class MLPTemporal(PyTorchModule):
                  dropouts: T2 = [nn.Dropout2d, None],
                  activations: T2 = [nn.ReLU, nn.ReLU],
                  normalizations: T2 = [nn.BatchNorm2d, nn.BatchNorm2d],
-                 maxpool_kwargs: Optional[dict] = None):
+                 maxpool_kwargs: Optional[dict] = None
+                 ):
         super(MLPTemporal, self).__init__()
         if maxpool_kwargs is not None:
             # self.pool = nn.MaxPool2d(kernel_size=(1, self.kernel_size),

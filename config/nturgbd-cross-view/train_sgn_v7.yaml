@@ -1,4 +1,4 @@
-work_dir: ./data/data/ntu_result/xview/sgn_v7/220413153001
+work_dir: ./data/data/ntu_result/xview/sgn/sgn_v7/220413153001
 
 phase: train
 save_score: True

@@ -1381,9 +1381,23 @@ sgn_v7:
         - 220413153001_dropout2d01:
                   - 94.49%
         - 220413153001_par1_mot1_pt2_parposfus1:
+                  - concat after sgn
                   - 94.03%
         - 220413153001_par1_mot1_pt2_parposfus0:
+                  - concat before sgn
                   - 94.08%
+        - 220413153001_tmode2:
+                  - temporal cnn with residual
+                  - 94.23%
+        - 220413153001_tmode3:
+                  - temporal cnn with all 3x3
+                  - 94.53%
+        - 220413153001_tmode5:
+                  - temporal cnn with 3convs
+                  - 94.20%
+        - 220413153001_gres111:
+                  - residual in the gcn blocks
+                  - 93.80%
 
 sgn-code:
         - original sgn repo code
