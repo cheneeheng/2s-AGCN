@@ -8,6 +8,7 @@
 
 # Continue from on sgn_v6
 
+from multiprocessing import parent_process
 import torch
 from torch import nn
 from torch import Tensor
@@ -139,16 +140,15 @@ class SGN(PyTorchModule):
         assert self.in_part_type in [0, 1, 2]
         assert self.in_motion in dr_modes
 
-        # 0 = concat before sgn, 1 = concat after sgn
-        assert self.par_pos_fusion in [0, 1]
-        if par_pos_fusion == 1:
-            assert self.in_part > 0 or self.in_motion > 0
+        # 0 = concat before sgn, 1 = concat after sgn, others have projection
+        assert self.par_pos_fusion in [0, 1, 2, 3, 4, 5]
         # 0 = concat, 1 = add
         assert self.sem_pos_fusion in [0, 1]
         assert self.sem_par_fusion in [0, 1]
         # 1 = add after GCN, 101 = add before GCN
         assert self.sem_fra_fusion in [1, 101]
         assert self.subject_fusion in [1, 101]
+        # 0 and 1 no projection
 
         sem_modes = [0, 1, 2, 3]
         assert self.sem_part in sem_modes
@@ -204,6 +204,7 @@ class SGN(PyTorchModule):
 
         # GCN ------------------------------------------------------------------
         self.init_spatial_gcn()
+        self.init_spatial_fusion()
 
         # ASPP -----------------------------------------------------------------
         # Frame level module ---------------------------------------------------
@@ -279,7 +280,7 @@ class SGN(PyTorchModule):
         _init_0(self.gcn_spatial.gcn1.w1.block.conv.conv.weight)
         _init_0(self.gcn_spatial.gcn2.w1.block.conv.conv.weight)
         _init_0(self.gcn_spatial.gcn3.w1.block.conv.conv.weight)
-        if self.par_pos_fusion == 1:
+        if self.par_pos_fusion % 2 == 1:
             _init_0(self.gcn_spatial_part.gcn1.w1.block.conv.conv.weight)
             _init_0(self.gcn_spatial_part.gcn2.w1.block.conv.conv.weight)
             _init_0(self.gcn_spatial_part.gcn3.w1.block.conv.conv.weight)
@@ -381,7 +382,7 @@ class SGN(PyTorchModule):
             g_activation=self.g_activation_fn,
             g_residual=self.g_residual
         )
-        if self.par_pos_fusion == 1:
+        if self.par_pos_fusion % 2 == 1:
             self.gcn_spatial_part = GCNSpatialBlock(
                 0,
                 0,
@@ -396,6 +397,17 @@ class SGN(PyTorchModule):
                 g_activation=self.g_activation_fn,
                 g_residual=self.g_residual
             )
+
+    def init_spatial_fusion(self):
+        self.fuse_spatial = SpatialFusion(
+            in_channels=self.c2,
+            out_channels=self.c2,
+            bias=self.bias,
+            dropout=self.dropout_fn,
+            activation=self.activation_fn,
+            normalization=self.normalization_fn,
+            mode=self.par_pos_fusion
+        )
 
     def init_temporal_mlp(self):
         if self.aspp is None or len(self.aspp) == 0:
@@ -556,30 +568,6 @@ class SGN(PyTorchModule):
             sub1 = self.sub_embed(s)
         return spa1, gro1, tem1, sub1
 
-    def get_spatial_fused_emd(self,
-                              x_pos: Optional[Tensor],
-                              x_par: Optional[Tensor],
-                              mode: int = 0):
-        # spatial fusion pre gcn
-        if mode == 0:
-            if self.par_pos_fusion == 1:
-                assert x_pos is not None and x_par is not None
-                x = [x_pos, x_par]
-            elif x_pos is not None and x_par is not None:
-                x = torch.cat([x_pos, x_par], 2)  # n,c,v'+v,t
-            elif x_pos is not None:
-                x = x_pos
-            elif x_par is not None:
-                x = x_par
-            else:
-                raise ValueError("Unsupported input combination")
-        # spatial fusion post gcn
-        elif mode == 1:
-            if self.par_pos_fusion == 1:
-                # x_pos here is already a list with x_par
-                x = torch.cat(x_pos, 2)  # n,c,v'+v,t
-        return x
-
     def forward(self,
                 x: Tensor,
                 s: Optional[Tensor] = None
@@ -631,40 +619,41 @@ class SGN(PyTorchModule):
                     x_par = torch.cat([dy2, gro1], 1)  # n,c,v',t
 
         # spatial fusion pre gcn
-        x = self.get_spatial_fused_emd(x_pos=x_pos, x_par=x_par, mode=0)
+        x, fusion_level = self.fuse_spatial(x1=x_pos, x2=x_par)
 
         # temporal fusion pre gcn
         if self.sem_frame > 0 and self.sem_fra_fusion == 101:
-            if self.par_pos_fusion == 1:
+            if self.par_pos_fusion % 2 == 1:
                 x = [i + tem1 for i in x]
             else:
                 x = x + tem1
         if self.subject > 0 and self.subject_fusion == 101:
-            if self.par_pos_fusion == 1:
+            if self.par_pos_fusion % 2 == 1:
                 x = [i + sub1 for i in x]
             else:
                 x = x + sub1
 
         # GCN ------------------------------------------------------------------
-        if self.par_pos_fusion == 1:
+        if self.par_pos_fusion % 2 == 1:
             x0, g0 = self.gcn_spatial(x[0])
             x1, g1 = self.gcn_spatial_part(x[1])
             x = [x0, x1]
             g_out = [g0, g1]
         else:
             x, g = self.gcn_spatial(x)
+            x = [x]
             g_out = [g]
 
         # Frame-level Module ---------------------------------------------------
         # spatial fusion post gcn
-        x = self.get_spatial_fused_emd(x_pos=x, x_par=None, mode=1)
+        x, _ = self.fuse_spatial(*x, fusion_level=fusion_level)
 
         # temporal fusion post gcn
         if self.sem_frame > 0 and self.sem_fra_fusion == 1:
-            if self.par_pos_fusion == 0:
+            if self.par_pos_fusion % 2 == 0:
                 x = x + tem1
         if self.subject > 0 and self.subject_fusion == 1:
-            if self.par_pos_fusion == 0:
+            if self.par_pos_fusion % 2 == 0:
                 x = x + sub1
 
         x = self.smp(x)
@@ -751,7 +740,7 @@ class Embedding(Module):
                              bias=self.bias,
                              activation=self.activation)
         elif mode == 2:
-            # bert style
+            # bert style (only if we have ont hot vector)
             self.cnn1 = Conv(self.in_channels,
                              self.out_channels,
                              bias=self.bias,
@@ -1072,6 +1061,85 @@ class GCNSpatialBlock(Module):
             x = self.gcn3(x, g3) + self.res1(x)
             g = [g1, g2, g3]
         return x, g
+
+
+class SpatialFusion(Module):
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 bias: int = 0,
+                 dropout: T1 = nn.Dropout2d,
+                 activation: T1 = nn.ReLU,
+                 normalization: T1 = nn.BatchNorm2d,
+                 mode: int = 1
+                 ):
+        super(SpatialFusion, self).__init__(in_channels,
+                                            out_channels,
+                                            bias=bias,
+                                            dropout=dropout,
+                                            activation=activation,
+                                            normalization=normalization)
+        assert mode in [0, 1, 2, 3, 4, 5]
+        self.mode = mode
+        if self.mode == 2 or self.mode == 3:
+            self.cnn1 = Conv(self.in_channels,
+                             self.out_channels,
+                             bias=self.bias)
+        elif self.mode == 4 or self.mode == 5:
+            self.cnn1 = Conv(self.in_channels,
+                             self.in_channels,
+                             bias=self.bias,
+                             activation=self.activation)
+            self.cnn2 = Conv(self.in_channels,
+                             self.out_channels,
+                             bias=self.bias)
+
+    def forward(self,
+                x1: Optional[Union[Tensor, list]] = None,
+                x2: Optional[Tensor] = None,
+                fusion_level: int = 0) -> Tuple[Tensor, bool]:
+        """Fusion of features from x1 (x_pos) and x2 (x_par).
+
+        Args:
+            x1 (Optional[Union[Tensor, list]]): x_pos
+            x2 (Optional[Tensor]): x_par
+            fusion_level (int): which stage of the fusion.
+
+        Returns:
+            Tensor: fused tensor or a list or original tensors.
+        """
+        if fusion_level == 0:
+            if self.mode in [1, 3, 5]:
+                assert x1 is not None and x2 is not None
+                x = [x1, x2]
+            elif x1 is not None and x2 is not None:
+                x = torch.cat([x1, x2], 2)  # n,c,v'+v,t
+            elif x1 is not None:
+                x = x1
+            elif x2 is not None:
+                x = x2
+            else:
+                raise ValueError("Unsupported input combination")
+
+        elif fusion_level == 1:
+            if self.mode in [0, 2, 4]:
+                assert x2 is None
+                x = x1
+            else:
+                assert x2 is not None and x2 is not None
+                x = torch.cat([x1, x2], 2)  # n,c,v'+v,t
+
+        # projection
+        if self.mode == 2 or self.mode == 3:
+            if fusion_level:
+                x = self.cnn1(x)
+        elif self.mode == 4 or self.mode == 5:
+            if fusion_level:
+                x = self.cnn1(x)
+                x = self.cnn2(x)
+
+        fusion_level += 1
+        return x, fusion_level
 
 
 if __name__ == '__main__':

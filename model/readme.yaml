@@ -1380,6 +1380,8 @@ sgn_v7:
                   - 94.14%
         - 220413153001_dropout2d01:
                   - 94.49%
+        - grid_dropout:
+                  - up until 0.2 all is above 94 and then all below.
         - 220413153001_par1_mot1_pt2_parposfus1:
                   - concat after sgn
                   - 94.03%
