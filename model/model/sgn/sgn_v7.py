@@ -30,7 +30,6 @@ T2 = List[Optional[Type[PyTorchModule]]]
 class SGN(PyTorchModule):
 
     g_activation_fn = nn.Softmax
-
     activation_fn = nn.ReLU
     # dropout_fn = nn.Dropout2d
 
@@ -69,7 +68,7 @@ class SGN(PyTorchModule):
 
                  subject: int = 0,
 
-                 g_part: int = 1,
+                 g_part: int = 0,
                  g_proj_shared: bool = False,
                  g_proj_dim: Union[list, int] = c3,  # c3
                  g_residual: List[int] = [0, 0, 0],
@@ -80,9 +79,16 @@ class SGN(PyTorchModule):
                  t_maxpool_kwargs: Optional[dict] = None,
                  aspp: list = None,
 
+                 spatial_maxpool: int = 1,
+
                  ):
         super(SGN, self).__init__()
 
+        self.num_class = num_class
+        self.num_point = num_point
+        self.num_segment = num_segment
+        self.in_channels = in_channels
+        self.bias = bias
         self.dropout_fn = lambda: nn.Dropout2d(dropout2d)
 
         if isinstance(c_multiplier, (int, float)):
@@ -96,52 +102,51 @@ class SGN(PyTorchModule):
         self.c3 = to_int(self.c3 * c_multiplier[2])  # gcn
         self.c4 = to_int(self.c4 * c_multiplier[3])  # gcn
 
-        self.num_class = num_class
-        self.num_point = num_point
-        self.num_segment = num_segment
-        self.in_channels = in_channels
-        self.bias = bias
+        self.norm_type = norm_type
+        assert self.norm_type in ['bn', 'ln']
+        if self.norm_type == 'bn':
+            self.normalization_fn = nn.BatchNorm2d
+            self.normalization_fn_1d = nn.BatchNorm1d
+        elif self.norm_type == 'ln':
+            self.normalization_fn = lambda x: nn.GroupNorm(1, x)
+            self.normalization_fn_1d = lambda x: nn.GroupNorm(1, x)
 
         self.in_position = in_position
         self.in_velocity = in_velocity
         self.in_part = in_part
         self.in_part_type = in_part_type
         self.in_motion = in_motion
+        assert self.in_position in [0, 1, 2, 3]
+        assert self.in_velocity in [0, 1, 2, 3]
+        assert self.in_part in [0, 1, 2, 3]
+        assert self.in_part_type in [0, 1, 2]
+        assert self.in_motion in [0, 1, 2, 3]
+        if self.in_position == 0 and self.sem_position > 0:
+            raise ValueError("in_position is 0 but sem_position is not")
+        if self.in_part == 0 and self.sem_part > 0:
+            raise ValueError("in_part is 0 but sem_part is not")
+
+        if self.in_part_type == 0:
+            self.parts_3points = self.parts_3points_wholebody
+        elif self.in_part_type == 1:
+            self.parts_3points = self.parts_3points_armandhand
+        elif self.in_part_type == 2:
+            self.parts_3points = self.parts_2points_interhandandinterfeet
+        self.parts_len = len(self.parts_3points)
+        self.parts_dim = len(self.parts_3points[0])
+
+        self.sem_part = sem_part
+        self.sem_position = sem_position
+        self.sem_frame = sem_frame
+        assert self.sem_part in [0, 1, 2, 3]
+        assert self.sem_position in [0, 1, 2, 3]
+        assert self.sem_frame in [0, 1, 2, 3]
 
         self.par_pos_fusion = par_pos_fusion
         self.sem_pos_fusion = sem_pos_fusion
         self.sem_par_fusion = sem_par_fusion
         self.sem_fra_fusion = sem_fra_fusion
         self.subject_fusion = subject_fusion
-
-        self.sem_part = sem_part
-        self.sem_position = sem_position
-        self.sem_frame = sem_frame
-
-        self.subject = subject
-
-        self.g_part = g_part
-        self.g_proj_shared = g_proj_shared
-        self.g_proj_dim = g_proj_dim
-        self.g_residual = g_residual
-        self.gcn_t_kernel = gcn_t_kernel
-
-        self.t_mode = t_mode
-        self.t_kernel = t_kernel
-        self.t_maxpool_kwargs = t_maxpool_kwargs
-        self.aspp = aspp
-
-        self.norm_type = norm_type
-
-        assert self.subject in [0, 1, 2, 3, 4]
-
-        dr_modes = [0, 1, 2, 3]
-        assert self.in_position in dr_modes
-        assert self.in_velocity in dr_modes
-        assert self.in_part in dr_modes
-        assert self.in_part_type in [0, 1, 2]
-        assert self.in_motion in dr_modes
-
         # 0 = concat before sgn, 1 = concat after sgn, others have projection
         assert self.par_pos_fusion in [0, 1, 2, 3, 4, 5]
         # 0 = concat, 1 = add
@@ -150,39 +155,16 @@ class SGN(PyTorchModule):
         # 1 = add after GCN, 101 = add before GCN
         assert self.sem_fra_fusion in [1, 101]
         assert self.subject_fusion in [1, 101]
-        # 0 and 1 no projection
 
-        sem_modes = [0, 1, 2, 3]
-        assert self.sem_part in sem_modes
-        assert self.sem_position in sem_modes
-        assert self.sem_frame in sem_modes
+        self.subject = subject
+        assert self.subject in [0, 1, 2, 3, 4]
 
-        if self.in_position == 0 and self.sem_position > 0:
-            raise ValueError("in_position is 0 but sem_position is not")
-        if self.in_part == 0 and self.sem_part > 0:
-            raise ValueError("in_part is 0 but sem_part is not")
-
+        self.g_part = g_part
         assert self.g_part in [0, 1, 2, 3]
-        assert self.t_kernel >= 0
-
-        assert self.norm_type in ['bn', 'ln']
-
-        if self.norm_type == 'bn':
-            self.normalization_fn = nn.BatchNorm2d
-            self.normalization_fn_1d = nn.BatchNorm1d
-        elif self.norm_type == 'ln':
-            self.normalization_fn = lambda x: nn.GroupNorm(1, x)
-            self.normalization_fn_1d = lambda x: nn.GroupNorm(1, x)
-
-        if in_part_type == 0:
-            self.parts_3points = self.parts_3points_wholebody
-        elif in_part_type == 1:
-            self.parts_3points = self.parts_3points_armandhand
-        elif in_part_type == 2:
-            self.parts_3points = self.parts_2points_interhandandinterfeet
-
-        self.parts_len = len(self.parts_3points)
-        self.parts_dim = len(self.parts_3points[0])
+        self.g_proj_shared = g_proj_shared
+        self.g_proj_dim = g_proj_dim
+        self.g_residual = g_residual
+        self.gcn_t_kernel = gcn_t_kernel
 
         if self.sem_pos_fusion == 1 or self.sem_par_fusion == 1:
             self.gcn_in_ch = self.c1
@@ -190,6 +172,14 @@ class SGN(PyTorchModule):
             self.gcn_in_ch = self.c1 * 2
         else:
             self.gcn_in_ch = self.c1
+
+        self.t_mode = t_mode
+        self.t_kernel = t_kernel
+        assert self.t_kernel >= 0
+        self.t_maxpool_kwargs = t_maxpool_kwargs
+        self.aspp = aspp
+
+        self.spatial_maxpool = spatial_maxpool
 
         # Dynamic Representation -----------------------------------------------
         self.init_input_dr()
@@ -213,8 +203,11 @@ class SGN(PyTorchModule):
         # Frame level module ---------------------------------------------------
         self.init_temporal_mlp()
 
-        self.smp = nn.AdaptiveMaxPool2d((1, num_segment))
+        if self.spatial_maxpool == 1:
+            self.smp = nn.AdaptiveMaxPool2d((1, num_segment))
+
         self.tmp = nn.AdaptiveMaxPool2d((1, 1))
+
         self.do = nn.Dropout(dropout)
 
         if self.t_mode == 0:
@@ -238,11 +231,6 @@ class SGN(PyTorchModule):
 
     def pad_zeros(self, x: Tensor) -> Tensor:
         return torch.cat([x.new(*x.shape[:-1], 1).zero_(), x], dim=-1)
-
-    def init_dr(self, *args, **kwargs) -> Module:
-        in_norm = kwargs.get('in_norm', None)
-        in_norm = in_norm if in_norm is not None else self.normalization_fn_1d
-        return self.init_emb(*args, in_norm=in_norm, **kwargs)
 
     def init_emb(self,
                  mode: int,
@@ -290,28 +278,32 @@ class SGN(PyTorchModule):
 
     def init_input_dr(self):
         if self.in_position > 0:
-            self.pos_embed = self.init_dr(
+            self.pos_embed = self.init_emb(
                 mode=self.in_position,
                 num_point=self.num_point,
-                in_channels=self.in_channels
+                in_channels=self.in_channels,
+                in_norm=self.normalization_fn_1d
             )
         if self.in_velocity > 0:
-            self.vel_embed = self.init_dr(
+            self.vel_embed = self.init_emb(
                 mode=self.in_velocity,
                 num_point=self.num_point,
-                in_channels=self.in_channels
+                in_channels=self.in_channels,
+                in_norm=self.normalization_fn_1d
             )
         if self.in_part > 0:
-            self.par_embed = self.init_dr(
+            self.par_embed = self.init_emb(
                 mode=self.in_part,
                 num_point=self.parts_len,
-                in_channels=self.in_channels*self.parts_dim
+                in_channels=self.in_channels*self.parts_dim,
+                in_norm=self.normalization_fn_1d
             )
         if self.in_motion > 0:
-            self.mot_embed = self.init_dr(
+            self.mot_embed = self.init_emb(
                 mode=self.in_motion,
                 num_point=self.parts_len,
-                in_channels=self.in_channels*self.parts_dim
+                in_channels=self.in_channels*self.parts_dim,
+                in_norm=self.normalization_fn_1d
             )
 
     def init_input_subject(self):
@@ -669,7 +661,8 @@ class SGN(PyTorchModule):
             if self.par_pos_fusion % 2 == 0:
                 x = x + sub1
 
-        x = self.smp(x)
+        if self.spatial_maxpool == 1:
+            x = self.smp(x)
         x = self.aspp(x)
         x = self.cnn(x)
 

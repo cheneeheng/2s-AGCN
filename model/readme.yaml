@@ -1382,15 +1382,51 @@ sgn_v7:
                   - 94.49%
         - grid_dropout:
                   - up until 0.2 all is above 94 and then all below.
+
         - 220413153001_par1_mot1_pt2_parposfus0:
                   - sem part 1
-                  - concat before sgn
+                  - pre spatial gcn
                   - 94.08%
         - 220413153001_par1_mot1_pt2_parposfus1:
                   - sem part 1
-                  - concat after sgn
+                  - post spatial gcn
+                  - dual GCN
                   - 94.03%
+        - 220413153001_par1_mot1_pt2_spar1_parposfus1_gpart1:
+                  - post spatial gcn
+                  - no gcn for parts
+                  - 93.68%
+
         - 220413153001_par1_mot1_pt2_spar1_parposfus2:
+                  - pre spatial gcn
+                  - 1 MLP after fusion
+                  - 94.19%
+        - 220413153001_par1_mot1_pt2_spar1_parposfus3:
+                  - post spatial gcn
+                  - dual GCN
+                  - 1 MLP after fusion
+                  - 93.94%
+        - 220413153001_par1_mot1_pt2_spar1_parposfus3_gpart1:
+                  - post spatial gcn
+                  - no gcn for parts
+                  - 1 MLP after fusion
+                  - 93.90%
+
+        - 220413153001_par1_mot1_pt2_spar1_parposfus4:
+                  - pre spatial gcn
+                  - 2 MLP after fusion
+                  - 93.89%
+        - 220413153001_par1_mot1_pt2_spar1_parposfus5:
+                  - post spatial gcn
+                  - dual GCN
+                  - 2 MLP after fusion
+                  -
+        - 220413153001_par1_mot1_pt2_spar1_parposfus5_gpart1:
+                  - post spatial gcn
+                  - no gcn for parts
+                  - 2 MLP after fusion
+                  - 93.99%
+
         - 220413153001_tmode2:
                   - temporal cnn with residual
                   - 94.23%
@@ -1404,9 +1440,21 @@ sgn_v7:
                   - residual in the gcn blocks
                   - 93.80%
         - 220413153001_tmode2_cmulti10101005:
+                  - temporal cnn with residual
+                  - reduced c4
+                  - 94.03%
         - 220413153001_tmode2_cmulti101005025:
+                  - temporal cnn with residual
+                  - reduced c3 c4
+                  - 92.59%
         - 220413153001_gres111_cmulti10101005:
+                  - resifual in GCN
+                  - reduced c4
+                  - 93.73%
         - 220413153001_gres111_cmulti101005025:
+                  - resifual in GCN
+                  - reduced c3 c4
+                  - 92.25%
 
 sgn-code:
         - original sgn repo code
