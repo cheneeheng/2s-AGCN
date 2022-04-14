@@ -1108,12 +1108,14 @@ class SpatialFusion(Module):
         Returns:
             Tensor: fused tensor or a list or original tensors.
         """
+        fuse_flag = False
         if fusion_level == 0:
             if self.mode in [1, 3, 5]:
                 assert x1 is not None and x2 is not None
                 x = [x1, x2]
             elif x1 is not None and x2 is not None:
                 x = torch.cat([x1, x2], 2)  # n,c,v'+v,t
+                fuse_flag = True
             elif x1 is not None:
                 x = x1
             elif x2 is not None:
@@ -1128,15 +1130,17 @@ class SpatialFusion(Module):
             else:
                 assert x2 is not None and x2 is not None
                 x = torch.cat([x1, x2], 2)  # n,c,v'+v,t
+                fuse_flag = True
 
         # projection
-        if self.mode == 2 or self.mode == 3:
-            if fusion_level:
-                x = self.cnn1(x)
-        elif self.mode == 4 or self.mode == 5:
-            if fusion_level:
-                x = self.cnn1(x)
-                x = self.cnn2(x)
+        if fuse_flag:
+            if self.mode == 2 or self.mode == 3:
+                if fusion_level:
+                    x = self.cnn1(x)
+            elif self.mode == 4 or self.mode == 5:
+                if fusion_level:
+                    x = self.cnn1(x)
+                    x = self.cnn2(x)
 
         fusion_level += 1
         return x, fusion_level
@@ -1152,7 +1156,7 @@ if __name__ == '__main__':
                 in_part=1,
                 in_motion=1,
                 in_part_type=2,
-                par_pos_fusion=1,
+                par_pos_fusion=2,
                 # subject=1,
                 sem_part=1,
                 # par_pos_fusion=1,

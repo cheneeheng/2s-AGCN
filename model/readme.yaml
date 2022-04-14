@@ -1382,12 +1382,15 @@ sgn_v7:
                   - 94.49%
         - grid_dropout:
                   - up until 0.2 all is above 94 and then all below.
-        - 220413153001_par1_mot1_pt2_parposfus1:
-                  - concat after sgn
-                  - 94.03%
         - 220413153001_par1_mot1_pt2_parposfus0:
+                  - sem part 1
                   - concat before sgn
                   - 94.08%
+        - 220413153001_par1_mot1_pt2_parposfus1:
+                  - sem part 1
+                  - concat after sgn
+                  - 94.03%
+        - 220413153001_par1_mot1_pt2_spar1_parposfus2:
         - 220413153001_tmode2:
                   - temporal cnn with residual
                   - 94.23%
@@ -1400,6 +1403,10 @@ sgn_v7:
         - 220413153001_gres111:
                   - residual in the gcn blocks
                   - 93.80%
+        - 220413153001_tmode2_cmulti10101005:
+        - 220413153001_tmode2_cmulti101005025:
+        - 220413153001_gres111_cmulti10101005:
+        - 220413153001_gres111_cmulti101005025:
 
 sgn-code:
         - original sgn repo code
