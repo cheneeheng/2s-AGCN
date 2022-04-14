@@ -1420,7 +1420,7 @@ sgn_v7:
                   - post spatial gcn
                   - dual GCN
                   - 2 MLP after fusion
-                  -
+                  - 93.77%
         - 220413153001_par1_mot1_pt2_spar1_parposfus5_gpart1:
                   - post spatial gcn
                   - no gcn for parts

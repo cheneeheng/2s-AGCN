@@ -73,6 +73,7 @@ class SGN(PyTorchModule):
                  g_proj_dim: Union[list, int] = c3,  # c3
                  g_residual: List[int] = [0, 0, 0],
                  gcn_t_kernel: int = 1,
+                 gcn_dropout: float = 0.0,
 
                  t_mode: int = 1,
                  t_kernel: int = 3,
@@ -116,15 +117,11 @@ class SGN(PyTorchModule):
         self.in_part = in_part
         self.in_part_type = in_part_type
         self.in_motion = in_motion
-        assert self.in_position in [0, 1, 2, 3]
-        assert self.in_velocity in [0, 1, 2, 3]
-        assert self.in_part in [0, 1, 2, 3]
+        assert self.in_position in [0, 1, 2, 3, 4]
+        assert self.in_velocity in [0, 1, 2, 3, 4]
+        assert self.in_part in [0, 1, 2, 3, 4]
         assert self.in_part_type in [0, 1, 2]
-        assert self.in_motion in [0, 1, 2, 3]
-        if self.in_position == 0 and self.sem_position > 0:
-            raise ValueError("in_position is 0 but sem_position is not")
-        if self.in_part == 0 and self.sem_part > 0:
-            raise ValueError("in_part is 0 but sem_part is not")
+        assert self.in_motion in [0, 1, 2, 3, 4]
 
         if self.in_part_type == 0:
             self.parts_3points = self.parts_3points_wholebody
@@ -138,9 +135,13 @@ class SGN(PyTorchModule):
         self.sem_part = sem_part
         self.sem_position = sem_position
         self.sem_frame = sem_frame
-        assert self.sem_part in [0, 1, 2, 3]
-        assert self.sem_position in [0, 1, 2, 3]
-        assert self.sem_frame in [0, 1, 2, 3]
+        assert self.sem_part in [0, 1, 2, 3, 4]
+        assert self.sem_position in [0, 1, 2, 3, 4]
+        assert self.sem_frame in [0, 1, 2, 3, 4]
+        if self.in_position == 0 and self.sem_position > 0:
+            raise ValueError("in_position is 0 but sem_position is not")
+        if self.in_part == 0 and self.sem_part > 0:
+            raise ValueError("in_part is 0 but sem_part is not")
 
         self.par_pos_fusion = par_pos_fusion
         self.sem_pos_fusion = sem_pos_fusion
@@ -165,6 +166,7 @@ class SGN(PyTorchModule):
         self.g_proj_dim = g_proj_dim
         self.g_residual = g_residual
         self.gcn_t_kernel = gcn_t_kernel
+        self.gcn_dropout_fn = lambda: nn.Dropout2d(dropout2d)
 
         if self.sem_pos_fusion == 1 or self.sem_par_fusion == 1:
             self.gcn_in_ch = self.c1
@@ -369,6 +371,7 @@ class SGN(PyTorchModule):
             kernel_size=self.gcn_t_kernel,
             padding=self.gcn_t_kernel//2,
             bias=self.bias,
+            dropout=self.gcn_dropout_fn,
             activation=self.activation_fn,
             normalization=self.normalization_fn,
             gcn_dims=[self.gcn_in_ch, self.c2, self.c3, self.c3],
@@ -384,6 +387,7 @@ class SGN(PyTorchModule):
                 kernel_size=self.gcn_t_kernel,
                 padding=self.gcn_t_kernel//2,
                 bias=self.bias,
+                dropout=self.gcn_dropout_fn,
                 activation=self.activation_fn,
                 normalization=self.normalization_fn,
                 gcn_dims=[self.gcn_in_ch, self.c2, self.c3, self.c3],
@@ -479,6 +483,22 @@ class SGN(PyTorchModule):
             paddings = [self.t_kernel//2, 0, 0]
             residuals = [1 for _ in range(3)]
             dropouts = [self.dropout_fn, None, None]
+        # original sgn + all dropout
+        elif self.t_mode == 7:
+            idx = 2
+            channels = [self.c3, self.c3, self.c4]
+            kernel_sizes = [self.t_kernel, 1]
+            paddings = [self.t_kernel//2, 0]
+            residuals = [0 for _ in range(idx)]
+            dropouts = [self.dropout_fn, self.dropout_fn]
+        # original sgn + all dropout
+        elif self.t_mode == 8:
+            idx = 2
+            channels = [self.c3, self.c3, self.c4]
+            kernel_sizes = [self.t_kernel, 1]
+            paddings = [self.t_kernel//2, 0]
+            residuals = [1 for _ in range(idx)]
+            dropouts = [self.dropout_fn, self.dropout_fn]
         else:
             raise ValueError("Unknown t_mode...")
         self.cnn = MLPTemporal(
@@ -728,7 +748,7 @@ class Embedding(Module):
                                         dropout=dropout,
                                         activation=activation,
                                         normalization=normalization)
-        assert mode in [1, 2, 3]
+        assert mode in [1, 2, 3, 4]
         self.mode = mode
 
         if in_norm is not None:
@@ -763,6 +783,16 @@ class Embedding(Module):
                                                 layer_channels[i+1],
                                                 bias=self.bias,
                                                 activation=self.activation))
+        elif mode == 4:
+            self.cnn1 = Conv(self.in_channels,
+                             inter_channels,
+                             bias=self.bias,
+                             activation=self.activation,
+                             dropout=self.dropout)
+            self.cnn2 = Conv(inter_channels,
+                             self.out_channels,
+                             bias=self.bias,
+                             activation=self.activation)
 
     def forward(self, x: Tensor) -> Tensor:
         # x: n,c,v,t
@@ -948,6 +978,7 @@ class GCNSpatialUnit(Module):
                  kernel_size: int = 1,
                  padding: int = 0,
                  bias: int = 0,
+                 dropout: Optional[Type[PyTorchModule]] = None,
                  activation: T1 = nn.ReLU,
                  normalization: T1 = nn.BatchNorm2d
                  ):
@@ -956,10 +987,12 @@ class GCNSpatialUnit(Module):
                                              kernel_size=kernel_size,
                                              padding=padding,
                                              bias=bias,
+                                             dropout=dropout,
                                              activation=activation,
                                              normalization=normalization)
         self.norm = self.normalization(self.out_channels)
         self.act = self.activation()
+        self.drop = lambda x: x if self.dropout is None else self.dropout()
         self.w1 = Conv(self.in_channels, self.out_channels, bias=self.bias)
         self.w2 = Conv(self.in_channels, self.out_channels, bias=self.bias,
                        kernel_size=self.kernel_size, padding=self.padding)
@@ -971,6 +1004,7 @@ class GCNSpatialUnit(Module):
         x1 = self.w1(x1) + self.w2(x)  # z + residual
         x1 = self.norm(x1)
         x1 = self.act(x1)
+        x1 = self.drop(x1)
         return x1
 
 
@@ -980,6 +1014,7 @@ class GCNSpatialBlock(Module):
                  kernel_size: int = 1,
                  padding: int = 0,
                  bias: int = 0,
+                 dropout: Optional[Type[PyTorchModule]] = None,
                  activation: T1 = nn.ReLU,
                  normalization: T1 = nn.BatchNorm2d,
                  gcn_dims: list,
@@ -992,6 +1027,7 @@ class GCNSpatialBlock(Module):
                                               kernel_size=kernel_size,
                                               padding=padding,
                                               bias=bias,
+                                              dropout=dropout,
                                               activation=activation,
                                               normalization=normalization)
         self.g_shared = isinstance(g_proj_dim, int)
@@ -1023,6 +1059,7 @@ class GCNSpatialBlock(Module):
                                    bias=self.bias,
                                    kernel_size=self.kernel_size,
                                    padding=self.padding,
+                                   dropout=self.dropout,
                                    activation=self.activation,
                                    normalization=self.normalization)
         self.gcn2 = GCNSpatialUnit(gcn_dims[1],
@@ -1030,6 +1067,7 @@ class GCNSpatialBlock(Module):
                                    bias=self.bias,
                                    kernel_size=self.kernel_size,
                                    padding=self.padding,
+                                   dropout=self.dropout,
                                    activation=self.activation,
                                    normalization=self.normalization)
         self.gcn3 = GCNSpatialUnit(gcn_dims[2],
@@ -1037,6 +1075,7 @@ class GCNSpatialBlock(Module):
                                    bias=self.bias,
                                    kernel_size=self.kernel_size,
                                    padding=self.padding,
+                                   dropout=self.dropout,
                                    activation=self.activation,
                                    normalization=self.normalization)
 
