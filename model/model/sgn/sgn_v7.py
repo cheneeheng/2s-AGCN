@@ -69,6 +69,7 @@ class SGN(PyTorchModule):
 
                  subject: int = 0,
 
+                 g_part: int = 1,
                  g_proj_shared: bool = False,
                  g_proj_dim: Union[list, int] = c3,  # c3
                  g_residual: List[int] = [0, 0, 0],
@@ -119,6 +120,7 @@ class SGN(PyTorchModule):
 
         self.subject = subject
 
+        self.g_part = g_part
         self.g_proj_shared = g_proj_shared
         self.g_proj_dim = g_proj_dim
         self.g_residual = g_residual
@@ -160,6 +162,7 @@ class SGN(PyTorchModule):
         if self.in_part == 0 and self.sem_part > 0:
             raise ValueError("in_part is 0 but sem_part is not")
 
+        assert self.g_part in [0, 1, 2, 3]
         assert self.t_kernel >= 0
 
         assert self.norm_type in ['bn', 'ln']
@@ -280,7 +283,7 @@ class SGN(PyTorchModule):
         _init_0(self.gcn_spatial.gcn1.w1.block.conv.conv.weight)
         _init_0(self.gcn_spatial.gcn2.w1.block.conv.conv.weight)
         _init_0(self.gcn_spatial.gcn3.w1.block.conv.conv.weight)
-        if self.par_pos_fusion % 2 == 1:
+        if self.g_part == 0:
             _init_0(self.gcn_spatial_part.gcn1.w1.block.conv.conv.weight)
             _init_0(self.gcn_spatial_part.gcn2.w1.block.conv.conv.weight)
             _init_0(self.gcn_spatial_part.gcn3.w1.block.conv.conv.weight)
@@ -382,7 +385,7 @@ class SGN(PyTorchModule):
             g_activation=self.g_activation_fn,
             g_residual=self.g_residual
         )
-        if self.par_pos_fusion % 2 == 1:
+        if self.g_part == 0:
             self.gcn_spatial_part = GCNSpatialBlock(
                 0,
                 0,
@@ -397,6 +400,13 @@ class SGN(PyTorchModule):
                 g_activation=self.g_activation_fn,
                 g_residual=self.g_residual
             )
+        elif self.g_part > 0 and self.par_pos_fusion % 2 == 1:   # post fusion
+            in_channels = self.c2
+            out_channels = self.c3
+            self.non_gcn_proj = self.init_emb(mode=self.g_part,
+                                              num_point=self.num_point,
+                                              in_channels=in_channels,
+                                              out_channels=out_channels)
 
     def init_spatial_fusion(self):
         if self.par_pos_fusion in [0, 2, 4]:
@@ -629,30 +639,27 @@ class SGN(PyTorchModule):
 
         # temporal fusion pre gcn
         if self.sem_frame > 0 and self.sem_fra_fusion == 101:
-            if self.par_pos_fusion % 2 == 1:
-                x = [i + tem1 for i in x]
-            else:
-                x = x + tem1
+            x = [i + tem1 for i in x]
         if self.subject > 0 and self.subject_fusion == 101:
-            if self.par_pos_fusion % 2 == 1:
-                x = [i + sub1 for i in x]
-            else:
-                x = x + sub1
+            x = [i + sub1 for i in x]
 
         # GCN ------------------------------------------------------------------
-        if self.par_pos_fusion % 2 == 1:
-            x0, g0 = self.gcn_spatial(x[0])
-            x1, g1 = self.gcn_spatial_part(x[1])
-            x = [x0, x1]
-            g_out = [g0, g1]
+        x0, g0 = self.gcn_spatial(x[0])
+
+        if self.par_pos_fusion % 2 == 1:   # post fusion
+            if self.g_part == 0:
+                x1, g1 = self.gcn_spatial_part(x[1])
+            elif self.g_part > 0:
+                x1 = self.non_gcn_proj(x[1])
+                g1 = None
+            x, g = [x0, x1], [g0, g1]
         else:
-            x, g = self.gcn_spatial(x)
-            x = [x]
-            g_out = [g]
+            x, g = [x0], [g0]
 
         # Frame-level Module ---------------------------------------------------
         # spatial fusion post gcn
         x, _ = self.fuse_spatial(*x, fusion_level=fusion_level)
+        x = x[0]
 
         # temporal fusion post gcn
         if self.sem_frame > 0 and self.sem_fra_fusion == 1:
@@ -672,7 +679,7 @@ class SGN(PyTorchModule):
         y = self.do(y)
         y = self.fc(y)
 
-        return y, g_out
+        return y, g
 
 
 class OneHotTensor(PyTorchModule):
@@ -1103,7 +1110,7 @@ class SpatialFusion(Module):
     def forward(self,
                 x1: Optional[Union[Tensor, list]] = None,
                 x2: Optional[Tensor] = None,
-                fusion_level: int = 0) -> Tuple[Tensor, bool]:
+                fusion_level: int = 0) -> Tuple[list, bool]:
         """Fusion of features from x1 (x_pos) and x2 (x_par).
 
         Args:
@@ -1148,6 +1155,9 @@ class SpatialFusion(Module):
                     x = self.cnn1(x)
                     x = self.cnn2(x)
 
+        if not isinstance(x, list):
+            x = [x]
+
         fusion_level += 1
         return x, fusion_level
 
@@ -1159,17 +1169,17 @@ if __name__ == '__main__':
     inputs = torch.ones(batch_size, 20, 75)
     subjects = torch.ones(batch_size, 20, 1)
     model = SGN(num_segment=20,
-                in_part=1,
-                in_motion=1,
-                in_part_type=2,
-                par_pos_fusion=5,
-                # subject=1,
-                sem_part=1,
-                # par_pos_fusion=1,
-                # sem_fra_fusion=1,
-                # subject_fusion=101
-                # c_multiplier=[1, 0.5, 0.25, 0.125],
-                t_mode=2
+                # in_part=1,
+                # in_motion=1,
+                # in_part_type=2,
+                # par_pos_fusion=3,
+                # # # subject=1,
+                # sem_part=1,
+                # g_part=0,
+                # # sem_fra_fusion=1,
+                # # subject_fusion=101
+                # # c_multiplier=[1, 0.5, 0.25, 0.125],
+                # t_mode=2
                 )
     model(inputs, subjects)
     # print(model)
