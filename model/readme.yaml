@@ -1461,6 +1461,13 @@ sgn_v7:
         - 220414210001_smp0:
                   - 93.32%
 
+        - 220414230001_tmode7:
+                  - sgn in temporal cnn with dropouts
+        - 220414230001_tmode7_gcndropout02:
+        - 220414230001_tmode7_gcndropout02_pos4_vel4:
+        - 220414230001_tmode8:
+                  - sgn in temporal cnn with dropouts + residual
+
 sgn-code:
         - original sgn repo code
         - 220324170001:

@@ -29,6 +29,8 @@ T2 = List[Optional[Type[PyTorchModule]]]
 
 class SGN(PyTorchModule):
 
+    emb_modes = [0, 1, 2, 3, 4, 5, 6]
+
     g_activation_fn = nn.Softmax
     activation_fn = nn.ReLU
     # dropout_fn = nn.Dropout2d
@@ -117,11 +119,11 @@ class SGN(PyTorchModule):
         self.in_part = in_part
         self.in_part_type = in_part_type
         self.in_motion = in_motion
-        assert self.in_position in [0, 1, 2, 3, 4]
-        assert self.in_velocity in [0, 1, 2, 3, 4]
-        assert self.in_part in [0, 1, 2, 3, 4]
+        assert self.in_position in self.emb_modes
+        assert self.in_velocity in self.emb_modes
+        assert self.in_part in self.emb_modes
         assert self.in_part_type in [0, 1, 2]
-        assert self.in_motion in [0, 1, 2, 3, 4]
+        assert self.in_motion in self.emb_modes
 
         if self.in_part_type == 0:
             self.parts_3points = self.parts_3points_wholebody
@@ -135,9 +137,9 @@ class SGN(PyTorchModule):
         self.sem_part = sem_part
         self.sem_position = sem_position
         self.sem_frame = sem_frame
-        assert self.sem_part in [0, 1, 2, 3, 4]
-        assert self.sem_position in [0, 1, 2, 3, 4]
-        assert self.sem_frame in [0, 1, 2, 3, 4]
+        assert self.sem_part in self.emb_modes
+        assert self.sem_position in self.emb_modes
+        assert self.sem_frame in self.emb_modes
         if self.in_position == 0 and self.sem_position > 0:
             raise ValueError("in_position is 0 but sem_position is not")
         if self.in_part == 0 and self.sem_part > 0:
@@ -228,6 +230,9 @@ class SGN(PyTorchModule):
     def get_inter_channels(self, mode: int, ch: int) -> Union[list, int]:
         if mode == 3:
             return [ch, ch, ch]
+        elif mode == 5:
+            # inspired by the 4x dim in ffn of transformers
+            return ch * 4
         else:
             return ch
 
@@ -748,7 +753,7 @@ class Embedding(Module):
                                         dropout=dropout,
                                         activation=activation,
                                         normalization=normalization)
-        assert mode in [1, 2, 3, 4]
+        assert mode in [1, 2, 3, 4, 5, 6]
         self.mode = mode
 
         if in_norm is not None:
@@ -756,34 +761,10 @@ class Embedding(Module):
         else:
             self.norm = lambda x: x
 
-        if mode == 1:
-            self.cnn1 = Conv(self.in_channels,
-                             inter_channels,
-                             bias=self.bias,
-                             activation=self.activation)
-            self.cnn2 = Conv(inter_channels,
-                             self.out_channels,
-                             bias=self.bias,
-                             activation=self.activation)
-        elif mode == 2:
-            # bert style (only if we have ont hot vector)
-            self.cnn1 = Conv(self.in_channels,
-                             self.out_channels,
-                             bias=self.bias,
-                             normalization=lambda: self.normalization(
-                                 self.out_channels),
-                             dropout=self.dropout)
-        elif mode == 3:
-            assert isinstance(inter_channels, list)
-            layer_channels = \
-                [self.in_channels] + inter_channels + [self.out_channels]
-            self.num_layers = len(layer_channels)-1
-            for i in range(self.num_layers):
-                setattr(self, f'cnn{i+1}', Conv(layer_channels[i],
-                                                layer_channels[i+1],
-                                                bias=self.bias,
-                                                activation=self.activation))
-        elif mode == 4:
+        if self.mode in [1, 4, 5, 6]:
+            # 1=original, 4=dropout, 5=higher inter, 6=residual
+            if self.mode != 4:
+                self.dropout = None
             self.cnn1 = Conv(self.in_channels,
                              inter_channels,
                              bias=self.bias,
@@ -793,13 +774,47 @@ class Embedding(Module):
                              self.out_channels,
                              bias=self.bias,
                              activation=self.activation)
+            if self.mode == 6:
+                if self.in_channels == inter_channels:
+                    self.res1 = lambda x: x
+                else:
+                    self.res1 = Conv(self.in_channels, inter_channels,
+                                     bias=self.bias)
+                if inter_channels == self.out_channels:
+                    self.res2 = lambda x: x
+                else:
+                    self.res2 = Conv(inter_channels, self.out_channels,
+                                     bias=self.bias)
+            else:
+                self.res1 = lambda x: 0
+                self.res2 = lambda x: 0
+
+        elif self.mode == 2:
+            # bert style (only if we have ont hot vector)
+            self.cnn1 = Conv(self.in_channels,
+                             self.out_channels,
+                             bias=self.bias,
+                             normalization=lambda: self.normalization(
+                                 self.out_channels),
+                             dropout=self.dropout)
+
+        elif self.mode == 3:
+            assert isinstance(inter_channels, list)
+            layer_channels = \
+                [self.in_channels] + inter_channels + [self.out_channels]
+            self.num_layers = len(layer_channels)-1
+            for i in range(self.num_layers):
+                setattr(self, f'cnn{i+1}', Conv(layer_channels[i],
+                                                layer_channels[i+1],
+                                                bias=self.bias,
+                                                activation=self.activation))
 
     def forward(self, x: Tensor) -> Tensor:
         # x: n,c,v,t
         x = self.norm(x)
-        if self.mode == 1:
-            x = self.cnn1(x)
-            x = self.cnn2(x)
+        if self.mode in [1, 4, 5, 6]:
+            x = self.cnn1(x) + self.res1(x)
+            x = self.cnn2(x) + self.res2(x)
         elif self.mode == 2:
             x = self.cnn1(x)
         elif self.mode == 3:
@@ -1200,7 +1215,10 @@ if __name__ == '__main__':
 
     inputs = torch.ones(batch_size, 20, 75)
     subjects = torch.ones(batch_size, 20, 1)
+
     model = SGN(num_segment=20,
+                in_position=6,
+                in_velocity=6,
                 # in_part=1,
                 # in_motion=1,
                 # in_part_type=2,
@@ -1210,9 +1228,9 @@ if __name__ == '__main__':
                 # g_part=0,
                 # # sem_fra_fusion=1,
                 # # subject_fusion=101
-                # # c_multiplier=[1, 0.5, 0.25, 0.125],
-                # t_mode=2
-                gcn_dropout=0,
+                c_multiplier=[1, 0.5, 0.25, 0.125],
+                t_mode=7,
+                gcn_dropout=0.2,
                 )
     model(inputs, subjects)
     # print(model)
