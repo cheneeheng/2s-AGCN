@@ -1439,6 +1439,8 @@ sgn_v7:
         - 220413153001_gres111:
                   - residual in the gcn blocks
                   - 93.80%
+        - 220413153001_gres111_nogshared:
+                  - 94.08%
         - 220413153001_tmode2_cmulti10101005:
                   - temporal cnn with residual
                   - reduced c4
@@ -1455,6 +1457,9 @@ sgn_v7:
                   - resifual in GCN
                   - reduced c3 c4
                   - 92.25%
+
+        - 220414210001_smp0:
+                  - 93.32%
 
 sgn-code:
         - original sgn repo code

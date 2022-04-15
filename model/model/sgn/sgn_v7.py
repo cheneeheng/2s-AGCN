@@ -166,7 +166,7 @@ class SGN(PyTorchModule):
         self.g_proj_dim = g_proj_dim
         self.g_residual = g_residual
         self.gcn_t_kernel = gcn_t_kernel
-        self.gcn_dropout_fn = lambda: nn.Dropout2d(dropout2d)
+        self.gcn_dropout_fn = lambda: nn.Dropout2d(gcn_dropout)
 
         if self.sem_pos_fusion == 1 or self.sem_par_fusion == 1:
             self.gcn_in_ch = self.c1
@@ -992,7 +992,7 @@ class GCNSpatialUnit(Module):
                                              normalization=normalization)
         self.norm = self.normalization(self.out_channels)
         self.act = self.activation()
-        self.drop = lambda x: x if self.dropout is None else self.dropout()
+        self.drop = (lambda x: x) if self.dropout is None else self.dropout()
         self.w1 = Conv(self.in_channels, self.out_channels, bias=self.bias)
         self.w2 = Conv(self.in_channels, self.out_channels, bias=self.bias,
                        kernel_size=self.kernel_size, padding=self.padding)
@@ -1212,6 +1212,7 @@ if __name__ == '__main__':
                 # # subject_fusion=101
                 # # c_multiplier=[1, 0.5, 0.25, 0.125],
                 # t_mode=2
+                gcn_dropout=0,
                 )
     model(inputs, subjects)
     # print(model)
