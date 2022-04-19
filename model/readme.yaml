@@ -1376,6 +1376,7 @@ sgn_v6:
                   - 20 is the best
 
 sgn_v7:
+        # dropouts
         - 220413153001_dropout2d00:
                   - 94.14%
         - 220413153001_dropout2d01:
@@ -1383,6 +1384,7 @@ sgn_v7:
         - grid_dropout:
                   - up until 0.2 all is above 94 and then all below.
 
+        # position and parts fusion
         - 220413153001_par1_mot1_pt2_parposfus0:
                   - sem part 1
                   - pre spatial gcn
@@ -1426,21 +1428,13 @@ sgn_v7:
                   - no gcn for parts
                   - 2 MLP after fusion
                   - 93.99%
+        - 220414230001_par1_mot1_pt0_spar1_parposfus5_gpart1:
+                  - 94.36%
 
+        # t modes
         - 220413153001_tmode2:
                   - temporal cnn with residual
                   - 94.23%
-        - 220413153001_tmode3:
-                  - temporal cnn with all 3x3
-                  - 94.53%
-        - 220413153001_tmode5:
-                  - temporal cnn with 3convs
-                  - 94.20%
-        - 220413153001_gres111:
-                  - residual in the gcn blocks
-                  - 93.80%
-        - 220413153001_gres111_nogshared:
-                  - 94.08%
         - 220413153001_tmode2_cmulti10101005:
                   - temporal cnn with residual
                   - reduced c4
@@ -1449,6 +1443,31 @@ sgn_v7:
                   - temporal cnn with residual
                   - reduced c3 c4
                   - 92.59%
+        - 220413153001_tmode3:
+                  - temporal cnn with all 3x3
+                  - 94.53%
+        - 220413153001_tmode5:
+                  - temporal cnn with 3convs
+                  - 94.20%
+        - 220414230001_tmode7:
+                  - temporal cnn with all layers having dropouts
+                  - 93.51%
+        - 220414230001_tmode7_gcndropout02:
+                  - temporal cnn with all layers + gcn with dropouts
+                  - 91.38%
+        - 220414230001_tmode7_gcndropout02_pos4_vel4:
+                  - temporal cnn with all layers + gcn + input emb with dropouts
+                  - 90.49%
+        - 220414230001_tmode8:
+                  - temporal cnn with all layers having dropouts + residual
+                  - 93.97%
+
+        # residuals
+        - 220413153001_gres111:
+                  - residual in the gcn blocks
+                  - 93.80%
+        - 220413153001_gres111_nogshared:
+                  - 94.08%
         - 220413153001_gres111_cmulti10101005:
                   - resifual in GCN
                   - reduced c4
@@ -1458,15 +1477,18 @@ sgn_v7:
                   - reduced c3 c4
                   - 92.25%
 
+        # no smp
         - 220414210001_smp0:
                   - 93.32%
 
-        - 220414230001_tmode7:
-                  - sgn in temporal cnn with dropouts
-        - 220414230001_tmode7_gcndropout02:
-        - 220414230001_tmode7_gcndropout02_pos4_vel4:
-        - 220414230001_tmode8:
-                  - sgn in temporal cnn with dropouts + residual
+        - 220415110001_pos4_vel4_gcndrop_tmode7_alldropouts:
+                  - 90.49%
+        - 220415110001_pos5_vel5:
+                  - input has inverted bottleneck like ffn in transformers.
+                  - 94.36%
+        - 220415110001_pos6_vel6_gres111_tmode2:
+                  - input + gcn + temporal cnn all residual
+                  - 94.02%
 
 sgn-code:
         - original sgn repo code

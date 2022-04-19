@@ -8,7 +8,7 @@
 
 # Continue from on sgn_v6
 
-from multiprocessing import parent_process
+
 import torch
 from torch import nn
 from torch import Tensor
@@ -57,6 +57,9 @@ class SGN(PyTorchModule):
                  in_part: int = 0,
                  in_part_type: int = 0,
                  in_motion: int = 0,
+
+                 xpos_proj: int = 0,
+                 xpar_proj: int = 0,
 
                  sem_part: int = 0,
                  sem_position: int = 1,
@@ -134,6 +137,11 @@ class SGN(PyTorchModule):
         self.parts_len = len(self.parts_3points)
         self.parts_dim = len(self.parts_3points[0])
 
+        self.xpos_proj = xpos_proj
+        self.xpar_proj = xpar_proj
+        assert self.xpos_proj in self.emb_modes
+        assert self.xpar_proj in self.emb_modes
+
         self.sem_part = sem_part
         self.sem_position = sem_position
         self.sem_frame = sem_frame
@@ -193,6 +201,34 @@ class SGN(PyTorchModule):
         # Frame Embedding ------------------------------------------------------
         self.init_input_sem()
 
+        if self.in_position > 0 or self.in_velocity > 0:
+            if self.xpos_proj > 0:
+                if self.sem_pos_fusion == 1:
+                    in_channels = self.c1
+                else:
+                    in_channels = self.c1*2
+                self.xpos_projection = self.init_emb(
+                    mode=self.xpos_proj,
+                    num_point=self.num_point,
+                    in_channels=in_channels,
+                    out_channels=self.c2,
+                    inter_channels=self.c2,
+                )
+
+        if self.in_part > 0 or self.in_motion > 0:
+            if self.xpar_proj > 0:
+                if self.sem_pos_fusion == 1:
+                    in_channels = self.c1
+                else:
+                    in_channels = self.c1*2
+                self.xpar_projection = self.init_emb(
+                    mode=self.xpar_proj,
+                    num_point=self.parts_len,
+                    in_channels=in_channels,
+                    out_channels=self.c2,
+                    inter_channels=self.c2,
+                )
+
         # Subject Embedding ----------------------------------------------------
         self.init_input_subject()
 
@@ -244,12 +280,13 @@ class SGN(PyTorchModule):
                  num_point: int,
                  in_channels: int,
                  out_channels: Optional[int] = None,
+                 inter_channels: Optional[int] = None,
                  bias: Optional[int] = None,
                  dropout: Optional[T1] = None,
                  activation: Optional[T1] = None,
                  normalization: Optional[T1] = None,
                  in_norm: Optional[T1] = None) -> Module:
-        inter_channels = self.get_inter_channels(mode, self.c1)
+        inter_channels = inter_channels if inter_channels is not None else self.get_inter_channels(mode, self.c1)  # noqa
         out_channels = out_channels if out_channels is not None else self.c1
         bias = bias if bias is not None else self.bias
         dropout = dropout if dropout is not None else self.dropout_fn
@@ -496,7 +533,7 @@ class SGN(PyTorchModule):
             paddings = [self.t_kernel//2, 0]
             residuals = [0 for _ in range(idx)]
             dropouts = [self.dropout_fn, self.dropout_fn]
-        # original sgn + all dropout
+        # original sgn + all dropout + residual
         elif self.t_mode == 8:
             idx = 2
             channels = [self.c3, self.c3, self.c4]
@@ -650,6 +687,11 @@ class SGN(PyTorchModule):
                     x_par = dy2 + gro1  # n,c,v',t
                 else:
                     x_par = torch.cat([dy2, gro1], 1)  # n,c,v',t
+
+        if hasattr(self, 'xpos_projection'):
+            x_pos = self.xpos_projection(x_pos)
+        if hasattr(self, 'xpar_projection'):
+            x_par = self.xpar_projection(x_par)
 
         # spatial fusion pre gcn
         x, fusion_level = self.fuse_spatial(x1=x_pos, x2=x_par)
@@ -1222,15 +1264,16 @@ if __name__ == '__main__':
                 # in_part=1,
                 # in_motion=1,
                 # in_part_type=2,
+                xpos_proj=1,
                 # par_pos_fusion=3,
                 # # # subject=1,
                 # sem_part=1,
                 # g_part=0,
                 # # sem_fra_fusion=1,
                 # # subject_fusion=101
-                c_multiplier=[1, 0.5, 0.25, 0.125],
-                t_mode=7,
-                gcn_dropout=0.2,
+                # c_multiplier=[1, 0.5, 0.25, 0.125],
+                # t_mode=7,
+                # gcn_dropout=0.2,
                 )
     model(inputs, subjects)
     # print(model)
