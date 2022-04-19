@@ -86,6 +86,7 @@ class SGN(PyTorchModule):
                  aspp: list = None,
 
                  spatial_maxpool: int = 1,
+                 temporal_maxpool: int = 1,
 
                  ):
         super(SGN, self).__init__()
@@ -192,7 +193,8 @@ class SGN(PyTorchModule):
         self.aspp = aspp
 
         self.spatial_maxpool = spatial_maxpool
-        assert self.spatial_maxpool in [0, 1, 2]
+        self.temporal_maxpool = temporal_maxpool
+        assert self.spatial_maxpool in [0, 1, 2, 3]
 
         # Dynamic Representation -----------------------------------------------
         self.init_input_dr()
@@ -246,31 +248,42 @@ class SGN(PyTorchModule):
         # Frame level module ---------------------------------------------------
         self.init_temporal_mlp()
 
-        if self.spatial_maxpool == 0:
+        if self.spatial_maxpool in [0, 3]:
             self.smp = nn.Identity()
         elif self.spatial_maxpool == 1:
-            self.smp = nn.AdaptiveMaxPool2d((1, num_segment))
+            self.smp = nn.AdaptiveMaxPool2d((1, self.num_segment))
         elif self.spatial_maxpool == 2:
             k = 0
             if self.in_position > 0 or self.in_velocity > 0:
                 k += self.num_point
             if self.in_part > 0 or self.in_motion > 0:
                 k += self.parts_len
-
             self.smp = nn.Conv2d(self.c3,
                                  self.c3,
                                  kernel_size=(k, 1),
                                  padding=(0, 0),
                                  bias=bool(self.bias))
 
-        self.tmp = nn.AdaptiveMaxPool2d((1, 1))
+        if self.temporal_maxpool in [0, 3]:
+            self.tmp = nn.Identity()
+        elif self.temporal_maxpool == 1:
+            self.tmp = nn.AdaptiveMaxPool2d((1, 1))
+        elif self.temporal_maxpool == 2:
+            self.tmp = nn.Conv2d(self.c4,
+                                 self.c4,
+                                 kernel_size=(1, self.num_segment),
+                                 padding=(0, 0),
+                                 bias=bool(self.bias))
 
         self.do = nn.Dropout(dropout)
 
         if self.t_mode == 0:
-            self.fc = nn.Linear(self.c3, num_class)
+            fc_in_ch = self.c3
+        elif self.temporal_maxpool == 3:
+            fc_in_ch = self.c4 * self.num_segment
         else:
-            self.fc = nn.Linear(self.c4, num_class)
+            fc_in_ch = self.c4
+        self.fc = nn.Linear(fc_in_ch, num_class)
 
         self.init_weight()
 
@@ -483,11 +496,23 @@ class SGN(PyTorchModule):
         )
 
     def init_temporal_mlp(self):
+        _c3 = self.c3
+        _c4 = self.c4
+        if self.spatial_maxpool == 3:
+            k = 0
+            if self.in_position > 0 or self.in_velocity > 0:
+                k += self.num_point
+            if self.in_part > 0 or self.in_motion > 0:
+                k += self.parts_len
+            _c3 *= k
+            assert self.t_mode in [9, 10]
+
+        # aspp
         if self.aspp is None or len(self.aspp) == 0:
             self.aspp = nn.Identity()
         else:
-            self.aspp = ASPP(self.c3,
-                             self.c3,
+            self.aspp = ASPP(_c3,
+                             _c3,
                              bias=self.bias,
                              dilation=self.aspp,
                              dropout=self.dropout_fn,
@@ -499,7 +524,7 @@ class SGN(PyTorchModule):
         # original sgn
         elif self.t_mode == 1:
             idx = 2
-            channels = [self.c3, self.c3, self.c4]
+            channels = [_c3, _c3, _c4]
             kernel_sizes = [self.t_kernel, 1]
             paddings = [self.t_kernel//2, 0]
             residuals = [0 for _ in range(idx)]
@@ -507,7 +532,7 @@ class SGN(PyTorchModule):
         # original sgn with residual
         elif self.t_mode == 2:
             idx = 2
-            channels = [self.c3, self.c3, self.c4]
+            channels = [_c3, _c3, _c4]
             kernel_sizes = [self.t_kernel, 1]
             paddings = [self.t_kernel//2, 0]
             residuals = [1 for _ in range(idx)]
@@ -515,7 +540,7 @@ class SGN(PyTorchModule):
         # all 3x3
         elif self.t_mode == 3:
             idx = 2
-            channels = [self.c3, self.c3, self.c4]
+            channels = [_c3, _c3, _c4]
             kernel_sizes = [self.t_kernel for _ in range(2)]
             paddings = [self.t_kernel//2 for _ in range(2)]
             residuals = [0 for _ in range(2)]
@@ -523,7 +548,7 @@ class SGN(PyTorchModule):
         # all 3x3 with residual
         elif self.t_mode == 4:
             idx = 2
-            channels = [self.c3, self.c3, self.c4]
+            channels = [_c3, _c3, _c4]
             kernel_sizes = [self.t_kernel for _ in range(2)]
             paddings = [self.t_kernel//2 for _ in range(2)]
             residuals = [1 for _ in range(2)]
@@ -531,7 +556,7 @@ class SGN(PyTorchModule):
         # 3 layers
         elif self.t_mode == 5:
             idx = 3
-            channels = [self.c3, self.c3, self.c3, self.c4]
+            channels = [_c3, _c3, _c3, _c4]
             kernel_sizes = [self.t_kernel, 1, 1]
             paddings = [self.t_kernel//2, 0, 0]
             residuals = [0 for _ in range(3)]
@@ -539,7 +564,7 @@ class SGN(PyTorchModule):
         # 3 layers with residual
         elif self.t_mode == 6:
             idx = 3
-            channels = [self.c3, self.c3, self.c3, self.c4]
+            channels = [_c3, _c3, _c3, _c4]
             kernel_sizes = [self.t_kernel, 1, 1]
             paddings = [self.t_kernel//2, 0, 0]
             residuals = [1 for _ in range(3)]
@@ -547,7 +572,7 @@ class SGN(PyTorchModule):
         # original sgn + all dropout
         elif self.t_mode == 7:
             idx = 2
-            channels = [self.c3, self.c3, self.c4]
+            channels = [_c3, _c3, _c4]
             kernel_sizes = [self.t_kernel, 1]
             paddings = [self.t_kernel//2, 0]
             residuals = [0 for _ in range(idx)]
@@ -555,11 +580,27 @@ class SGN(PyTorchModule):
         # original sgn + all dropout + residual
         elif self.t_mode == 8:
             idx = 2
-            channels = [self.c3, self.c3, self.c4]
+            channels = [_c3, _c3, _c4]
             kernel_sizes = [self.t_kernel, 1]
             paddings = [self.t_kernel//2, 0]
             residuals = [1 for _ in range(idx)]
             dropouts = [self.dropout_fn, self.dropout_fn]
+        # original sgn with quarter input channel
+        elif self.t_mode == 9:
+            idx = 2
+            channels = [_c3, _c3//4, _c4]
+            kernel_sizes = [self.t_kernel, 1]
+            paddings = [self.t_kernel//2, 0]
+            residuals = [0 for _ in range(idx)]
+            dropouts = [self.dropout_fn, None]
+        # original sgn with quarter input channel + residual
+        elif self.t_mode == 10:
+            idx = 2
+            channels = [_c3, _c3//4, _c4]
+            kernel_sizes = [self.t_kernel, 1]
+            paddings = [self.t_kernel//2, 0]
+            residuals = [1 for _ in range(idx)]
+            dropouts = [self.dropout_fn, None]
         else:
             raise ValueError("Unknown t_mode...")
         self.cnn = MLPTemporal(
@@ -748,11 +789,15 @@ class SGN(PyTorchModule):
                 x = x + sub1
 
         x = self.smp(x)
+        if self.spatial_maxpool == 3:
+            x = x.reshape((x.shape[0], -1, 1, x.shape[-1]))  # n,cv,1,t
+
         x = self.aspp(x)
         x = self.cnn(x)
 
         # Classification -------------------------------------------------------
         y = self.tmp(x)
+
         y = torch.flatten(y, 1)
         y = self.do(y)
         y = self.fc(y)
@@ -1290,9 +1335,10 @@ if __name__ == '__main__':
                 # # sem_fra_fusion=1,
                 # # subject_fusion=101
                 # c_multiplier=[0.5, 1, 1, 1],
-                # t_mode=7,
+                t_mode=9,
                 # gcn_dropout=0.2,
-                spatial_maxpool=1
+                # spatial_maxpool=3,
+                temporal_maxpool=2,
                 )
     model(inputs, subjects)
     # print(model)
