@@ -29,7 +29,7 @@ T2 = List[Optional[Type[PyTorchModule]]]
 
 class SGN(PyTorchModule):
 
-    emb_modes = [0, 1, 2, 3, 4, 5, 6]
+    emb_modes = [0, 1, 2, 3, 4, 5, 6, 7]
 
     g_activation_fn = nn.Softmax
     activation_fn = nn.ReLU
@@ -207,12 +207,14 @@ class SGN(PyTorchModule):
                     in_channels = self.c1
                 else:
                     in_channels = self.c1*2
+                inter_channels = self.get_inter_channels(self.xpos_proj,
+                                                         self.c2)
                 self.xpos_projection = self.init_emb(
                     mode=self.xpos_proj,
                     num_point=self.num_point,
                     in_channels=in_channels,
                     out_channels=self.c2,
-                    inter_channels=self.c2,
+                    inter_channels=inter_channels,
                 )
 
         if self.in_part > 0 or self.in_motion > 0:
@@ -266,6 +268,8 @@ class SGN(PyTorchModule):
     def get_inter_channels(self, mode: int, ch: int) -> Union[list, int]:
         if mode == 3:
             return [ch, ch, ch]
+        elif mode == 7:
+            return []
         elif mode == 5:
             # inspired by the 4x dim in ffn of transformers
             return ch * 4
@@ -795,7 +799,7 @@ class Embedding(Module):
                                         dropout=dropout,
                                         activation=activation,
                                         normalization=normalization)
-        assert mode in [1, 2, 3, 4, 5, 6]
+        assert mode in [1, 2, 3, 4, 5, 6, 7]
         self.mode = mode
 
         if in_norm is not None:
@@ -840,7 +844,7 @@ class Embedding(Module):
                                  self.out_channels),
                              dropout=self.dropout)
 
-        elif self.mode == 3:
+        elif self.mode == 3 or self.mode == 7:
             assert isinstance(inter_channels, list)
             layer_channels = \
                 [self.in_channels] + inter_channels + [self.out_channels]
@@ -859,7 +863,7 @@ class Embedding(Module):
             x = self.cnn2(x) + self.res2(x)
         elif self.mode == 2:
             x = self.cnn1(x)
-        elif self.mode == 3:
+        elif self.mode in [3, 7]:
             for i in range(self.num_layers):
                 x = getattr(self, f'cnn{i+1}')(x)
         return x
@@ -1259,12 +1263,12 @@ if __name__ == '__main__':
     subjects = torch.ones(batch_size, 20, 1)
 
     model = SGN(num_segment=20,
-                in_position=6,
-                in_velocity=6,
+                in_position=1,
+                in_velocity=1,
                 # in_part=1,
                 # in_motion=1,
                 # in_part_type=2,
-                xpos_proj=1,
+                xpos_proj=7,
                 # par_pos_fusion=3,
                 # # # subject=1,
                 # sem_part=1,
