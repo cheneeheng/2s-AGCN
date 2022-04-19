@@ -192,6 +192,7 @@ class SGN(PyTorchModule):
         self.aspp = aspp
 
         self.spatial_maxpool = spatial_maxpool
+        assert self.spatial_maxpool in [0, 1, 2]
 
         # Dynamic Representation -----------------------------------------------
         self.init_input_dr()
@@ -245,8 +246,22 @@ class SGN(PyTorchModule):
         # Frame level module ---------------------------------------------------
         self.init_temporal_mlp()
 
-        if self.spatial_maxpool == 1:
+        if self.spatial_maxpool == 0:
+            self.smp = nn.Identity()
+        elif self.spatial_maxpool == 1:
             self.smp = nn.AdaptiveMaxPool2d((1, num_segment))
+        elif self.spatial_maxpool == 2:
+            k = 0
+            if self.in_position > 0 or self.in_velocity > 0:
+                k += self.num_point
+            if self.in_part > 0 or self.in_motion > 0:
+                k += self.parts_len
+
+            self.smp = nn.Conv2d(self.c3,
+                                 self.c3,
+                                 kernel_size=(k, 1),
+                                 padding=(0, 0),
+                                 bias=bool(self.bias))
 
         self.tmp = nn.AdaptiveMaxPool2d((1, 1))
 
@@ -469,7 +484,7 @@ class SGN(PyTorchModule):
 
     def init_temporal_mlp(self):
         if self.aspp is None or len(self.aspp) == 0:
-            self.aspp = lambda x: x
+            self.aspp = nn.Identity()
         else:
             self.aspp = ASPP(self.c3,
                              self.c3,
@@ -480,7 +495,7 @@ class SGN(PyTorchModule):
                              normalization=self.normalization_fn)
         # skip
         if self.t_mode == 0:
-            self.cnn = lambda x: x
+            self.cnn = nn.Identity()
         # original sgn
         elif self.t_mode == 1:
             idx = 2
@@ -732,8 +747,7 @@ class SGN(PyTorchModule):
             if self.par_pos_fusion % 2 == 0:
                 x = x + sub1
 
-        if self.spatial_maxpool == 1:
-            x = self.smp(x)
+        x = self.smp(x)
         x = self.aspp(x)
         x = self.cnn(x)
 
@@ -805,7 +819,7 @@ class Embedding(Module):
         if in_norm is not None:
             self.norm = DataNorm(self.in_channels * num_point, in_norm)
         else:
-            self.norm = lambda x: x
+            self.norm = nn.Identity()
 
         if self.mode in [1, 4, 5, 6]:
             # 1=original, 4=dropout, 5=higher inter, 6=residual
@@ -822,12 +836,12 @@ class Embedding(Module):
                              activation=self.activation)
             if self.mode == 6:
                 if self.in_channels == inter_channels:
-                    self.res1 = lambda x: x
+                    self.res1 = nn.Identity()
                 else:
                     self.res1 = Conv(self.in_channels, inter_channels,
                                      bias=self.bias)
                 if inter_channels == self.out_channels:
-                    self.res2 = lambda x: x
+                    self.res2 = nn.Identity()
                 else:
                     self.res2 = Conv(inter_channels, self.out_channels,
                                      bias=self.bias)
@@ -971,7 +985,7 @@ class MLPTemporal(PyTorchModule):
             #                          stride=(1, max_pool_stride))
             self.pool = nn.MaxPool2d(**maxpool_kwargs)
         else:
-            self.pool = lambda x: x
+            self.pool = nn.Identity()
         self.num_layers = len(channels) - 1
         for i in range(self.num_layers):
             setattr(self,
@@ -990,7 +1004,7 @@ class MLPTemporal(PyTorchModule):
                 setattr(self, f'res{i+1}', lambda x: 0)
             elif residuals[i] == 1:
                 if channels[i] == channels[i+1]:
-                    setattr(self, f'res{i+1}', lambda x: x)
+                    setattr(self, f'res{i+1}', nn.Identity())
                 else:
                     setattr(self, f'res{i+1}', Conv(channels[i], channels[i+1],
                                                     bias=biases[i]))
@@ -1053,7 +1067,7 @@ class GCNSpatialUnit(Module):
                                              normalization=normalization)
         self.norm = self.normalization(self.out_channels)
         self.act = self.activation()
-        self.drop = (lambda x: x) if self.dropout is None else self.dropout()
+        self.drop = nn.Identity() if self.dropout is None else self.dropout()
         self.w1 = Conv(self.in_channels, self.out_channels, bias=self.bias)
         self.w2 = Conv(self.in_channels, self.out_channels, bias=self.bias,
                        kernel_size=self.kernel_size, padding=self.padding)
@@ -1145,7 +1159,7 @@ class GCNSpatialBlock(Module):
                 setattr(self, f'res{i+1}', lambda x: 0)
             elif r == 1:
                 if gcn_dims[i] == gcn_dims[i+1]:
-                    setattr(self, f'res{i+1}', lambda x: x)
+                    setattr(self, f'res{i+1}', nn.Identity())
                 else:
                     setattr(self, f'res{i+1}', Conv(gcn_dims[i], gcn_dims[i+1],
                                                     bias=self.bias))
@@ -1263,21 +1277,22 @@ if __name__ == '__main__':
     subjects = torch.ones(batch_size, 20, 1)
 
     model = SGN(num_segment=20,
-                in_position=1,
-                in_velocity=1,
+                in_position=5,
+                in_velocity=5,
                 # in_part=1,
                 # in_motion=1,
                 # in_part_type=2,
-                xpos_proj=7,
+                # xpos_proj=0,
                 # par_pos_fusion=3,
                 # # # subject=1,
                 # sem_part=1,
                 # g_part=0,
                 # # sem_fra_fusion=1,
                 # # subject_fusion=101
-                # c_multiplier=[1, 0.5, 0.25, 0.125],
+                # c_multiplier=[0.5, 1, 1, 1],
                 # t_mode=7,
                 # gcn_dropout=0.2,
+                spatial_maxpool=1
                 )
     model(inputs, subjects)
     # print(model)

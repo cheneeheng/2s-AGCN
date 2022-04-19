@@ -1490,6 +1490,10 @@ sgn_v7:
                   - input + gcn + temporal cnn all residual
                   - 94.02%
 
+        - 220419133001_xposproj1:
+                  - 2 projection layer MLP after input concat.
+                  - 94.07%
+
 sgn-code:
         - original sgn repo code
         - 220324170001:
