@@ -80,6 +80,7 @@ class SGN(PyTorchModule):
                  subject: int = 0,
 
                  g_part: int = -1,
+                 g_kernel: int = 1,
                  g_proj_shared: bool = False,
                  g_proj_dim: Union[List[int], int] = c3,  # c3
                  g_residual: Union[List[int], int] = [0, 0, 0],
@@ -180,6 +181,7 @@ class SGN(PyTorchModule):
 
         self.g_part = g_part
         assert self.g_part in [-1, 0, 1, 2, 3]
+        self.g_kernel = g_kernel
         self.g_proj_shared = g_proj_shared
         self.g_proj_dim = g_proj_dim
         self.g_residual = g_residual
@@ -458,6 +460,7 @@ class SGN(PyTorchModule):
             normalization=self.normalization_fn,
             gcn_dims=[self.gcn_in_ch] + self.gcn_dims,
             g_proj_dim=self.g_proj_dim,
+            g_kernel=self.g_kernel,
             g_proj_shared=self.g_proj_shared,
             g_activation=self.g_activation_fn,
             g_residual=self.g_residual,
@@ -474,6 +477,7 @@ class SGN(PyTorchModule):
                 normalization=self.normalization_fn,
                 gcn_dims=[self.gcn_in_ch] + self.gcn_dims,
                 g_proj_dim=self.g_proj_dim,
+                g_kernel=self.g_kernel,
                 g_proj_shared=self.g_proj_shared,
                 g_activation=self.g_activation_fn,
                 g_residual=self.g_residual,
@@ -1076,19 +1080,25 @@ class GCNSpatialG(Module):
     def __init__(self,
                  in_channels: int,
                  out_channels: int,
+                 kernel_size: int = 1,
+                 padding: int = 0,
                  bias: int = 0,
                  activation: T1 = nn.Softmax,
                  g_proj_shared: bool = False,
                  ):
         super(GCNSpatialG, self).__init__(in_channels,
                                           out_channels,
+                                          kernel_size=kernel_size,
+                                          padding=padding,
                                           bias=bias,
                                           activation=activation)
-        self.g1 = Conv(self.in_channels, self.out_channels, bias=self.bias)
+        self.g1 = Conv(self.in_channels, self.out_channels, bias=self.bias,
+                       kernel_size=self.kernel_size, padding=self.padding)
         if g_proj_shared:
             self.g2 = self.g1
         else:
-            self.g2 = Conv(self.in_channels, self.out_channels, bias=self.bias)
+            self.g2 = Conv(self.in_channels, self.out_channels, bias=self.bias,
+                           kernel_size=self.kernel_size, padding=self.padding)
         self.act = self.activation(dim=-1)
 
     def forward(self, x: Tensor) -> Tensor:
@@ -1147,6 +1157,7 @@ class GCNSpatialBlock(Module):
                  normalization: T1 = nn.BatchNorm2d,
                  gcn_dims: List[int],
                  g_proj_dim: Union[List[int], int],
+                 g_kernel: int = 1,
                  g_proj_shared: bool = False,
                  g_activation: T1 = nn.Softmax,
                  g_residual: Union[List[int], int] = [0, 0, 0],
@@ -1164,6 +1175,8 @@ class GCNSpatialBlock(Module):
             self.gcn_g = GCNSpatialG(gcn_dims[0],
                                      g_proj_dim,
                                      bias=self.bias,
+                                     kernel_size=g_kernel,
+                                     padding=g_kernel//2,
                                      activation=g_activation,
                                      g_proj_shared=g_proj_shared)
         else:
@@ -1173,6 +1186,8 @@ class GCNSpatialBlock(Module):
                         GCNSpatialG(gcn_dims[i],
                                     g_proj_dim[i],
                                     bias=self.bias,
+                                    kernel_size=g_kernel,
+                                    padding=g_kernel//2,
                                     activation=g_activation,
                                     g_proj_shared=g_proj_shared))
 
@@ -1188,9 +1203,8 @@ class GCNSpatialBlock(Module):
                                    normalization=self.normalization))
 
         self.res = lambda x: 0
-        self.res1 = lambda x: 0
-        self.res2 = lambda x: 0
-        self.res3 = lambda x: 0
+        for i in range(self.num_blocks):
+            setattr(self, f'res{i+1}', lambda x: 0)
 
         if isinstance(g_residual, list):
             assert len(g_residual) == self.num_blocks
@@ -1344,12 +1358,13 @@ if __name__ == '__main__':
                 g_residual=[0, 0, 0, 0, 0],
                 # # sem_fra_fusion=1,
                 # # subject_fusion=101
-                c_multiplier=[0.5, 0.5, 0.5, 0.5],
+                c_multiplier=[0.5, 0.5, 1.0, 1.0],
                 # t_mode=9,
                 # gcn_dropout=0.2,
                 # spatial_maxpool=3,
                 # temporal_maxpool=3,
-                gcn_dims=[64, 64, 64, 64, 128]
+                gcn_dims=[64, 64, 64, 64, 256],
+                g_kernel=5,
                 )
     model(inputs, subjects)
     # print(model)
