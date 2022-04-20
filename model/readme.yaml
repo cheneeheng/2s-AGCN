@@ -1506,12 +1506,20 @@ sgn_v7:
                   - 94.74%
         - 220419133001_temmaxpool3:
                   - TMP is stacked, no max pool
+                  - 93.47%
         - 220419133001_tmode9_temmaxpool3:
                   - TMP is stacked, no max pool
                   - 92.22%
         - 220419133001_tmode9_spatemmaxpool3:
                   - SMP & TMP is stacked, no max pool
                   - 93.78%
+
+        - 220419133001_gcnresidual1:
+                  - 1 residual for the gcn unit
+                  - 94.02%
+
+        - 220419133001_pos5_vel5_gcnresidual1_cmulti05050510:
+                  - 92.93%
 
 sgn-code:
         - original sgn repo code

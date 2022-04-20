@@ -85,6 +85,7 @@ class SGN(PyTorchModule):
                  g_residual: Union[List[int], int] = [0, 0, 0],
                  gcn_t_kernel: int = 1,
                  gcn_dropout: float = 0.0,
+                 gcn_dims: list = [c2, c3, c3],
 
                  t_mode: int = 1,
                  t_kernel: int = 3,
@@ -184,6 +185,7 @@ class SGN(PyTorchModule):
         self.g_residual = g_residual
         self.gcn_t_kernel = gcn_t_kernel
         self.gcn_dropout_fn = lambda: nn.Dropout2d(gcn_dropout)
+        self.gcn_dims = gcn_dims
 
         if self.sem_pos_fusion == 1 or self.sem_par_fusion == 1:
             self.gcn_in_ch = self.c1
@@ -454,11 +456,11 @@ class SGN(PyTorchModule):
             dropout=self.gcn_dropout_fn,
             activation=self.activation_fn,
             normalization=self.normalization_fn,
-            gcn_dims=[self.gcn_in_ch, self.c2, self.c3, self.c3],
+            gcn_dims=[self.gcn_in_ch] + self.gcn_dims,
             g_proj_dim=self.g_proj_dim,
             g_proj_shared=self.g_proj_shared,
             g_activation=self.g_activation_fn,
-            g_residual=self.g_residual
+            g_residual=self.g_residual,
         )
         if self.g_part == 0:
             self.gcn_spatial_part = GCNSpatialBlock(
@@ -470,11 +472,11 @@ class SGN(PyTorchModule):
                 dropout=self.gcn_dropout_fn,
                 activation=self.activation_fn,
                 normalization=self.normalization_fn,
-                gcn_dims=[self.gcn_in_ch, self.c2, self.c3, self.c3],
+                gcn_dims=[self.gcn_in_ch] + self.gcn_dims,
                 g_proj_dim=self.g_proj_dim,
                 g_proj_shared=self.g_proj_shared,
                 g_activation=self.g_activation_fn,
-                g_residual=self.g_residual
+                g_residual=self.g_residual,
             )
         elif self.g_part > 0 and self.par_pos_fusion % 2 == 1:   # post fusion
             in_channels = self.c2
@@ -1164,46 +1166,25 @@ class GCNSpatialBlock(Module):
                                      activation=g_activation,
                                      g_proj_shared=g_proj_shared)
         else:
-            self.gcn_g1 = GCNSpatialG(gcn_dims[0],
-                                      g_proj_dim[0],
-                                      bias=self.bias,
-                                      activation=g_activation,
-                                      g_proj_shared=g_proj_shared)
-            self.gcn_g2 = GCNSpatialG(gcn_dims[1],
-                                      g_proj_dim[1],
-                                      bias=self.bias,
-                                      activation=g_activation,
-                                      g_proj_shared=g_proj_shared)
-            self.gcn_g3 = GCNSpatialG(gcn_dims[2],
-                                      g_proj_dim[2],
-                                      bias=self.bias,
-                                      activation=g_activation,
-                                      g_proj_shared=g_proj_shared)
 
-        self.gcn1 = GCNSpatialUnit(gcn_dims[0],
-                                   gcn_dims[1],
+            for i in range(len(gcn_dims)-1):
+                setattr(self, f'gcn_g{i+1}',
+                        GCNSpatialG(gcn_dims[i],
+                                    g_proj_dim[i],
+                                    bias=self.bias,
+                                    activation=g_activation,
+                                    g_proj_shared=g_proj_shared))
+
+        for i in range(len(gcn_dims)-1):
+            setattr(self, f'gcn{i+1}',
+                    GCNSpatialUnit(gcn_dims[i],
+                                   gcn_dims[i+1],
                                    bias=self.bias,
                                    kernel_size=self.kernel_size,
                                    padding=self.padding,
                                    dropout=self.dropout,
                                    activation=self.activation,
-                                   normalization=self.normalization)
-        self.gcn2 = GCNSpatialUnit(gcn_dims[1],
-                                   gcn_dims[2],
-                                   bias=self.bias,
-                                   kernel_size=self.kernel_size,
-                                   padding=self.padding,
-                                   dropout=self.dropout,
-                                   activation=self.activation,
-                                   normalization=self.normalization)
-        self.gcn3 = GCNSpatialUnit(gcn_dims[2],
-                                   gcn_dims[3],
-                                   bias=self.bias,
-                                   kernel_size=self.kernel_size,
-                                   padding=self.padding,
-                                   dropout=self.dropout,
-                                   activation=self.activation,
-                                   normalization=self.normalization)
+                                   normalization=self.normalization))
 
         self.res = lambda x: 0
         self.res1 = lambda x: 0
@@ -1367,14 +1348,15 @@ if __name__ == '__main__':
                 # gcn_dropout=0.2,
                 # spatial_maxpool=3,
                 # temporal_maxpool=3,
+                gcn_dims=[128, 256, 256, 256, 256]
                 )
     model(inputs, subjects)
     # print(model)
 
-    try:
-        flops = FlopCountAnalysis(model, inputs)
-        # print(flops.total())
-        # print(flops.by_module_and_operator())
-        print(flop_count_table(flops))
-    except NameError:
-        print("Warning: fvcore is not found")
+    # try:
+    #     flops = FlopCountAnalysis(model, inputs)
+    #     # print(flops.total())
+    #     # print(flops.by_module_and_operator())
+    #     print(flop_count_table(flops))
+    # except NameError:
+    #     print("Warning: fvcore is not found")
