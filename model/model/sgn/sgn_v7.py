@@ -1158,6 +1158,7 @@ class GCNSpatialBlock(Module):
                                               dropout=dropout,
                                               activation=activation,
                                               normalization=normalization)
+        self.num_blocks = len(gcn_dims) - 1
         self.g_shared = isinstance(g_proj_dim, int)
         if self.g_shared:
             self.gcn_g = GCNSpatialG(gcn_dims[0],
@@ -1167,7 +1168,7 @@ class GCNSpatialBlock(Module):
                                      g_proj_shared=g_proj_shared)
         else:
 
-            for i in range(len(gcn_dims)-1):
+            for i in range(self.num_blocks):
                 setattr(self, f'gcn_g{i+1}',
                         GCNSpatialG(gcn_dims[i],
                                     g_proj_dim[i],
@@ -1175,7 +1176,7 @@ class GCNSpatialBlock(Module):
                                     activation=g_activation,
                                     g_proj_shared=g_proj_shared))
 
-        for i in range(len(gcn_dims)-1):
+        for i in range(self.num_blocks):
             setattr(self, f'gcn{i+1}',
                     GCNSpatialUnit(gcn_dims[i],
                                    gcn_dims[i+1],
@@ -1192,6 +1193,7 @@ class GCNSpatialBlock(Module):
         self.res3 = lambda x: 0
 
         if isinstance(g_residual, list):
+            assert len(g_residual) == self.num_blocks
             for i, r in enumerate(g_residual):
                 if r == 0:
                     setattr(self, f'res{i+1}', lambda x: 0)
@@ -1207,10 +1209,10 @@ class GCNSpatialBlock(Module):
 
         elif isinstance(g_residual, int):
             if g_residual == 1:
-                if gcn_dims[0] == gcn_dims[3]:
+                if gcn_dims[0] == gcn_dims[-1]:
                     self.res = nn.Identity()
                 else:
-                    self.res = Conv(gcn_dims[0], gcn_dims[3], bias=self.bias)
+                    self.res = Conv(gcn_dims[0], gcn_dims[-1], bias=self.bias)
             else:
                 raise ValueError("Unknown residual modes...")
 
@@ -1221,17 +1223,16 @@ class GCNSpatialBlock(Module):
         x0 = x
         if self.g_shared:
             g = self.gcn_g(x)
-            x = self.gcn1(x, g) + self.res1(x)
-            x = self.gcn2(x, g) + self.res2(x)
-            x = self.gcn3(x, g) + self.res3(x)
+            for i in range(self.num_blocks):
+                x = getattr(self, f'gcn{i+1}')(x, g) + \
+                    getattr(self, f'res{i+1}')(x)
         else:
-            g1 = self.gcn_g1(x)
-            x = self.gcn1(x, g1) + self.res1(x)
-            g2 = self.gcn_g2(x)
-            x = self.gcn2(x, g2) + self.res1(x)
-            g3 = self.gcn_g3(x)
-            x = self.gcn3(x, g3) + self.res1(x)
-            g = [g1, g2, g3]
+            g = []
+            for i in range(self.num_blocks):
+                g1 = getattr(self, f'gcn_g{i+1}')(x)
+                g.append(g1)
+                x = getattr(self, f'gcn{i+1}')(x, g1) + \
+                    getattr(self, f'res{i+1}')(x)
         x += self.res(x0)
         return x, g
 
@@ -1340,15 +1341,15 @@ if __name__ == '__main__':
                 # # # subject=1,
                 # sem_part=1,
                 # g_part=0,
-                g_residual=1,
+                g_residual=[0, 0, 0, 0, 0],
                 # # sem_fra_fusion=1,
                 # # subject_fusion=101
-                # c_multiplier=[0.5, 1, 1, 1],
+                c_multiplier=[0.5, 0.5, 0.5, 0.5],
                 # t_mode=9,
                 # gcn_dropout=0.2,
                 # spatial_maxpool=3,
                 # temporal_maxpool=3,
-                gcn_dims=[128, 256, 256, 256, 256]
+                gcn_dims=[64, 64, 64, 64, 128]
                 )
     model(inputs, subjects)
     # print(model)
