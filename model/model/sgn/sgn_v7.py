@@ -14,6 +14,12 @@ from torch import nn
 from torch import Tensor
 from torch.nn import Module as PyTorchModule
 
+try:
+    from fvcore.nn import FlopCountAnalysis
+    from fvcore.nn import flop_count_table
+except ImportError:
+    print("Warning: fvcore is not found")
+
 import math
 from typing import Tuple, Optional, Union, Type, List
 
@@ -73,10 +79,10 @@ class SGN(PyTorchModule):
 
                  subject: int = 0,
 
-                 g_part: int = 0,
+                 g_part: int = -1,
                  g_proj_shared: bool = False,
-                 g_proj_dim: Union[list, int] = c3,  # c3
-                 g_residual: List[int] = [0, 0, 0],
+                 g_proj_dim: Union[List[int], int] = c3,  # c3
+                 g_residual: Union[List[int], int] = [0, 0, 0],
                  gcn_t_kernel: int = 1,
                  gcn_dropout: float = 0.0,
 
@@ -172,7 +178,7 @@ class SGN(PyTorchModule):
         assert self.subject in [0, 1, 2, 3, 4]
 
         self.g_part = g_part
-        assert self.g_part in [0, 1, 2, 3]
+        assert self.g_part in [-1, 0, 1, 2, 3]
         self.g_proj_shared = g_proj_shared
         self.g_proj_dim = g_proj_dim
         self.g_residual = g_residual
@@ -1137,11 +1143,11 @@ class GCNSpatialBlock(Module):
                  dropout: Optional[Type[PyTorchModule]] = None,
                  activation: T1 = nn.ReLU,
                  normalization: T1 = nn.BatchNorm2d,
-                 gcn_dims: list,
-                 g_proj_dim: Tuple[int, list],
+                 gcn_dims: List[int],
+                 g_proj_dim: Union[List[int], int],
                  g_proj_shared: bool = False,
                  g_activation: T1 = nn.Softmax,
-                 g_residual: List[int] = [0, 0, 0],
+                 g_residual: Union[List[int], int] = [0, 0, 0],
                  ):
         super(GCNSpatialBlock, self).__init__(*args,
                                               kernel_size=kernel_size,
@@ -1199,19 +1205,39 @@ class GCNSpatialBlock(Module):
                                    activation=self.activation,
                                    normalization=self.normalization)
 
-        for i, r in enumerate(g_residual):
-            if r == 0:
-                setattr(self, f'res{i+1}', lambda x: 0)
-            elif r == 1:
-                if gcn_dims[i] == gcn_dims[i+1]:
-                    setattr(self, f'res{i+1}', nn.Identity())
+        self.res = lambda x: 0
+        self.res1 = lambda x: 0
+        self.res2 = lambda x: 0
+        self.res3 = lambda x: 0
+
+        if isinstance(g_residual, list):
+            for i, r in enumerate(g_residual):
+                if r == 0:
+                    setattr(self, f'res{i+1}', lambda x: 0)
+                elif r == 1:
+                    if gcn_dims[i] == gcn_dims[i+1]:
+                        setattr(self, f'res{i+1}', nn.Identity())
+                    else:
+                        setattr(self, f'res{i+1}', Conv(gcn_dims[i],
+                                                        gcn_dims[i+1],
+                                                        bias=self.bias))
                 else:
-                    setattr(self, f'res{i+1}', Conv(gcn_dims[i], gcn_dims[i+1],
-                                                    bias=self.bias))
+                    raise ValueError("Unknown residual modes...")
+
+        elif isinstance(g_residual, int):
+            if g_residual == 1:
+                if gcn_dims[0] == gcn_dims[3]:
+                    self.res = nn.Identity()
+                else:
+                    self.res = Conv(gcn_dims[0], gcn_dims[3], bias=self.bias)
             else:
                 raise ValueError("Unknown residual modes...")
 
+        else:
+            raise ValueError("Unknown residual modes...")
+
     def forward(self, x: Tensor) -> Tensor:
+        x0 = x
         if self.g_shared:
             g = self.gcn_g(x)
             x = self.gcn1(x, g) + self.res1(x)
@@ -1225,6 +1251,7 @@ class GCNSpatialBlock(Module):
             g3 = self.gcn_g3(x)
             x = self.gcn3(x, g3) + self.res1(x)
             g = [g1, g2, g3]
+        x += self.res(x0)
         return x, g
 
 
@@ -1322,8 +1349,8 @@ if __name__ == '__main__':
     subjects = torch.ones(batch_size, 20, 1)
 
     model = SGN(num_segment=20,
-                in_position=5,
-                in_velocity=5,
+                # in_position=5,
+                # in_velocity=5,
                 # in_part=1,
                 # in_motion=1,
                 # in_part_type=2,
@@ -1332,13 +1359,22 @@ if __name__ == '__main__':
                 # # # subject=1,
                 # sem_part=1,
                 # g_part=0,
+                g_residual=1,
                 # # sem_fra_fusion=1,
                 # # subject_fusion=101
                 # c_multiplier=[0.5, 1, 1, 1],
-                t_mode=9,
+                # t_mode=9,
                 # gcn_dropout=0.2,
                 # spatial_maxpool=3,
-                temporal_maxpool=2,
+                # temporal_maxpool=3,
                 )
     model(inputs, subjects)
     # print(model)
+
+    try:
+        flops = FlopCountAnalysis(model, inputs)
+        # print(flops.total())
+        # print(flops.by_module_and_operator())
+        print(flop_count_table(flops))
+    except NameError:
+        print("Warning: fvcore is not found")
