@@ -23,6 +23,7 @@ class Module(PyTorchModule):
                  dropout: Optional[Type[PyTorchModule]] = None,
                  activation: Optional[Type[PyTorchModule]] = None,
                  normalization: Optional[Type[PyTorchModule]] = None,
+                 prenorm: bool = False
                  ):
         super(Module, self).__init__()
         self.in_channels = in_channels
@@ -38,10 +39,13 @@ class Module(PyTorchModule):
         self.dropout = dropout
         self.activation = activation
         self.normalization = normalization
+        self.prenorm = prenorm
 
     def update_block_dict(self, block: OrderedDict) -> OrderedDict:
         if self.normalization is not None:
             block.update({'norm': self.normalization()})
+            if self.prenorm:
+                block.move_to_end('norm', last=False)
         if self.activation is not None:
             block.update({'act': self.activation()})
         if self.dropout is not None:
@@ -102,6 +106,7 @@ class Conv(Module):
                  dropout: Optional[Type[PyTorchModule]] = None,
                  activation: Optional[Type[PyTorchModule]] = None,
                  normalization: Optional[Type[PyTorchModule]] = None,
+                 prenorm: bool = False
                  ):
         super(Conv, self).__init__(in_channels,
                                    out_channels,
@@ -112,7 +117,8 @@ class Conv(Module):
                                    deterministic=deterministic,
                                    dropout=dropout,
                                    activation=activation,
-                                   normalization=normalization)
+                                   normalization=normalization,
+                                   prenorm=prenorm)
         block = OrderedDict({
             'conv': Conv1xN(self.in_channels,
                             self.out_channels,
@@ -139,6 +145,7 @@ class Pool(Module):
                  dropout: Optional[Type[PyTorchModule]] = None,
                  activation: Optional[Type[PyTorchModule]] = None,
                  normalization: Optional[Type[PyTorchModule]] = None,
+                 prenorm: bool = False
                  ):
         super(Pool, self).__init__(in_channels,
                                    out_channels,
@@ -149,7 +156,8 @@ class Pool(Module):
                                    deterministic=deterministic,
                                    dropout=dropout,
                                    activation=activation,
-                                   normalization=normalization)
+                                   normalization=normalization,
+                                   prenorm=prenorm)
         block = OrderedDict({
             'pool': pooling,
             'conv': Conv1xN(self.in_channels,

@@ -21,9 +21,10 @@ except ImportError:
     print("Warning: fvcore is not found")
 
 import math
-from typing import Tuple, Optional, Union, Type, List
+from typing import Tuple, Optional, Union, Type, List, Any
 
 from model.module import *
+from model.module.layernorm import LayerNorm
 from model.resource.common_ntu import *
 
 from utils.utils import *
@@ -33,12 +34,15 @@ T1 = Type[PyTorchModule]
 T2 = List[Optional[Type[PyTorchModule]]]
 
 
+def null_fn(x: Any) -> int: return 0
+
+
 class SGN(PyTorchModule):
 
     emb_modes = [0, 1, 2, 3, 4, 5, 6, 7]
 
     g_activation_fn = nn.Softmax
-    activation_fn = nn.ReLU
+    # activation_fn = nn.ReLU
     # dropout_fn = nn.Dropout2d
 
     c1, c2, c3, c4 = c1, c2, c3, c4
@@ -56,7 +60,8 @@ class SGN(PyTorchModule):
                  dropout: float = 0.0,
                  dropout2d: float = 0.0,
                  c_multiplier: Union[int, float, list] = 1,
-                 norm_type: str = 'bn',
+                 norm_type: str = 'bn-pre',
+                 act_type: str = 'relu',
 
                  in_position: int = 1,
                  in_velocity: int = 1,
@@ -118,13 +123,25 @@ class SGN(PyTorchModule):
         self.c4 = to_int(self.c4 * c_multiplier[3])  # gcn
 
         self.norm_type = norm_type
-        assert self.norm_type in ['bn', 'ln']
-        if self.norm_type == 'bn':
+        if 'bn' in self.norm_type:
             self.normalization_fn = nn.BatchNorm2d
             self.normalization_fn_1d = nn.BatchNorm1d
-        elif self.norm_type == 'ln':
-            self.normalization_fn = lambda x: nn.GroupNorm(1, x)
-            self.normalization_fn_1d = lambda x: nn.GroupNorm(1, x)
+        elif 'ln' in self.norm_type:
+            self.normalization_fn = LayerNorm
+            self.normalization_fn_1d = LayerNorm
+        else:
+            raise ValueError("Unknown norm_type ...")
+        if 'pre' in self.norm_type:
+            self.prenorm = True
+        else:
+            self.prenorm = False
+
+        self.act_type = act_type
+        assert self.act_type in ['relu', 'gelu']
+        if self.act_type == 'relu':
+            self.activation_fn = nn.ReLU
+        elif self.act_type == 'gelu':
+            self.activation_fn = nn.GELU
 
         self.in_position = in_position
         self.in_velocity = in_velocity
@@ -625,7 +642,8 @@ class SGN(PyTorchModule):
                 dropouts=dropouts,
                 activations=[self.activation_fn for _ in range(idx)],
                 normalizations=[self.normalization_fn for _ in range(idx)],
-                maxpool_kwargs=self.t_maxpool_kwargs
+                maxpool_kwargs=self.t_maxpool_kwargs,
+                prenorm=self.prenorm
             )
 
     def get_dy1(self, x: Tensor):
@@ -845,7 +863,7 @@ class DataNorm(PyTorchModule):
         self.bn = normalization(dim)  # channel dim * num_point
 
     def forward(self, x: Tensor) -> Tensor:
-        bs, _, num_point, step = x.shape
+        bs, _, num_point, step = x.shape  # n,c,v,t
         x = x.view(bs, -1, step)
         x = self.bn(x)
         x = x.view(bs, -1, num_point, step).contiguous()
@@ -904,8 +922,8 @@ class Embedding(Module):
                     self.res2 = Conv(inter_channels, self.out_channels,
                                      bias=self.bias)
             else:
-                self.res1 = lambda x: 0
-                self.res2 = lambda x: 0
+                self.res1 = null_fn
+                self.res2 = null_fn
 
         elif self.mode == 2:
             # bert style (only if we have ont hot vector)
@@ -1035,17 +1053,20 @@ class MLPTemporal(PyTorchModule):
                  dropouts: T2 = [nn.Dropout2d, None],
                  activations: T2 = [nn.ReLU, nn.ReLU],
                  normalizations: T2 = [nn.BatchNorm2d, nn.BatchNorm2d],
-                 maxpool_kwargs: Optional[dict] = None
+                 maxpool_kwargs: Optional[dict] = None,
+                 prenorm: bool = False
                  ):
         super(MLPTemporal, self).__init__()
         if maxpool_kwargs is not None:
-            # self.pool = nn.MaxPool2d(kernel_size=(1, self.kernel_size),
-            #                          stride=(1, max_pool_stride))
             self.pool = nn.MaxPool2d(**maxpool_kwargs)
         else:
             self.pool = nn.Identity()
         self.num_layers = len(channels) - 1
         for i in range(self.num_layers):
+            if prenorm:
+                def norm_func(): return normalizations[i](channels[i])
+            else:
+                def norm_func(): return normalizations[i](channels[i+1])
             setattr(self,
                     f'cnn{i+1}',
                     Conv(channels[i],
@@ -1054,12 +1075,12 @@ class MLPTemporal(PyTorchModule):
                          padding=paddings[i],
                          bias=biases[i],
                          activation=activations[i],
-                         normalization=lambda: normalizations[i](
-                             channels[i+1]),
-                         dropout=dropouts[i])
+                         normalization=norm_func,
+                         dropout=dropouts[i],
+                         prenorm=prenorm)
                     )
             if residuals[i] == 0:
-                setattr(self, f'res{i+1}', lambda x: 0)
+                setattr(self, f'res{i+1}', null_fn)
             elif residuals[i] == 1:
                 if channels[i] == channels[i+1]:
                     setattr(self, f'res{i+1}', nn.Identity())
@@ -1085,6 +1106,8 @@ class GCNSpatialG(Module):
                  padding: int = 0,
                  bias: int = 0,
                  activation: T1 = nn.Softmax,
+                 normalization: Optional[T1] = None,
+                 prenorm: bool = False,
                  g_proj_shared: bool = False,
                  ):
         super(GCNSpatialG, self).__init__(in_channels,
@@ -1092,7 +1115,11 @@ class GCNSpatialG(Module):
                                           kernel_size=kernel_size,
                                           padding=padding,
                                           bias=bias,
-                                          activation=activation)
+                                          activation=activation,
+                                          normalization=normalization,
+                                          prenorm=prenorm)
+        if self.prenorm:
+            self.norm = self.normalization(self.in_channels)
         self.g1 = Conv(self.in_channels, self.out_channels, bias=self.bias,
                        kernel_size=self.kernel_size, padding=self.padding)
         if g_proj_shared:
@@ -1103,6 +1130,8 @@ class GCNSpatialG(Module):
         self.act = self.activation(dim=-1)
 
     def forward(self, x: Tensor) -> Tensor:
+        if self.prenorm:
+            x = self.norm(x)
         g1 = self.g1(x).permute(0, 3, 2, 1).contiguous()  # n,t,v,c
         g2 = self.g2(x).permute(0, 3, 1, 2).contiguous()  # n,t,c,v
         g3 = g1.matmul(g2)  # n,t,v,v
@@ -1119,7 +1148,8 @@ class GCNSpatialUnit(Module):
                  bias: int = 0,
                  dropout: Optional[Type[PyTorchModule]] = None,
                  activation: T1 = nn.ReLU,
-                 normalization: T1 = nn.BatchNorm2d
+                 normalization: T1 = nn.BatchNorm2d,
+                 prenorm: bool = False
                  ):
         super(GCNSpatialUnit, self).__init__(in_channels,
                                              out_channels,
@@ -1128,8 +1158,12 @@ class GCNSpatialUnit(Module):
                                              bias=bias,
                                              dropout=dropout,
                                              activation=activation,
-                                             normalization=normalization)
-        self.norm = self.normalization(self.out_channels)
+                                             normalization=normalization,
+                                             prenorm=prenorm)
+        if self.prenorm:
+            self.norm = self.normalization(self.in_channels)
+        else:
+            self.norm = self.normalization(self.out_channels)
         self.act = self.activation()
         self.drop = nn.Identity() if self.dropout is None else self.dropout()
         self.w1 = Conv(self.in_channels, self.out_channels, bias=self.bias)
@@ -1137,11 +1171,14 @@ class GCNSpatialUnit(Module):
                        kernel_size=self.kernel_size, padding=self.padding)
 
     def forward(self, x: Tensor, g: Tensor) -> Tensor:
+        if self.prenorm:
+            x = self.norm(x)
         x1 = x.permute(0, 3, 2, 1).contiguous()  # n,t,v,c
         x1 = g.matmul(x1)
         x1 = x1.permute(0, 3, 2, 1).contiguous()  # n,c,v,t
         x1 = self.w1(x1) + self.w2(x)  # z + residual
-        x1 = self.norm(x1)
+        if not self.prenorm:
+            x1 = self.norm(x1)
         x1 = self.act(x1)
         x1 = self.drop(x1)
         return x1
@@ -1156,6 +1193,7 @@ class GCNSpatialBlock(Module):
                  dropout: Optional[Type[PyTorchModule]] = None,
                  activation: T1 = nn.ReLU,
                  normalization: T1 = nn.BatchNorm2d,
+                 prenorm: bool = False,
                  gcn_dims: List[int],
                  g_proj_dim: Union[List[int], int],
                  g_kernel: int = 1,
@@ -1169,7 +1207,8 @@ class GCNSpatialBlock(Module):
                                               bias=bias,
                                               dropout=dropout,
                                               activation=activation,
-                                              normalization=normalization)
+                                              normalization=normalization,
+                                              prenorm=prenorm)
         self.num_blocks = len(gcn_dims) - 1
         self.g_shared = isinstance(g_proj_dim, int)
         if self.g_shared:
@@ -1179,9 +1218,10 @@ class GCNSpatialBlock(Module):
                                      kernel_size=g_kernel,
                                      padding=g_kernel//2,
                                      activation=g_activation,
+                                     normalization=self.normalization,
+                                     prenorm=self.prenorm,
                                      g_proj_shared=g_proj_shared)
         else:
-
             for i in range(self.num_blocks):
                 setattr(self, f'gcn_g{i+1}',
                         GCNSpatialG(gcn_dims[i],
@@ -1190,6 +1230,8 @@ class GCNSpatialBlock(Module):
                                     kernel_size=g_kernel,
                                     padding=g_kernel//2,
                                     activation=g_activation,
+                                    normalization=self.normalization,
+                                    prenorm=self.prenorm,
                                     g_proj_shared=g_proj_shared))
 
         for i in range(self.num_blocks):
@@ -1201,17 +1243,18 @@ class GCNSpatialBlock(Module):
                                    padding=self.padding,
                                    dropout=self.dropout,
                                    activation=self.activation,
-                                   normalization=self.normalization))
+                                   normalization=self.normalization,
+                                   prenorm=self.prenorm))
 
-        self.res = lambda x: 0
+        self.res = null_fn
         for i in range(self.num_blocks):
-            setattr(self, f'res{i+1}', lambda x: 0)
+            setattr(self, f'res{i+1}', null_fn)
 
         if isinstance(g_residual, list):
             assert len(g_residual) == self.num_blocks
             for i, r in enumerate(g_residual):
                 if r == 0:
-                    setattr(self, f'res{i+1}', lambda x: 0)
+                    setattr(self, f'res{i+1}', null_fn)
                 elif r == 1:
                     if gcn_dims[i] == gcn_dims[i+1]:
                         setattr(self, f'res{i+1}', nn.Identity())
@@ -1346,6 +1389,7 @@ if __name__ == '__main__':
     subjects = torch.ones(batch_size, 20, 1)
 
     model = SGN(num_segment=20,
+                norm_type='ln-pre',
                 # in_position=5,
                 # in_velocity=5,
                 # in_part=1,

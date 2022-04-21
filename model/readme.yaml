@@ -1469,11 +1469,11 @@ sgn_v7:
         - 220413153001_gres111_nogshared:
                   - 94.08%
         - 220413153001_gres111_cmulti10101005:
-                  - resifual in GCN
+                  - residual in GCN
                   - reduced c4
                   - 93.73%
         - 220413153001_gres111_cmulti101005025:
-                  - resifual in GCN
+                  - residual in GCN
                   - reduced c3 c4
                   - 92.25%
 
@@ -1529,6 +1529,8 @@ sgn_v7:
                   - 93.97%
         - 220419133001_gkernel3_gtk3:
                   - 94.01%
+        - 220419133001_gkernel3_gtk3_tmode0:
+                  - 92.46%
 
 sgn-code:
         - original sgn repo code
