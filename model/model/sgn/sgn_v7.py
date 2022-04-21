@@ -93,6 +93,12 @@ class SGN(PyTorchModule):
                  gcn_dropout: float = 0.0,
                  gcn_dims: list = [c2, c3, c3],
 
+                 t_g_proj_shared: bool = False,
+                 t_g_proj_dim: Union[List[int], int] = c4,
+                 t_g_residual: Union[List[int], int] = [0, 0, 0],
+                 t_gcn_dropout: float = 0.0,
+                 t_gcn_dims: list = [c3, c4, c4],
+
                  t_mode: int = 1,
                  t_kernel: int = 3,
                  t_maxpool_kwargs: Optional[dict] = None,
@@ -205,6 +211,12 @@ class SGN(PyTorchModule):
         self.gcn_t_kernel = gcn_t_kernel
         self.gcn_dropout_fn = lambda: nn.Dropout2d(gcn_dropout)
         self.gcn_dims = gcn_dims
+
+        self.t_g_proj_shared = t_g_proj_shared
+        self.t_g_proj_dim = t_g_proj_dim
+        self.t_g_residual = t_g_residual
+        self.t_gcn_dropout_fn = lambda: nn.Dropout2d(t_gcn_dropout)
+        self.t_gcn_dims = t_gcn_dims
 
         if self.sem_pos_fusion == 1 or self.sem_par_fusion == 1:
             self.gcn_in_ch = self.c1
@@ -559,15 +571,15 @@ class SGN(PyTorchModule):
                 kernel_size=1,
                 padding=0,
                 bias=self.bias,
-                dropout=self.gcn_dropout_fn,
+                dropout=self.t_gcn_dropout_fn,
                 activation=self.activation_fn,
                 normalization=self.normalization_fn,
-                gcn_dims=[_c3, _c3, _c4, _c4],
-                g_proj_dim=_c4,
+                gcn_dims=[_c3] + self.t_gcn_dims,
+                g_proj_dim=self.t_g_proj_dim,
                 g_kernel=1,
-                g_proj_shared=True,
+                g_proj_shared=self.t_g_proj_shared,
                 g_activation=self.g_activation_fn,
-                g_residual=[0, 0, 0],
+                g_residual=self.t_g_residual,
             )
         else:
             # original sgn
