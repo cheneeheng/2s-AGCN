@@ -552,6 +552,23 @@ class SGN(PyTorchModule):
         # skip
         if self.t_mode == 0:
             self.cnn = nn.Identity()
+        elif self.t_mode == 100:
+            self.cnn = GCNSpatialBlock(
+                0,
+                0,
+                kernel_size=1,
+                padding=0,
+                bias=self.bias,
+                dropout=self.gcn_dropout_fn,
+                activation=self.activation_fn,
+                normalization=self.normalization_fn,
+                gcn_dims=[_c3, _c3, _c4, _c4],
+                g_proj_dim=_c4,
+                g_kernel=1,
+                g_proj_shared=True,
+                g_activation=self.g_activation_fn,
+                g_residual=[0, 0, 0],
+            )
         else:
             # original sgn
             if self.t_mode == 1:
@@ -826,7 +843,12 @@ class SGN(PyTorchModule):
             x = x.reshape((x.shape[0], -1, 1, x.shape[-1]))  # n,cv,1,t
 
         x = self.aspp(x)
-        x = self.cnn(x)
+
+        if self.t_mode == 100:
+            x, _ = self.cnn(x.transpose(-1, -2))
+            x = x.transpose(-1, -2)
+        else:
+            x = self.cnn(x)
 
         # Classification -------------------------------------------------------
         y = self.tmp(x)
@@ -1406,7 +1428,7 @@ if __name__ == '__main__':
                 # # sem_fra_fusion=1,
                 # # subject_fusion=101
                 # c_multiplier=[0.5, 0.5, 1.0, 1.0],
-                # t_mode=9,
+                t_mode=100,
                 # gcn_dropout=0.2,
                 # spatial_maxpool=3,
                 # temporal_maxpool=3,
