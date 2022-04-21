@@ -1532,6 +1532,12 @@ sgn_v7:
         - 220419133001_gkernel3_gtk3_tmode0:
                   - 92.46%
 
+        - 220419133001_ln:
+        - 220419133001_ln_prenorm:
+        - 220419133001_gelu:
+        - 220419133001_gelu_ln:
+        - 220419133001_gelu_ln_prenorm:
+
 sgn-code:
         - original sgn repo code
         - 220324170001:

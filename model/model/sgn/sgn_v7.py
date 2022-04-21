@@ -39,7 +39,7 @@ def null_fn(x: Any) -> int: return 0
 
 class SGN(PyTorchModule):
 
-    emb_modes = [0, 1, 2, 3, 4, 5, 6, 7]
+    emb_modes = [0, 1, 2, 3, 4, 5, 6, 7, 8]
 
     g_activation_fn = nn.Softmax
     # activation_fn = nn.ReLU
@@ -328,6 +328,8 @@ class SGN(PyTorchModule):
         elif mode == 5:
             # inspired by the 4x dim in ffn of transformers
             return ch * 4
+        elif mode == 8:
+            return ch // 2
         else:
             return ch
 
@@ -889,7 +891,7 @@ class Embedding(Module):
                                         dropout=dropout,
                                         activation=activation,
                                         normalization=normalization)
-        assert mode in [1, 2, 3, 4, 5, 6, 7]
+        assert mode in [1, 2, 3, 4, 5, 6, 7, 8]
         self.mode = mode
 
         if in_norm is not None:
@@ -897,8 +899,8 @@ class Embedding(Module):
         else:
             self.norm = nn.Identity()
 
-        if self.mode in [1, 4, 5, 6]:
-            # 1=original, 4=dropout, 5=higher inter, 6=residual
+        if self.mode in [1, 4, 5, 6, 8]:
+            # 1=original, 4=dropout, 5=higher inter, 6=residual, 8=lower inter
             if self.mode != 4:
                 self.dropout = None
             self.cnn1 = Conv(self.in_channels,
@@ -948,7 +950,7 @@ class Embedding(Module):
     def forward(self, x: Tensor) -> Tensor:
         # x: n,c,v,t
         x = self.norm(x)
-        if self.mode in [1, 4, 5, 6]:
+        if self.mode in [1, 4, 5, 6, 8]:
             x = self.cnn1(x) + self.res1(x)
             x = self.cnn2(x) + self.res2(x)
         elif self.mode == 2:
@@ -1389,9 +1391,9 @@ if __name__ == '__main__':
     subjects = torch.ones(batch_size, 20, 1)
 
     model = SGN(num_segment=20,
-                norm_type='ln-pre',
-                # in_position=5,
-                # in_velocity=5,
+                # norm_type='ln-pre',
+                in_position=8,
+                in_velocity=8,
                 # in_part=1,
                 # in_motion=1,
                 # in_part_type=2,
@@ -1400,16 +1402,16 @@ if __name__ == '__main__':
                 # # # subject=1,
                 # sem_part=1,
                 # g_part=0,
-                g_residual=[0, 0, 0, 0, 0],
+                # g_residual=[0, 0, 0, 0, 0],
                 # # sem_fra_fusion=1,
                 # # subject_fusion=101
-                c_multiplier=[0.5, 0.5, 1.0, 1.0],
+                # c_multiplier=[0.5, 0.5, 1.0, 1.0],
                 # t_mode=9,
                 # gcn_dropout=0.2,
                 # spatial_maxpool=3,
                 # temporal_maxpool=3,
-                gcn_dims=[64, 64, 64, 64, 256],
-                g_kernel=5,
+                # gcn_dims=[64, 64, 64, 64, 256],
+                # g_kernel=5,
                 )
     model(inputs, subjects)
     # print(model)
