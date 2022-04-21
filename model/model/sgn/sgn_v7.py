@@ -533,99 +533,100 @@ class SGN(PyTorchModule):
         # skip
         if self.t_mode == 0:
             self.cnn = nn.Identity()
-        # original sgn
-        elif self.t_mode == 1:
-            idx = 2
-            channels = [_c3, _c3, _c4]
-            kernel_sizes = [self.t_kernel, 1]
-            paddings = [self.t_kernel//2, 0]
-            residuals = [0 for _ in range(idx)]
-            dropouts = [self.dropout_fn, None]
-        # original sgn with residual
-        elif self.t_mode == 2:
-            idx = 2
-            channels = [_c3, _c3, _c4]
-            kernel_sizes = [self.t_kernel, 1]
-            paddings = [self.t_kernel//2, 0]
-            residuals = [1 for _ in range(idx)]
-            dropouts = [self.dropout_fn, None]
-        # all 3x3
-        elif self.t_mode == 3:
-            idx = 2
-            channels = [_c3, _c3, _c4]
-            kernel_sizes = [self.t_kernel for _ in range(2)]
-            paddings = [self.t_kernel//2 for _ in range(2)]
-            residuals = [0 for _ in range(2)]
-            dropouts = [self.dropout_fn, None]
-        # all 3x3 with residual
-        elif self.t_mode == 4:
-            idx = 2
-            channels = [_c3, _c3, _c4]
-            kernel_sizes = [self.t_kernel for _ in range(2)]
-            paddings = [self.t_kernel//2 for _ in range(2)]
-            residuals = [1 for _ in range(2)]
-            dropouts = [self.dropout_fn, None]
-        # 3 layers
-        elif self.t_mode == 5:
-            idx = 3
-            channels = [_c3, _c3, _c3, _c4]
-            kernel_sizes = [self.t_kernel, 1, 1]
-            paddings = [self.t_kernel//2, 0, 0]
-            residuals = [0 for _ in range(3)]
-            dropouts = [self.dropout_fn, None, None]
-        # 3 layers with residual
-        elif self.t_mode == 6:
-            idx = 3
-            channels = [_c3, _c3, _c3, _c4]
-            kernel_sizes = [self.t_kernel, 1, 1]
-            paddings = [self.t_kernel//2, 0, 0]
-            residuals = [1 for _ in range(3)]
-            dropouts = [self.dropout_fn, None, None]
-        # original sgn + all dropout
-        elif self.t_mode == 7:
-            idx = 2
-            channels = [_c3, _c3, _c4]
-            kernel_sizes = [self.t_kernel, 1]
-            paddings = [self.t_kernel//2, 0]
-            residuals = [0 for _ in range(idx)]
-            dropouts = [self.dropout_fn, self.dropout_fn]
-        # original sgn + all dropout + residual
-        elif self.t_mode == 8:
-            idx = 2
-            channels = [_c3, _c3, _c4]
-            kernel_sizes = [self.t_kernel, 1]
-            paddings = [self.t_kernel//2, 0]
-            residuals = [1 for _ in range(idx)]
-            dropouts = [self.dropout_fn, self.dropout_fn]
-        # original sgn with quarter input channel
-        elif self.t_mode == 9:
-            idx = 2
-            channels = [_c3, _c3//4, _c4]
-            kernel_sizes = [self.t_kernel, 1]
-            paddings = [self.t_kernel//2, 0]
-            residuals = [0 for _ in range(idx)]
-            dropouts = [self.dropout_fn, None]
-        # original sgn with quarter input channel + residual
-        elif self.t_mode == 10:
-            idx = 2
-            channels = [_c3, _c3//4, _c4]
-            kernel_sizes = [self.t_kernel, 1]
-            paddings = [self.t_kernel//2, 0]
-            residuals = [1 for _ in range(idx)]
-            dropouts = [self.dropout_fn, None]
         else:
-            raise ValueError("Unknown t_mode...")
-        self.cnn = MLPTemporal(
-            channels=channels,
-            kernel_sizes=kernel_sizes,
-            paddings=paddings,
-            biases=[self.bias for _ in range(idx)],
-            residuals=residuals,
-            dropouts=dropouts,
-            activations=[self.activation_fn for _ in range(idx)],
-            normalizations=[self.normalization_fn for _ in range(idx)],
-            maxpool_kwargs=self.t_maxpool_kwargs
-        )
+            # original sgn
+            if self.t_mode == 1:
+                idx = 2
+                channels = [_c3, _c3, _c4]
+                kernel_sizes = [self.t_kernel, 1]
+                paddings = [self.t_kernel//2, 0]
+                residuals = [0 for _ in range(idx)]
+                dropouts = [self.dropout_fn, None]
+            # original sgn with residual
+            elif self.t_mode == 2:
+                idx = 2
+                channels = [_c3, _c3, _c4]
+                kernel_sizes = [self.t_kernel, 1]
+                paddings = [self.t_kernel//2, 0]
+                residuals = [1 for _ in range(idx)]
+                dropouts = [self.dropout_fn, None]
+            # all 3x3
+            elif self.t_mode == 3:
+                idx = 2
+                channels = [_c3, _c3, _c4]
+                kernel_sizes = [self.t_kernel for _ in range(2)]
+                paddings = [self.t_kernel//2 for _ in range(2)]
+                residuals = [0 for _ in range(2)]
+                dropouts = [self.dropout_fn, None]
+            # all 3x3 with residual
+            elif self.t_mode == 4:
+                idx = 2
+                channels = [_c3, _c3, _c4]
+                kernel_sizes = [self.t_kernel for _ in range(2)]
+                paddings = [self.t_kernel//2 for _ in range(2)]
+                residuals = [1 for _ in range(2)]
+                dropouts = [self.dropout_fn, None]
+            # 3 layers
+            elif self.t_mode == 5:
+                idx = 3
+                channels = [_c3, _c3, _c3, _c4]
+                kernel_sizes = [self.t_kernel, 1, 1]
+                paddings = [self.t_kernel//2, 0, 0]
+                residuals = [0 for _ in range(3)]
+                dropouts = [self.dropout_fn, None, None]
+            # 3 layers with residual
+            elif self.t_mode == 6:
+                idx = 3
+                channels = [_c3, _c3, _c3, _c4]
+                kernel_sizes = [self.t_kernel, 1, 1]
+                paddings = [self.t_kernel//2, 0, 0]
+                residuals = [1 for _ in range(3)]
+                dropouts = [self.dropout_fn, None, None]
+            # original sgn + all dropout
+            elif self.t_mode == 7:
+                idx = 2
+                channels = [_c3, _c3, _c4]
+                kernel_sizes = [self.t_kernel, 1]
+                paddings = [self.t_kernel//2, 0]
+                residuals = [0 for _ in range(idx)]
+                dropouts = [self.dropout_fn, self.dropout_fn]
+            # original sgn + all dropout + residual
+            elif self.t_mode == 8:
+                idx = 2
+                channels = [_c3, _c3, _c4]
+                kernel_sizes = [self.t_kernel, 1]
+                paddings = [self.t_kernel//2, 0]
+                residuals = [1 for _ in range(idx)]
+                dropouts = [self.dropout_fn, self.dropout_fn]
+            # original sgn with quarter input channel
+            elif self.t_mode == 9:
+                idx = 2
+                channels = [_c3, _c3//4, _c4]
+                kernel_sizes = [self.t_kernel, 1]
+                paddings = [self.t_kernel//2, 0]
+                residuals = [0 for _ in range(idx)]
+                dropouts = [self.dropout_fn, None]
+            # original sgn with quarter input channel + residual
+            elif self.t_mode == 10:
+                idx = 2
+                channels = [_c3, _c3//4, _c4]
+                kernel_sizes = [self.t_kernel, 1]
+                paddings = [self.t_kernel//2, 0]
+                residuals = [1 for _ in range(idx)]
+                dropouts = [self.dropout_fn, None]
+            else:
+                raise ValueError("Unknown t_mode...")
+            self.cnn = MLPTemporal(
+                channels=channels,
+                kernel_sizes=kernel_sizes,
+                paddings=paddings,
+                biases=[self.bias for _ in range(idx)],
+                residuals=residuals,
+                dropouts=dropouts,
+                activations=[self.activation_fn for _ in range(idx)],
+                normalizations=[self.normalization_fn for _ in range(idx)],
+                maxpool_kwargs=self.t_maxpool_kwargs
+            )
 
     def get_dy1(self, x: Tensor):
         bs, step, dim = x.shape
