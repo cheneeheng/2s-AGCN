@@ -1110,6 +1110,7 @@ class MLPTemporal(PyTorchModule):
                  activations: T2 = [nn.ReLU, nn.ReLU],
                  normalizations: T2 = [nn.BatchNorm2d, nn.BatchNorm2d],
                  maxpool_kwargs: Optional[dict] = None,
+                 residual: int = 0,
                  prenorm: bool = False
                  ):
         super(MLPTemporal, self).__init__()
@@ -1117,6 +1118,15 @@ class MLPTemporal(PyTorchModule):
             self.pool = nn.MaxPool2d(**maxpool_kwargs)
         else:
             self.pool = nn.Identity()
+        if residual == 0:
+            self.res = null_fn
+        elif residual == 1:
+            if channels[0] == channels[-1]:
+                self.res = nn.Identity()
+            else:
+                self.res = Conv(channels[0], channels[-1], bias=biases[0])
+        else:
+            raise ValueError('Unknown residual mode...')
         self.num_layers = len(channels) - 1
         for i in range(self.num_layers):
             if prenorm:
@@ -1148,9 +1158,11 @@ class MLPTemporal(PyTorchModule):
 
     def forward(self, x: Tensor) -> Tensor:
         # x: n,c,v,t ; v=1 due to SMP
+        x0 = x
         x = self.pool(x)
         for i in range(self.num_layers):
             x = getattr(self, f'cnn{i+1}')(x) + getattr(self, f'res{i+1}')(x)
+        x += self.res(x0)
         return x
 
 
@@ -1335,54 +1347,56 @@ class GCNSpatialBlock(Module):
             raise ValueError("Unknown residual modes...")
 
         if ffn_mode > 0:
-            if ffn_mode == 1:
-                idx = 2
-                for i in range(self.num_blocks):
+            for i in range(self.num_blocks):
+                if ffn_mode == 1:
+                    idx = 2
                     channels = [gcn_dims[i+1], gcn_dims[i+1], gcn_dims[i+1]]
                     kernel_sizes = [1, 1]
                     paddings = [0, 0]
                     residuals = [0, 0]
                     dropouts = [self.dropout, None]
-                    setattr(self,
-                            f'ffn{i+1}',
-                            MLPTemporal(
-                                channels=channels,
-                                kernel_sizes=kernel_sizes,
-                                paddings=paddings,
-                                biases=[self.bias for _ in range(idx)],
-                                residuals=residuals,
-                                dropouts=dropouts,
-                                activations=[
-                                    self.activation for _ in range(idx)],
-                                normalizations=[
-                                    self.normalization for _ in range(idx)],
-                                maxpool_kwargs=None,
-                                prenorm=self.prenorm)
-                            )
-            elif ffn_mode == 2:
-                idx = 2
-                for i in range(self.num_blocks):
+                    residual = 0
+                elif ffn_mode == 2:
+                    idx = 2
                     channels = [gcn_dims[i+1], gcn_dims[i+1], gcn_dims[i+1]]
                     kernel_sizes = [3, 1]
                     paddings = [1, 0]
                     residuals = [0, 0]
                     dropouts = [self.dropout, None]
-                    setattr(self,
-                            f'ffn{i+1}',
-                            MLPTemporal(
-                                channels=channels,
-                                kernel_sizes=kernel_sizes,
-                                paddings=paddings,
-                                biases=[self.bias for _ in range(idx)],
-                                residuals=residuals,
-                                dropouts=dropouts,
-                                activations=[
-                                    self.activation for _ in range(idx)],
-                                normalizations=[
-                                    self.normalization for _ in range(idx)],
-                                maxpool_kwargs=None,
-                                prenorm=self.prenorm)
-                            )
+                    residual = 0
+                elif ffn_mode == 3:
+                    idx = 2
+                    channels = [gcn_dims[i+1], gcn_dims[i+1], gcn_dims[i+1]]
+                    kernel_sizes = [1, 1]
+                    paddings = [0, 0]
+                    residuals = [0, 0]
+                    dropouts = [self.dropout, None]
+                    residual = 1
+                elif ffn_mode == 4:
+                    idx = 2
+                    channels = [gcn_dims[i+1], gcn_dims[i+1], gcn_dims[i+1]]
+                    kernel_sizes = [3, 1]
+                    paddings = [1, 0]
+                    residuals = [0, 0]
+                    dropouts = [self.dropout, None]
+                    residual = 1
+                setattr(self,
+                        f'ffn{i+1}',
+                        MLPTemporal(
+                            channels=channels,
+                            kernel_sizes=kernel_sizes,
+                            paddings=paddings,
+                            biases=[self.bias for _ in range(idx)],
+                            residuals=residuals,
+                            dropouts=dropouts,
+                            activations=[
+                                self.activation for _ in range(idx)],
+                            normalizations=[
+                                self.normalization for _ in range(idx)],
+                            maxpool_kwargs=None,
+                            residual=residual,
+                            prenorm=self.prenorm)
+                        )
         else:
             for i in range(self.num_blocks):
                 setattr(self, f'ffn{i+1}', nn.Identity())
@@ -1501,7 +1515,8 @@ if __name__ == '__main__':
     subjects = torch.ones(batch_size, 20, 1)
 
     model = SGN(num_segment=20,
-                gcn_ffn=2,
+                gcn_ffn=3,
+                # g_proj_dim=[256, 512, 512],
                 # c_multiplier=[1.0, 1.0, 2.0, 1.0],
                 # sem_position2=1,
                 # norm_type='ln-pre',
