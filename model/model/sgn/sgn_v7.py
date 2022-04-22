@@ -74,6 +74,7 @@ class SGN(PyTorchModule):
 
                  sem_part: int = 0,
                  sem_position: int = 1,
+                 sem_position2: int = 0,
                  sem_frame: int = 1,
 
                  par_pos_fusion: int = 0,
@@ -176,6 +177,7 @@ class SGN(PyTorchModule):
 
         self.sem_part = sem_part
         self.sem_position = sem_position
+        self.sem_position2 = sem_position2
         self.sem_frame = sem_frame
         assert self.sem_part in self.emb_modes
         assert self.sem_position in self.emb_modes
@@ -442,6 +444,22 @@ class SGN(PyTorchModule):
             )
 
     def init_input_sem(self):
+        # POST SPATIAL GCN VALUES
+        num_points = None
+        if self.in_position == 0 and self.in_velocity == 0:
+            if self.in_part > 0 or self.in_motion > 0:
+                num_points = self.parts_len
+            else:
+                raise ValueError("Input args are faulty...")
+        else:
+            if self.in_part > 0 or self.in_motion > 0:
+                num_points = self.num_point+self.parts_len
+            else:
+                num_points = self.num_point
+        if self.sem_fra_fusion == 1:
+            out_channels = self.c3
+        elif self.sem_fra_fusion == 101:
+            out_channels = self.gcn_in_ch
         # Joint Embedding
         if self.sem_position > 0:
             self.spa = OneHotTensor(self.num_point, self.num_segment, mode=0)
@@ -456,28 +474,18 @@ class SGN(PyTorchModule):
                                            in_channels=self.parts_len)
         # Frame Embedding
         if self.sem_frame > 0:
-            if self.in_position == 0 and self.in_velocity == 0:
-                if self.in_part > 0 or self.in_motion > 0:
-                    self.tem = OneHotTensor(self.num_segment,
-                                            self.parts_len,
-                                            mode=1)
-            else:
-                if self.in_part > 0 or self.in_motion > 0:
-                    self.tem = OneHotTensor(self.num_segment,
-                                            self.num_point+self.parts_len,
-                                            mode=1)
-                else:
-                    self.tem = OneHotTensor(self.num_segment,
-                                            self.num_point,
-                                            mode=1)
-            if self.sem_fra_fusion == 1:
-                out_channels = self.c3
-            elif self.sem_fra_fusion == 101:
-                out_channels = self.gcn_in_ch
+            self.tem = OneHotTensor(self.num_segment, num_points, mode=1)
             self.tem_embed = self.init_emb(mode=self.sem_frame,
                                            num_point=self.num_point,
                                            in_channels=self.num_segment,
                                            out_channels=out_channels)
+        # Joint Embedding2
+        if self.sem_position2 > 0:
+            self.spa2 = OneHotTensor(num_points, self.num_segment, mode=0)
+            self.spa_embed2 = self.init_emb(mode=self.sem_position2,
+                                            num_point=num_points,
+                                            in_channels=num_points,
+                                            out_channels=out_channels)
 
     def init_spatial_gcn(self):
         self.gcn_spatial = GCNSpatialBlock(
@@ -746,7 +754,7 @@ class SGN(PyTorchModule):
                            Optional[Tensor],
                            Optional[Tensor],
                            Optional[Tensor]]:
-        spa1, gro1, tem1, sub1 = None, None, None, None
+        spa1, gro1, tem1, sub1, spa2 = None, None, None, None, None
         bs, step, dim = x.shape
         if self.sem_position > 0:
             spa1 = self.spa_embed(self.spa(bs))
@@ -754,11 +762,13 @@ class SGN(PyTorchModule):
             gro1 = self.gro_embed(self.gro(bs))
         if self.sem_frame > 0:
             tem1 = self.tem_embed(self.tem(bs))
+        if self.sem_position2 > 0:
+            spa2 = self.spa_embed2(self.spa2(bs))
         if self.subject > 0:
             s = s.view((bs, step, 1, 1))  # n,t,v,c
             s = s.permute(0, 3, 2, 1).contiguous()  # n,c,v,t
             sub1 = self.sub_embed(s)
-        return spa1, gro1, tem1, sub1
+        return spa1, gro1, tem1, sub1, spa2
 
     def forward(self,
                 x: Tensor,
@@ -783,7 +793,7 @@ class SGN(PyTorchModule):
         assert dy1 is not None or dy2 is not None
 
         # Joint and frame embeddings -------------------------------------------
-        spa1, gro1, tem1, sub1 = self.get_emb(x, s)
+        spa1, gro1, tem1, sub1, spa2 = self.get_emb(x, s)
 
         # Joint-level Module ---------------------------------------------------
         # xyz embeddings
@@ -849,6 +859,9 @@ class SGN(PyTorchModule):
         if self.subject > 0 and self.subject_fusion == 1:
             if self.par_pos_fusion % 2 == 0:
                 x = x + sub1
+
+        if self.sem_position2 > 0:
+            x += spa2
 
         x = self.smp(x)
         if self.spatial_maxpool == 3:
@@ -1425,9 +1438,11 @@ if __name__ == '__main__':
     subjects = torch.ones(batch_size, 20, 1)
 
     model = SGN(num_segment=20,
+                # c_multiplier=[1.0, 1.0, 2.0, 1.0],
+                sem_position2=1,
                 # norm_type='ln-pre',
-                in_position=8,
-                in_velocity=8,
+                # in_position=1,
+                # in_velocity=1,
                 # in_part=1,
                 # in_motion=1,
                 # in_part_type=2,
@@ -1440,11 +1455,11 @@ if __name__ == '__main__':
                 # # sem_fra_fusion=1,
                 # # subject_fusion=101
                 # c_multiplier=[0.5, 0.5, 1.0, 1.0],
-                t_mode=100,
+                # t_mode=100,
                 # gcn_dropout=0.2,
                 # spatial_maxpool=3,
                 # temporal_maxpool=3,
-                # gcn_dims=[64, 64, 64, 64, 256],
+                # gcn_dims=[128, 128, 512],
                 # g_kernel=5,
                 )
     model(inputs, subjects)

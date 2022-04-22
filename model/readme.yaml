@@ -1533,10 +1533,29 @@ sgn_v7:
                   - 92.46%
 
         - 220419133001_ln:
+                  - 91.53%
         - 220419133001_ln_prenorm:
+                  - 90.69%
         - 220419133001_gelu:
+                  - 94.39%
         - 220419133001_gelu_ln:
+                  - 92.92%
         - 220419133001_gelu_ln_prenorm:
+                  - 92.64%
+
+        - 220419133001_pos8_vel8:
+                  - 93.86%
+        - 220419133001_tmode100:
+                  - has shared g projection
+                  - 92.36%
+        - 220419133001_tmode100_nosharedgproj:
+                  - 3 gcn
+                  - 92.74%
+        - 220419133001_tmode100_nosharedgproj_1temporalgcn:
+                  - 92.94%
+        - 220419133001_tmode100_nosharedgproj_2temporalgcn:
+                  - 92.17%
+
 
 sgn-code:
         - original sgn repo code
