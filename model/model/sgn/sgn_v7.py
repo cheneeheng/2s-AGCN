@@ -93,12 +93,14 @@ class SGN(PyTorchModule):
                  gcn_t_kernel: int = 1,
                  gcn_dropout: float = 0.0,
                  gcn_dims: list = [c2, c3, c3],
+                 gcn_ffn: int = 0,
 
                  t_g_proj_shared: bool = False,
                  t_g_proj_dim: Union[List[int], int] = c4,
                  t_g_residual: Union[List[int], int] = [0, 0, 0],
                  t_gcn_dropout: float = 0.0,
                  t_gcn_dims: list = [c3, c4, c4],
+                 t_gcn_ffn: int = 0,
 
                  t_mode: int = 1,
                  t_kernel: int = 3,
@@ -213,12 +215,14 @@ class SGN(PyTorchModule):
         self.gcn_t_kernel = gcn_t_kernel
         self.gcn_dropout_fn = lambda: nn.Dropout2d(gcn_dropout)
         self.gcn_dims = gcn_dims
+        self.gcn_ffn = gcn_ffn
 
         self.t_g_proj_shared = t_g_proj_shared
         self.t_g_proj_dim = t_g_proj_dim
         self.t_g_residual = t_g_residual
         self.t_gcn_dropout_fn = lambda: nn.Dropout2d(t_gcn_dropout)
         self.t_gcn_dims = t_gcn_dims
+        self.t_gcn_ffn = t_gcn_ffn
 
         if self.sem_pos_fusion == 1 or self.sem_par_fusion == 1:
             self.gcn_in_ch = self.c1
@@ -503,6 +507,7 @@ class SGN(PyTorchModule):
             g_proj_shared=self.g_proj_shared,
             g_activation=self.g_activation_fn,
             g_residual=self.g_residual,
+            ffn_mode=self.gcn_ffn
         )
         if self.g_part == 0:
             self.gcn_spatial_part = GCNSpatialBlock(
@@ -520,6 +525,7 @@ class SGN(PyTorchModule):
                 g_proj_shared=self.g_proj_shared,
                 g_activation=self.g_activation_fn,
                 g_residual=self.g_residual,
+                ffn_mode=self.gcn_ffn
             )
         elif self.g_part > 0 and self.par_pos_fusion % 2 == 1:   # post fusion
             in_channels = self.c2
@@ -588,6 +594,7 @@ class SGN(PyTorchModule):
                 g_proj_shared=self.t_g_proj_shared,
                 g_activation=self.g_activation_fn,
                 g_residual=self.t_g_residual,
+                ffn_mode=self.t_gcn_ffn
             )
         else:
             # original sgn
@@ -1249,6 +1256,7 @@ class GCNSpatialBlock(Module):
                  g_proj_shared: bool = False,
                  g_activation: T1 = nn.Softmax,
                  g_residual: Union[List[int], int] = [0, 0, 0],
+                 ffn_mode: int = 0,
                  ):
         super(GCNSpatialBlock, self).__init__(*args,
                                               kernel_size=kernel_size,
@@ -1326,6 +1334,59 @@ class GCNSpatialBlock(Module):
         else:
             raise ValueError("Unknown residual modes...")
 
+        if ffn_mode > 0:
+            if ffn_mode == 1:
+                idx = 2
+                for i in range(self.num_blocks):
+                    channels = [gcn_dims[i+1], gcn_dims[i+1], gcn_dims[i+1]]
+                    kernel_sizes = [1, 1]
+                    paddings = [0, 0]
+                    residuals = [0, 0]
+                    dropouts = [self.dropout, None]
+                    setattr(self,
+                            f'ffn{i+1}',
+                            MLPTemporal(
+                                channels=channels,
+                                kernel_sizes=kernel_sizes,
+                                paddings=paddings,
+                                biases=[self.bias for _ in range(idx)],
+                                residuals=residuals,
+                                dropouts=dropouts,
+                                activations=[
+                                    self.activation for _ in range(idx)],
+                                normalizations=[
+                                    self.normalization for _ in range(idx)],
+                                maxpool_kwargs=None,
+                                prenorm=self.prenorm)
+                            )
+            elif ffn_mode == 2:
+                idx = 2
+                for i in range(self.num_blocks):
+                    channels = [gcn_dims[i+1], gcn_dims[i+1], gcn_dims[i+1]]
+                    kernel_sizes = [3, 1]
+                    paddings = [1, 0]
+                    residuals = [0, 0]
+                    dropouts = [self.dropout, None]
+                    setattr(self,
+                            f'ffn{i+1}',
+                            MLPTemporal(
+                                channels=channels,
+                                kernel_sizes=kernel_sizes,
+                                paddings=paddings,
+                                biases=[self.bias for _ in range(idx)],
+                                residuals=residuals,
+                                dropouts=dropouts,
+                                activations=[
+                                    self.activation for _ in range(idx)],
+                                normalizations=[
+                                    self.normalization for _ in range(idx)],
+                                maxpool_kwargs=None,
+                                prenorm=self.prenorm)
+                            )
+        else:
+            for i in range(self.num_blocks):
+                setattr(self, f'ffn{i+1}', nn.Identity())
+
     def forward(self, x: Tensor) -> Tensor:
         x0 = x
         if self.g_shared:
@@ -1333,6 +1394,7 @@ class GCNSpatialBlock(Module):
             for i in range(self.num_blocks):
                 x = getattr(self, f'gcn{i+1}')(x, g) + \
                     getattr(self, f'res{i+1}')(x)
+                x = getattr(self, f'ffn{i+1}')(x)
         else:
             g = []
             for i in range(self.num_blocks):
@@ -1340,6 +1402,7 @@ class GCNSpatialBlock(Module):
                 g.append(g1)
                 x = getattr(self, f'gcn{i+1}')(x, g1) + \
                     getattr(self, f'res{i+1}')(x)
+                x = getattr(self, f'ffn{i+1}')(x)
         x += self.res(x0)
         return x, g
 
@@ -1438,8 +1501,9 @@ if __name__ == '__main__':
     subjects = torch.ones(batch_size, 20, 1)
 
     model = SGN(num_segment=20,
+                gcn_ffn=2,
                 # c_multiplier=[1.0, 1.0, 2.0, 1.0],
-                sem_position2=1,
+                # sem_position2=1,
                 # norm_type='ln-pre',
                 # in_position=1,
                 # in_velocity=1,
