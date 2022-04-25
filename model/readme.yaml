@@ -1561,6 +1561,58 @@ sgn_v7:
         - 220422100001_sempos21:
                   - 94.17%
 
+        - 220422100001_gcnffn1:
+                  - 2 1x1 MLP in gcn
+                  - WRONG CONFIG
+                  - 94.00%
+        - 220422100001_gcnffn1_tmode0:
+                  - 2 1x1 MLP in gcn
+                  - no temporal MLP
+                  - 92.17%
+        - 220422100001_gcnffn1_gprojdim256512512:
+                  - 2 1x1 MLP in gcn
+                  - multiple g projections
+                  - 93.72%
+        - 220422100001_gcnffn2:
+                  - 1x3 and 1x1 MLP in gcn
+                  - 94.00%
+        - 220422100001_gcnffn2_tmode0:
+                  - 1x3 and 1x1 MLP in gcn
+                  - no temporal MLP
+                  - 93.42%
+        - 220422100001_gcnffn2_gprojdim256512512:
+                  - 1x3 and 1x1 MLP in gcn
+                  - multiple g projections
+                  - 94.07%
+        - 220422100001_gcnffn3:
+                  - 2 1x1 MLP + residual in gcn
+                  - 94.39%
+        - 220422100001_gcnffn3_gprojdim256512512:
+                  - 2 1x1 MLP + residual in gcn
+                  - 94.13%
+        - 220422100001_gcnffn4:
+                  - 1x3 and 1x1 MLP + residual in gcn
+                  - 94.51%
+        - 220422100001_gcnffn4_gprojdim256512512:
+                  - 1x3 and 1x1 MLP + residual in gcn
+                  - 94.90%
+        - 220422100001_gcnffn5:
+                  - 2 1x1 MLP + residual in gcn
+                  - higher interchannel
+                  - 94.41%
+        - 220422100001_gcnffn5_gprojdim256512512:
+                  - 2 1x1 MLP + residual in gcn
+                  - higher interchannel
+                  - 94.02%
+        - 220422100001_gcnffn6:
+                  - 1x3 and 1x1 MLP + residual in gcn
+                  - higher interchannel
+                  - 94.67%
+        - 220422100001_gcnffn6_gprojdim256512512:
+                  - 1x3 and 1x1 MLP + residual in gcn
+                  - higher interchannel
+                  - 94.64%
+
 sgn-code:
         - original sgn repo code
         - 220324170001:

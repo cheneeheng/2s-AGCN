@@ -21,7 +21,7 @@ except ImportError:
     print("Warning: fvcore is not found")
 
 import math
-from typing import Tuple, Optional, Union, Type, List, Any
+from typing import OrderedDict, Tuple, Optional, Union, Type, List, Any
 
 from model.module import *
 from model.module.layernorm import LayerNorm
@@ -596,6 +596,56 @@ class SGN(PyTorchModule):
                 g_residual=self.t_g_residual,
                 ffn_mode=self.t_gcn_ffn
             )
+        elif self.t_mode in [101, 102]:
+            if self.t_mode == 101:
+                idx = 2
+                channels = [_c3, _c3, _c4]
+                kernel_sizes = [self.t_kernel, 1]
+                paddings = [self.t_kernel//2, 0]
+                residuals = [0 for _ in range(idx)]
+                dropouts = [self.dropout_fn, None]
+            elif self.t_mode == 102:
+                idx = 2
+                channels = [_c3, _c3, _c4]
+                kernel_sizes = [self.t_kernel, 1]
+                paddings = [self.t_kernel//2, 0]
+                residuals = [1 for _ in range(idx)]
+                dropouts = [self.dropout_fn, None]
+            self.cnn = nn.Sequential(OrderedDict([
+                ('GCN',
+                    GCNSpatialBlock(
+                        0,
+                        0,
+                        kernel_size=1,
+                        padding=0,
+                        bias=self.bias,
+                        dropout=self.t_gcn_dropout_fn,
+                        activation=self.activation_fn,
+                        normalization=self.normalization_fn,
+                        gcn_dims=[_c3] + self.t_gcn_dims,
+                        g_proj_dim=self.t_g_proj_dim,
+                        g_kernel=1,
+                        g_proj_shared=self.t_g_proj_shared,
+                        g_activation=self.g_activation_fn,
+                        g_residual=self.t_g_residual,
+                        ffn_mode=self.t_gcn_ffn,
+                        return_g=False
+                    )),
+                ('MLP',
+                    MLPTemporal(
+                        channels=channels,
+                        kernel_sizes=kernel_sizes,
+                        paddings=paddings,
+                        biases=[self.bias for _ in range(idx)],
+                        residuals=residuals,
+                        dropouts=dropouts,
+                        activations=[self.activation_fn for _ in range(idx)],
+                        normalizations=[
+                            self.normalization_fn for _ in range(idx)],
+                        maxpool_kwargs=self.t_maxpool_kwargs,
+                        prenorm=self.prenorm
+                    ))
+            ]))
         else:
             # original sgn
             if self.t_mode == 1:
@@ -879,6 +929,9 @@ class SGN(PyTorchModule):
         if self.t_mode == 100:
             x, _ = self.cnn(x.transpose(-1, -2))
             x = x.transpose(-1, -2)
+        elif self.t_mode in [101, 102]:
+            x = self.cnn.GCN(x.transpose(-1, -2))
+            x = self.cnn.MLP(x.transpose(-1, -2))
         else:
             x = self.cnn(x)
 
@@ -1269,6 +1322,7 @@ class GCNSpatialBlock(Module):
                  g_activation: T1 = nn.Softmax,
                  g_residual: Union[List[int], int] = [0, 0, 0],
                  ffn_mode: int = 0,
+                 return_g: bool = True
                  ):
         super(GCNSpatialBlock, self).__init__(*args,
                                               kernel_size=kernel_size,
@@ -1278,6 +1332,7 @@ class GCNSpatialBlock(Module):
                                               activation=activation,
                                               normalization=normalization,
                                               prenorm=prenorm)
+        self.return_g = return_g
         self.num_blocks = len(gcn_dims) - 1
         self.g_shared = isinstance(g_proj_dim, int)
         if self.g_shared:
@@ -1380,6 +1435,22 @@ class GCNSpatialBlock(Module):
                     residuals = [0, 0]
                     dropouts = [self.dropout, None]
                     residual = 1
+                elif ffn_mode == 5:
+                    idx = 2
+                    channels = [gcn_dims[i+1], gcn_dims[i+1]*4, gcn_dims[i+1]]
+                    kernel_sizes = [1, 1]
+                    paddings = [0, 0]
+                    residuals = [0, 0]
+                    dropouts = [self.dropout, None]
+                    residual = 1
+                elif ffn_mode == 6:
+                    idx = 2
+                    channels = [gcn_dims[i+1], gcn_dims[i+1]*4, gcn_dims[i+1]]
+                    kernel_sizes = [3, 1]
+                    paddings = [1, 0]
+                    residuals = [0, 0]
+                    dropouts = [self.dropout, None]
+                    residual = 1
                 setattr(self,
                         f'ffn{i+1}',
                         MLPTemporal(
@@ -1418,7 +1489,10 @@ class GCNSpatialBlock(Module):
                     getattr(self, f'res{i+1}')(x)
                 x = getattr(self, f'ffn{i+1}')(x)
         x += self.res(x0)
-        return x, g
+        if self.return_g:
+            return x, g
+        else:
+            return x
 
 
 class SpatialFusion(Module):
@@ -1515,7 +1589,7 @@ if __name__ == '__main__':
     subjects = torch.ones(batch_size, 20, 1)
 
     model = SGN(num_segment=20,
-                gcn_ffn=3,
+                # gcn_ffn=3,
                 # g_proj_dim=[256, 512, 512],
                 # c_multiplier=[1.0, 1.0, 2.0, 1.0],
                 # sem_position2=1,
@@ -1534,7 +1608,9 @@ if __name__ == '__main__':
                 # # sem_fra_fusion=1,
                 # # subject_fusion=101
                 # c_multiplier=[0.5, 0.5, 1.0, 1.0],
-                # t_mode=100,
+                t_mode=101,
+                t_gcn_dims=[256, 256, 256],
+                t_g_residual=[0, 0, 0],
                 # gcn_dropout=0.2,
                 # spatial_maxpool=3,
                 # temporal_maxpool=3,
