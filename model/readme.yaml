@@ -1556,6 +1556,13 @@ sgn_v7:
         - 220419133001_tmode100_nosharedgproj_2temporalgcn:
                   - 92.17%
 
+        - 220426000001_tmode101_3tgcn:
+                  - 3 temporal gcn + 2 MLP
+                  - 93.11%
+        - 220426000001_tmode102_3tgcn:
+                  - 3 temporal gcn + residual + 2 MLP
+                  - 93.86%
+
         - 220422100001_cmulti10102010:
                   - 94.34%
         - 220422100001_sempos21:
@@ -1565,6 +1572,9 @@ sgn_v7:
                   - 2 1x1 MLP in gcn
                   - WRONG CONFIG
                   - 94.00%
+        - 220422100001_gcnffn1_rerun:
+                  - 2 1x1 MLP in gcn
+                  - 93.85%
         - 220422100001_gcnffn1_tmode0:
                   - 2 1x1 MLP in gcn
                   - no temporal MLP

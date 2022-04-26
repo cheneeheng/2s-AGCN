@@ -82,6 +82,7 @@ class SGN(PyTorchModule):
                  sem_pos_fusion: int = 0,
                  sem_fra_fusion: int = 1,
                  subject_fusion: int = 1,
+                 dual_gcn_fusion: int = 0,
 
                  subject: int = 0,
 
@@ -94,6 +95,8 @@ class SGN(PyTorchModule):
                  gcn_dropout: float = 0.0,
                  gcn_dims: list = [c2, c3, c3],
                  gcn_ffn: int = 0,
+
+                 gcn_tem: int = 0,
 
                  t_g_proj_shared: bool = False,
                  t_g_proj_dim: Union[List[int], int] = c4,
@@ -194,6 +197,7 @@ class SGN(PyTorchModule):
         self.sem_par_fusion = sem_par_fusion
         self.sem_fra_fusion = sem_fra_fusion
         self.subject_fusion = subject_fusion
+        self.dual_gcn_fusion = dual_gcn_fusion
         # 0 = concat before sgn, 1 = concat after sgn, others have projection
         assert self.par_pos_fusion in [0, 1, 2, 3, 4, 5]
         # 0 = concat, 1 = add
@@ -202,6 +206,7 @@ class SGN(PyTorchModule):
         # 1 = add after GCN, 101 = add before GCN
         assert self.sem_fra_fusion in [1, 101]
         assert self.subject_fusion in [1, 101]
+        assert self.dual_gcn_fusion in [0, 1]
 
         self.subject = subject
         assert self.subject in [0, 1, 2, 3, 4]
@@ -216,6 +221,8 @@ class SGN(PyTorchModule):
         self.gcn_dropout_fn = lambda: nn.Dropout2d(gcn_dropout)
         self.gcn_dims = gcn_dims
         self.gcn_ffn = gcn_ffn
+
+        self.gcn_tem = gcn_tem
 
         self.t_g_proj_shared = t_g_proj_shared
         self.t_g_proj_dim = t_g_proj_dim
@@ -286,6 +293,8 @@ class SGN(PyTorchModule):
         # Frame embedding is a form of PE
 
         # GCN ------------------------------------------------------------------
+        if self.gcn_tem > 0:
+            self.init_temporal_gcn()
         self.init_spatial_gcn()
         self.init_spatial_fusion()
 
@@ -478,6 +487,8 @@ class SGN(PyTorchModule):
                                            in_channels=self.parts_len)
         # Frame Embedding
         if self.sem_frame > 0:
+            if self.gcn_tem > 0 and self.dual_gcn_fusion == 0:
+                out_channels *= 2
             self.tem = OneHotTensor(self.num_segment, num_points, mode=1)
             self.tem_embed = self.init_emb(mode=self.sem_frame,
                                            num_point=self.num_point,
@@ -490,6 +501,52 @@ class SGN(PyTorchModule):
                                             num_point=num_points,
                                             in_channels=num_points,
                                             out_channels=out_channels)
+
+    def init_temporal_gcn(self):
+        self.gcn_temporal = GCNSpatialBlock(
+            0,
+            0,
+            kernel_size=self.gcn_t_kernel,
+            padding=self.gcn_t_kernel//2,
+            bias=self.bias,
+            dropout=self.gcn_dropout_fn,
+            activation=self.activation_fn,
+            normalization=self.normalization_fn,
+            gcn_dims=[self.gcn_in_ch] + self.gcn_dims,
+            g_proj_dim=self.g_proj_dim,
+            g_kernel=self.g_kernel,
+            g_proj_shared=self.g_proj_shared,
+            g_activation=self.g_activation_fn,
+            g_residual=self.g_residual,
+            ffn_mode=self.gcn_ffn
+        )
+        if self.g_part == 0:
+            self.gcn_temporal_part = GCNSpatialBlock(
+                0,
+                0,
+                kernel_size=self.gcn_t_kernel,
+                padding=self.gcn_t_kernel//2,
+                bias=self.bias,
+                dropout=self.gcn_dropout_fn,
+                activation=self.activation_fn,
+                normalization=self.normalization_fn,
+                gcn_dims=[self.gcn_in_ch] + self.gcn_dims,
+                g_proj_dim=self.g_proj_dim,
+                g_kernel=self.g_kernel,
+                g_proj_shared=self.g_proj_shared,
+                g_activation=self.g_activation_fn,
+                g_residual=self.g_residual,
+                ffn_mode=self.gcn_ffn
+            )
+        elif self.g_part > 0 and self.par_pos_fusion % 2 == 1:   # post fusion
+            in_channels = self.c2
+            out_channels = self.c3
+            self.non_gcn_temporal_proj = self.init_emb(
+                mode=self.g_part,
+                num_point=self.num_point,
+                in_channels=in_channels,
+                out_channels=out_channels
+            )
 
     def init_spatial_gcn(self):
         self.gcn_spatial = GCNSpatialBlock(
@@ -563,6 +620,9 @@ class SGN(PyTorchModule):
                 k += self.parts_len
             _c3 *= k
             assert self.t_mode in [9, 10]
+
+        if self.gcn_tem > 0 and self.dual_gcn_fusion == 0:
+            _c3 *= 2
 
         # aspp
         if self.aspp is None or len(self.aspp) == 0:
@@ -893,21 +953,43 @@ class SGN(PyTorchModule):
 
         # GCN ------------------------------------------------------------------
         x0, g0 = self.gcn_spatial(x[0])
+        if self.gcn_tem > 0:
+            x0_t, g0_t = self.gcn_temporal(x[0].transpose(-1, -2))
 
         if self.par_pos_fusion % 2 == 1:   # post fusion
             if self.g_part == 0:
                 x1, g1 = self.gcn_spatial_part(x[1])
+                if self.gcn_tem > 0:
+                    x1_t, g1_t = self.gcn_temporal_part(x[1].transpose(-1, -2))
             elif self.g_part > 0:
                 x1 = self.non_gcn_proj(x[1])
+                if self.gcn_tem > 0:
+                    x1_t = self.non_gcn_temporal_proj(x[1].transpose(-1, -2))
                 g1 = None
-            x, g = [x0, x1], [g0, g1]
+            if self.gcn_tem > 0:
+                x, x_t, g, g_t = [x0, x1], [x0_t, x1_t], [g0, g1], [g0_t, g1_t]
+            else:
+                x, g = [x0, x1], [g0, g1]
         else:
-            x, g = [x0], [g0]
+            if self.gcn_tem > 0:
+                x, x_t, g, g_t = [x0], [x0_t], [g0], [g0_t]
+            else:
+                x, g = [x0], [g0]
 
         # Frame-level Module ---------------------------------------------------
         # spatial fusion post gcn
-        x, _ = self.fuse_spatial(*x, fusion_level=fusion_level)
-        x = x[0]
+        x_fused, _ = self.fuse_spatial(*x, fusion_level=fusion_level)
+        if self.gcn_tem > 0:
+            x1 = x_fused[0]
+            x_t_fused, _ = self.fuse_spatial(*x_t, fusion_level=fusion_level)
+            if self.dual_gcn_fusion == 0:
+                x2 = x_t_fused[0].transpose(-1, -2)
+                x = torch.cat([x1, x2], 1)
+            elif self.dual_gcn_fusion == 1:
+                x2 = x_t_fused[0].transpose(-1, -2)
+                x = x1 + x2
+        else:
+            x = x_fused[0]
 
         # temporal fusion post gcn
         if self.sem_frame > 0 and self.sem_fra_fusion == 1:
@@ -1589,6 +1671,8 @@ if __name__ == '__main__':
     subjects = torch.ones(batch_size, 20, 1)
 
     model = SGN(num_segment=20,
+                dual_gcn_fusion=0,
+                gcn_tem=1,
                 # gcn_ffn=3,
                 # g_proj_dim=[256, 512, 512],
                 # c_multiplier=[1.0, 1.0, 2.0, 1.0],
@@ -1608,11 +1692,11 @@ if __name__ == '__main__':
                 # # sem_fra_fusion=1,
                 # # subject_fusion=101
                 # c_multiplier=[0.5, 0.5, 1.0, 1.0],
-                t_mode=101,
-                t_gcn_dims=[256, 256, 256],
-                t_g_residual=[0, 0, 0],
+                # t_mode=101,
+                # t_gcn_dims=[256],
+                # t_g_residual=[0],
                 # gcn_dropout=0.2,
-                # spatial_maxpool=3,
+                # spatial_maxpool=0,
                 # temporal_maxpool=3,
                 # gcn_dims=[128, 128, 512],
                 # g_kernel=5,
