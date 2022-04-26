@@ -1559,9 +1559,21 @@ sgn_v7:
         - 220426000001_tmode101_3tgcn:
                   - 3 temporal gcn + 2 MLP
                   - 93.11%
+        - 220426000001_tmode101_1tgcn:
+                  - 1 temporal gcn + 2 MLP
+                  - 93.29%
+        - 220426000001_tmode101_1tgcn_nosmp:
+                  - 1 temporal gcn + 2 MLP + no smp
+                  - 93.26%
         - 220426000001_tmode102_3tgcn:
                   - 3 temporal gcn + residual + 2 MLP
                   - 93.86%
+        - 220426000001_tmode102_1tgcn:
+                  - 1 temporal gcn + residual + 2 MLP
+                  - 93.84%
+        - 220426000001_tmode102_1tgcn_nosmp:
+                  - 1 temporal gcn + residual + 2 MLP + no smp
+                  - 94.09%
 
         - 220422100001_cmulti10102010:
                   - 94.34%
@@ -1622,6 +1634,13 @@ sgn_v7:
                   - 1x3 and 1x1 MLP + residual in gcn
                   - higher interchannel
                   - 94.64%
+
+        - 220427173001_dualgcn0:
+                  - parallel temporal and spatial GCN with concat
+                  - 94.64%
+        - 220427173001_dualgcn1:
+                  - parallel temporal and spatial GCN with sum
+                  - 94.30%
 
 sgn-code:
         - original sgn repo code
