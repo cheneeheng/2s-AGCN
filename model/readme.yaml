@@ -1641,6 +1641,28 @@ sgn_v7:
         - 220427173001_dualgcn1:
                   - parallel temporal and spatial GCN with sum
                   - 94.30%
+        - 220427173001_dualgcn1_nosharedproj:
+                  - 94.22%
+
+sgn_v8:
+        - 220427003001_gcntem1_dualfuse0:
+                  - parallel gcn from tem and spa
+                  - concat fused prior to tmp
+                  - 94.72%
+        - 220427003001_gcntem1_dualfuse1:
+                  - parallel gcn from tem and spa
+                  - sum fused prior to tmp
+                  - 94.26%
+        - 220427003001_gcntem2_dualfuse0:
+                  - parallel gcn from tem and spa
+                  - cv merged for tem gcn
+                  - concat fused prior to tmp
+                  - 94.69%
+        - 220427003001_gcntem2_dualfuse1:
+                  - parallel gcn from tem and spa
+                  - cv merged for tem gcn
+                  - sum fused prior to tmp
+                  - 94.28%
 
 sgn-code:
         - original sgn repo code
