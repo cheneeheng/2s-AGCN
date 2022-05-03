@@ -93,6 +93,7 @@ def normalization_fn(norm_type: str) -> Tuple[Type[PyTorchModule],
 class SGN(PyTorchModule):
 
     # CONSTANTS
+    ffn_mode = [0, 1, 2, 3, 4, 5, 6, 101]
     emb_modes = [0, 1, 2, 3, 4, 5, 6, 7, 8]
     c1, c2, c3, c4 = c1, c2, c3, c4
     g_activation_fn = nn.Softmax
@@ -232,7 +233,7 @@ class SGN(PyTorchModule):
             g_residual=gcn_spa_g_residual,
             ffn_mode=gcn_spa_ffn,
         )
-        assert gcn_spa_ffn in [0, 1, 2, 3, 4, 5, 6]
+        assert gcn_spa_ffn in self.ffn_mode
 
         # Temporal GCN
         gcn_dims = [self.gcn_in_ch] + gcn_tem_dims
@@ -249,7 +250,7 @@ class SGN(PyTorchModule):
             g_residual=gcn_tem_g_residual,
             ffn_mode=gcn_tem_ffn,
         )
-        assert gcn_tem_ffn in [0, 1, 2, 3, 4, 5, 6]
+        assert gcn_tem_ffn in self.ffn_mode
 
         # GCN in temporal mlp
         self.t_gcn_kwargs = dict(
@@ -263,7 +264,7 @@ class SGN(PyTorchModule):
             g_residual=t_g_residual,
             ffn_mode=t_gcn_ffn,
         )
-        assert t_gcn_ffn in [0, 1, 2, 3, 4, 5, 6]
+        assert t_gcn_ffn in self.ffn_mode
 
         # 0 no pool, 1 pool, 2 projection, 3 no pool but merge channels
         self.spatial_maxpool = spatial_maxpool
@@ -467,13 +468,13 @@ class SGN(PyTorchModule):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
                 m.weight.data.normal_(0, math.sqrt(2. / n))
         if 'spa' in self.gcn_list:
-            init_0(self.gcn_spatial.gcn1.w1.block.conv.conv.weight)
-            init_0(self.gcn_spatial.gcn2.w1.block.conv.conv.weight)
-            init_0(self.gcn_spatial.gcn3.w1.block.conv.conv.weight)
+            for p_name, param in self.gcn_spatial.named_parameters():
+                if f'w1.block.conv.conv.weight' in p_name:
+                    init_0(param)
         if 'tem' in self.gcn_list:
-            init_0(self.gcn_temporal.gcn1.w1.block.conv.conv.weight)
-            init_0(self.gcn_temporal.gcn2.w1.block.conv.conv.weight)
-            init_0(self.gcn_temporal.gcn3.w1.block.conv.conv.weight)
+            for p_name, param in self.gcn_temporal.named_parameters():
+                if f'w1.block.conv.conv.weight' in p_name:
+                    init_0(param)
 
     def forward(self, x: Tensor, *args, **kwargs) -> Tuple[Tensor, list]:
         """Model forward pass.
@@ -717,77 +718,13 @@ class MLPTemporal(PyTorchModule):
             raise ValueError('Unknown residual mode...')
         self.num_layers = len(channels) - 1
         for i in range(self.num_layers):
-            if prenorm:
-                def norm_func(): return normalizations[i](channels[i])
+            if normalizations[i] is None:
+                norm_func = None
             else:
-                def norm_func(): return normalizations[i](channels[i+1])
-            setattr(self,
-                    f'cnn{i+1}',
-                    Conv(channels[i],
-                         channels[i+1],
-                         kernel_size=kernel_sizes[i],
-                         padding=paddings[i],
-                         bias=biases[i],
-                         activation=activations[i],
-                         normalization=norm_func,
-                         dropout=dropouts[i],
-                         prenorm=prenorm)
-                    )
-            if residuals[i] == 0:
-                setattr(self, f'res{i+1}', null_fn)
-            elif residuals[i] == 1:
-                if channels[i] == channels[i+1]:
-                    setattr(self, f'res{i+1}', nn.Identity())
+                if prenorm:
+                    def norm_func(): return normalizations[i](channels[i])
                 else:
-                    setattr(self, f'res{i+1}', Conv(channels[i], channels[i+1],
-                                                    bias=biases[i]))
-            else:
-                raise ValueError('Unknown residual mode...')
-
-    def forward(self, x: Tensor) -> Tensor:
-        # x: n,c,v,t ; v=1 due to SMP
-        x0 = x
-        x = self.pool(x)
-        for i in range(self.num_layers):
-            x = getattr(self, f'cnn{i+1}')(x) + getattr(self, f'res{i+1}')(x)
-        x += self.res(x0)
-        return x
-
-
-class MLPTemporal(PyTorchModule):
-    def __init__(self,
-                 channels: List[int],
-                 kernel_sizes: List[int] = [3, 1],
-                 paddings: List[int] = [1, 0],
-                 biases: List[int] = [0, 0],
-                 residuals: List[int] = [0, 0],
-                 dropouts: T2 = [nn.Dropout2d, None],
-                 activations: T2 = [nn.ReLU, nn.ReLU],
-                 normalizations: T2 = [nn.BatchNorm2d, nn.BatchNorm2d],
-                 maxpool_kwargs: Optional[dict] = None,
-                 residual: int = 0,
-                 prenorm: bool = False
-                 ):
-        super(MLPTemporal, self).__init__()
-        if maxpool_kwargs is not None:
-            self.pool = nn.MaxPool2d(**maxpool_kwargs)
-        else:
-            self.pool = nn.Identity()
-        if residual == 0:
-            self.res = null_fn
-        elif residual == 1:
-            if channels[0] == channels[-1]:
-                self.res = nn.Identity()
-            else:
-                self.res = Conv(channels[0], channels[-1], bias=biases[0])
-        else:
-            raise ValueError('Unknown residual mode...')
-        self.num_layers = len(channels) - 1
-        for i in range(self.num_layers):
-            if prenorm:
-                def norm_func(): return normalizations[i](channels[i])
-            else:
-                def norm_func(): return normalizations[i](channels[i+1])
+                    def norm_func(): return normalizations[i](channels[i+1])
             setattr(self,
                     f'cnn{i+1}',
                     Conv(channels[i],
@@ -1222,6 +1159,10 @@ class GCNSpatialBlock(Module):
                     residuals = [0, 0]
                     dropouts = [self.dropout, None]
                     residual = 0
+                    prenorm = self.prenorm
+                    activations = [self.activation for _ in range(idx)]
+                    normalizations = [self.normalization for _ in range(idx)]
+                    biases = [self.bias for _ in range(idx)]
                 elif ffn_mode == 2:
                     idx = 2
                     channels = [gcn_dims[i+1], gcn_dims[i+1], gcn_dims[i+1]]
@@ -1230,6 +1171,10 @@ class GCNSpatialBlock(Module):
                     residuals = [0, 0]
                     dropouts = [self.dropout, None]
                     residual = 0
+                    prenorm = self.prenorm
+                    activations = [self.activation for _ in range(idx)]
+                    normalizations = [self.normalization for _ in range(idx)]
+                    biases = [self.bias for _ in range(idx)]
                 elif ffn_mode == 3:
                     idx = 2
                     channels = [gcn_dims[i+1], gcn_dims[i+1], gcn_dims[i+1]]
@@ -1238,6 +1183,10 @@ class GCNSpatialBlock(Module):
                     residuals = [0, 0]
                     dropouts = [self.dropout, None]
                     residual = 1
+                    prenorm = self.prenorm
+                    activations = [self.activation for _ in range(idx)]
+                    normalizations = [self.normalization for _ in range(idx)]
+                    biases = [self.bias for _ in range(idx)]
                 elif ffn_mode == 4:
                     idx = 2
                     channels = [gcn_dims[i+1], gcn_dims[i+1], gcn_dims[i+1]]
@@ -1246,6 +1195,10 @@ class GCNSpatialBlock(Module):
                     residuals = [0, 0]
                     dropouts = [self.dropout, None]
                     residual = 1
+                    prenorm = self.prenorm
+                    activations = [self.activation for _ in range(idx)]
+                    normalizations = [self.normalization for _ in range(idx)]
+                    biases = [self.bias for _ in range(idx)]
                 elif ffn_mode == 5:
                     idx = 2
                     channels = [gcn_dims[i+1], gcn_dims[i+1]*4, gcn_dims[i+1]]
@@ -1254,6 +1207,10 @@ class GCNSpatialBlock(Module):
                     residuals = [0, 0]
                     dropouts = [self.dropout, None]
                     residual = 1
+                    prenorm = self.prenorm
+                    activations = [self.activation for _ in range(idx)]
+                    normalizations = [self.normalization for _ in range(idx)]
+                    biases = [self.bias for _ in range(idx)]
                 elif ffn_mode == 6:
                     idx = 2
                     channels = [gcn_dims[i+1], gcn_dims[i+1]*4, gcn_dims[i+1]]
@@ -1262,22 +1219,37 @@ class GCNSpatialBlock(Module):
                     residuals = [0, 0]
                     dropouts = [self.dropout, None]
                     residual = 1
+                    prenorm = self.prenorm
+                    activations = [self.activation for _ in range(idx)]
+                    normalizations = [self.normalization for _ in range(idx)]
+                    biases = [self.bias for _ in range(idx)]
+                elif ffn_mode == 101:
+                    # transformer style
+                    idx = 2
+                    channels = [gcn_dims[i+1], gcn_dims[i+1]*4, gcn_dims[i+1]]
+                    kernel_sizes = [1, 1]
+                    paddings = [0, 0]
+                    residuals = [0, 0]
+                    dropouts = [self.dropout, self.dropout]
+                    residual = 1
+                    prenorm = True
+                    activations = [self.activation, None]
+                    normalizations = [None for _ in range(idx)]
+                    biases = [self.bias for _ in range(idx)]
                 setattr(self,
                         f'ffn{i+1}',
                         MLPTemporal(
                             channels=channels,
                             kernel_sizes=kernel_sizes,
                             paddings=paddings,
-                            biases=[self.bias for _ in range(idx)],
+                            biases=biases,
                             residuals=residuals,
                             dropouts=dropouts,
-                            activations=[
-                                self.activation for _ in range(idx)],
-                            normalizations=[
-                                self.normalization for _ in range(idx)],
+                            activations=activations,
+                            normalizations=normalizations,
                             maxpool_kwargs=None,
                             residual=residual,
-                            prenorm=self.prenorm)
+                            prenorm=prenorm)
                         )
         else:
             for i in range(self.num_blocks):

@@ -1664,6 +1664,118 @@ sgn_v8:
                   - sum fused prior to tmp
                   - 94.28%
 
+sgn_v9:
+        - 220427193001_stgcn_gcnfusion0_gcntem0:
+                  - spatial and temporal gcn
+                  - cat fusion
+                  - swap cv
+                  - 94.83%
+        - 220427193001_stgcn_gcnfusion1_gcntem0:
+                  - spatial and temporal gcn
+                  - add fusion
+                  - swap cv
+                  - 94.36%
+        - 220427193001_stgcn_gcnfusion0_gcntem1:
+                  - spatial and temporal gcn
+                  - cat fusion
+                  - merge cv
+                  - 94.45%
+        - 220427193001_stgcn_gcnfusion1_gcntem1:
+                  - spatial and temporal gcn
+                  - add fusion
+                  - merge cv
+                  - 93.78%
+        - 220427193001_stgcn_gcnfusion0_gcntem0_30seg:
+                  - spatial and temporal gcn
+                  - cat fusion
+                  - swap cv
+                  - 30seg
+                  - 93.80%
+        - 220427193001_stgcn_gcnfusion0_gcntem0_40seg:
+                  - spatial and temporal gcn
+                  - cat fusion
+                  - swap cv
+                  - 40seg
+                  - 93.37%
+        - 220427193001_stgcn_gcnfusion0_gcntem0_50seg:
+                  - spatial and temporal gcn
+                  - cat fusion
+                  - swap cv
+                  - 50seg
+                  - 93.02%
+
+        - 220429183001_stgcn_gcnfusion0_gcntem0_gcntemgprojdim256512512:
+                  - SEG30 ************
+                  - spatial and temporal gcn
+                  - cat fusion
+                  - swap cv
+                  - separate projection for G
+                  - 93.93%
+        - 220429183001_stgcn_gcnfusion0_gcntem0_gcntemdims128128256256:
+                  - SEG30 ************
+                  - spatial and temporal gcn
+                  - cat fusion
+                  - swap cv
+                  - 4 gcn block for tem gcn
+                  - 93.67%
+        - 220429183001_stgcn_gcnfusion0_gcntem0_gcntemdims128128256256256:
+                  - SEG30 ************
+                  - spatial and temporal gcn
+                  - cat fusion
+                  - swap cv
+                  - 5 gcn block for tem gcn
+                  - 93.90%
+        # - 220429183001_stgcn_gcnfusion0_gcntem0_gcntemgprojdim256256512512_gcntemdims128128256256:
+        - __:
+                  - SEG30 ************
+                  - spatial and temporal gcn
+                  - cat fusion
+                  - swap cv
+                  - 4 gcn block for tem gcn
+                  - separate projection for G
+                  - 93.55%
+        # - 220429183001_stgcn_gcnfusion0_gcntem0_gcntemgprojdim256256512512512_gcntemdims128128256256256:
+        - __:  
+                  - SEG30 ************
+                  - spatial and temporal gcn
+                  - cat fusion
+                  - swap cv
+                  - 5 gcn block for tem gcn
+                  - separate projection for G
+                  - 94.06%
+        # - 220429183001_stgcn_gcnfusion0_gcntem0_gcntemgprojdim256256512512512_gcntemdims128128256256256_20seg:
+        - __:
+                  - spatial and temporal gcn
+                  - cat fusion
+                  - swap cv
+                  - 5 gcn block for tem gcn
+                  - separate projection for G
+                  - 94.47%
+        - 220429183001_stgcn_gcnfusion0_gcntem0_gcntemdims128128256256256_20seg:
+                  - spatial and temporal gcn
+                  - cat fusion
+                  - swap cv
+                  - 5 gcn block for tem gcn
+                  - 
+        - 220429183001_stgcn_gcnfusion0_gcntem0_gcntemdims128128256256_20seg:
+                  - spatial and temporal gcn
+                  - cat fusion
+                  - swap cv
+                  - 4 gcn block for tem gcn
+                  - 
+        - 220429183001_stgcn_gcnfusion0_gcntem0_gcntemdims128256:
+                  - spatial and temporal gcn
+                  - cat fusion
+                  - swap cv
+                  - 2 gcn block for tem gcn
+                  - 94.59%
+        - 220429183001_stgcn_gcnfusion0_gcntem0_gcntemdims256:
+                  - spatial and temporal gcn
+                  - cat fusion
+                  - swap cv
+                  - 1 gcn block for tem gcn
+                  - 94.42%
+
 sgn-code:
         - original sgn repo code
         - 220324170001:
