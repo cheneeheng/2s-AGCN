@@ -1,4 +1,4 @@
-work_dir: ./data/data/ntu_result/xview/sgn/sgn_v9/220427193001
+work_dir: ./data/data/ntu_result/xview/sgn/sgn_v10/220503140001
 
 phase: train
 save_score: True
@@ -47,7 +47,7 @@ test_dataloader_args:
 use_sgn_dataloader: True
 
 ## model
-model: model.sgn_v9.SGN
+model: model.sgn_v10.SGN
 model_args:
   ### main args
   num_class: 60
@@ -77,19 +77,21 @@ model_args:
   gcn_spa_g_kernel: 1
   gcn_spa_g_proj_shared: False
   gcn_spa_g_proj_dim: 256
-  gcn_spa_g_residual: [0, 0, 0]
   gcn_spa_t_kernel: 1
   gcn_spa_dropout: 0.0
+  gcn_spa_gcn_residual: [0, 0, 0]
   gcn_spa_dims: [128, 256, 256]
-  gcn_spa_ffn: 0
+  gcn_spa_ffn: 1
+  gcn_spa_prenorm: True
   gcn_tem_g_kernel: 1
   gcn_tem_g_proj_shared: False
   gcn_tem_g_proj_dim: 256
-  gcn_tem_g_residual: [0, 0, 0]
   gcn_tem_t_kernel: 1
   gcn_tem_dropout: 0.0
+  gcn_tem_gcn_residual: [0, 0, 0]
   gcn_tem_dims: [128, 256, 256]
-  gcn_tem_ffn: 0
+  gcn_tem_ffn: 1
+  gcn_tem_prenorm: True
   # t_g_kernel: 1
   # t_g_proj_shared: False
   # t_g_proj_dim: 512

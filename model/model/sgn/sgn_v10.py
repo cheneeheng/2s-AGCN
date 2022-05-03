@@ -6,11 +6,8 @@
 
 # Code refractored
 
-# Continue from on sgn_v8
+# Continue from on sgn_v9
 # NO PARTS
-
-
-# FREEZE 220503
 
 
 import torch
@@ -37,6 +34,14 @@ from utils.utils import *
 
 T1 = Type[PyTorchModule]
 T2 = List[Optional[Type[PyTorchModule]]]
+
+
+class Identity(PyTorchModule):
+    def __init__(self, *args, **kwargs):
+        super(Identity, self).__init__()
+
+    def forward(self, *args):
+        return args[0]
 
 
 def null_fn(x: Any) -> int:
@@ -96,7 +101,7 @@ def normalization_fn(norm_type: str) -> Tuple[Type[PyTorchModule],
 class SGN(PyTorchModule):
 
     # CONSTANTS
-    ffn_mode = [0, 1, 2, 3, 4, 5, 6, 101]
+    ffn_mode = [0, 1]
     emb_modes = [0, 1, 2, 3, 4, 5, 6, 7, 8]
     c1, c2, c3, c4 = c1, c2, c3, c4
     g_activation_fn = nn.Softmax
@@ -131,29 +136,32 @@ class SGN(PyTorchModule):
                  gcn_spa_g_kernel: int = 1,
                  gcn_spa_g_proj_shared: bool = False,
                  gcn_spa_g_proj_dim: Union[List[int], int] = c3,  # c3
-                 gcn_spa_g_residual: Union[List[int], int] = [0, 0, 0],
+                 gcn_spa_gcn_residual: Union[List[int], int] = [0, 0, 0],
+                 gcn_spa_prenorm: bool = True,
                  gcn_spa_t_kernel: int = 1,
                  gcn_spa_dropout: float = 0.0,
                  gcn_spa_dims: list = [c2, c3, c3],
-                 gcn_spa_ffn: int = 0,
+                 gcn_spa_ffn: int = 1,
 
                  gcn_tem_g_kernel: int = 1,
                  gcn_tem_g_proj_shared: bool = False,
                  gcn_tem_g_proj_dim: Union[List[int], int] = c3,  # c3
-                 gcn_tem_g_residual: Union[List[int], int] = [0, 0, 0],
+                 gcn_tem_gcn_residual: Union[List[int], int] = [0, 0, 0],
+                 gcn_tem_prenorm: bool = True,
                  gcn_tem_t_kernel: int = 1,
                  gcn_tem_dropout: float = 0.0,
                  gcn_tem_dims: list = [c2, c3, c3],
-                 gcn_tem_ffn: int = 0,
+                 gcn_tem_ffn: int = 1,
 
                  t_g_kernel: int = 1,
                  t_g_proj_shared: bool = False,
                  t_g_proj_dim: Union[List[int], int] = c4,
-                 t_g_residual: Union[List[int], int] = [0, 0, 0],
+                 t_gcn_residual: Union[List[int], int] = [0, 0, 0],
                  t_gcn_t_kernel: int = 1,
                  t_gcn_dropout: float = 0.0,
                  t_gcn_dims: list = [c3, c4, c4],
                  t_gcn_ffn: int = 0,
+                 t_gcn_prenorm: bool = False,
 
                  spatial_maxpool: int = 1,
                  temporal_maxpool: int = 1,
@@ -230,10 +238,11 @@ class SGN(PyTorchModule):
             padding=gcn_spa_t_kernel//2,
             dropout=lambda: nn.Dropout2d(gcn_spa_dropout),
             gcn_dims=[self.gcn_in_ch]+gcn_spa_dims,
+            gcn_residual=gcn_spa_gcn_residual,
+            gcn_prenorm=gcn_spa_prenorm,
             g_proj_dim=gcn_spa_g_proj_dim,
             g_kernel=gcn_spa_g_kernel,
             g_proj_shared=gcn_spa_g_proj_shared,
-            g_residual=gcn_spa_g_residual,
             ffn_mode=gcn_spa_ffn,
         )
         assert gcn_spa_ffn in self.ffn_mode
@@ -247,10 +256,11 @@ class SGN(PyTorchModule):
             padding=gcn_tem_t_kernel//2,
             dropout=lambda: nn.Dropout2d(gcn_tem_dropout),
             gcn_dims=gcn_dims,
+            gcn_residual=gcn_tem_gcn_residual,
+            gcn_prenorm=gcn_tem_prenorm,
             g_proj_dim=gcn_tem_g_proj_dim,
             g_kernel=gcn_tem_g_kernel,
             g_proj_shared=gcn_tem_g_proj_shared,
-            g_residual=gcn_tem_g_residual,
             ffn_mode=gcn_tem_ffn,
         )
         assert gcn_tem_ffn in self.ffn_mode
@@ -261,10 +271,11 @@ class SGN(PyTorchModule):
             padding=t_gcn_t_kernel//2,
             dropout=lambda: nn.Dropout2d(t_gcn_dropout),
             gcn_dims=t_gcn_dims,
+            gcn_residual=t_gcn_residual,
+            gcn_prenorm=t_gcn_prenorm,
             g_proj_dim=t_g_proj_dim,
             g_kernel=t_g_kernel,
             g_proj_shared=t_g_proj_shared,
-            g_residual=t_g_residual,
             ffn_mode=t_gcn_ffn,
         )
         assert t_gcn_ffn in self.ffn_mode
@@ -419,7 +430,7 @@ class SGN(PyTorchModule):
             t_gcn_kwargs=self.t_gcn_kwargs
         )
 
-        # 0=identity, 3= n,cv,1,t
+        # 0=nn.Identity, 3= n,cv,1,t
         if self.spatial_maxpool == 0:
             self.smp = nn.Identity()
         elif self.spatial_maxpool == 1:
@@ -751,9 +762,9 @@ class MLPTemporal(PyTorchModule):
             else:
                 raise ValueError('Unknown residual mode...')
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor, x_n: Optional[Tensor] = None) -> Tensor:
         # x: n,c,v,t ; v=1 due to SMP
-        x0 = x
+        x0 = x if x_n is None else x_n
         x = self.pool(x)
         for i in range(self.num_layers):
             x = getattr(self, f'cnn{i+1}')(x) + getattr(self, f'res{i+1}')(x)
@@ -979,7 +990,6 @@ class GCNSpatialG(Module):
                  bias: int = 0,
                  activation: T1 = nn.Softmax,
                  normalization: Optional[T1] = None,
-                 prenorm: bool = False,
                  g_proj_shared: bool = False,
                  ):
         super(GCNSpatialG, self).__init__(in_channels,
@@ -988,10 +998,7 @@ class GCNSpatialG(Module):
                                           padding=padding,
                                           bias=bias,
                                           activation=activation,
-                                          normalization=normalization,
-                                          prenorm=prenorm)
-        if self.prenorm:
-            self.norm = self.normalization(self.in_channels)
+                                          normalization=normalization)
         self.g1 = Conv(self.in_channels, self.out_channels, bias=self.bias,
                        kernel_size=self.kernel_size, padding=self.padding)
         if g_proj_shared:
@@ -1002,8 +1009,6 @@ class GCNSpatialG(Module):
         self.act = self.activation(dim=-1)
 
     def forward(self, x: Tensor) -> Tensor:
-        if self.prenorm:
-            x = self.norm(x)
         g1 = self.g1(x).permute(0, 3, 2, 1).contiguous()  # n,t,v,c
         g2 = self.g2(x).permute(0, 3, 1, 2).contiguous()  # n,t,c,v
         g3 = g1.matmul(g2)  # n,t,v,v
@@ -1032,9 +1037,7 @@ class GCNSpatialUnit(Module):
                                              activation=activation,
                                              normalization=normalization,
                                              prenorm=prenorm)
-        if self.prenorm:
-            self.norm = self.normalization(self.in_channels)
-        else:
+        if not self.prenorm:
             self.norm = self.normalization(self.out_channels)
         self.act = self.activation()
         self.drop = nn.Identity() if self.dropout is None else self.dropout()
@@ -1043,8 +1046,6 @@ class GCNSpatialUnit(Module):
                        kernel_size=self.kernel_size, padding=self.padding)
 
     def forward(self, x: Tensor, g: Tensor) -> Tensor:
-        if self.prenorm:
-            x = self.norm(x)
         x1 = x.permute(0, 3, 2, 1).contiguous()  # n,t,v,c
         x1 = g.matmul(x1)
         x1 = x1.permute(0, 3, 2, 1).contiguous()  # n,c,v,t
@@ -1065,13 +1066,13 @@ class GCNSpatialBlock(Module):
                  dropout: Optional[Type[PyTorchModule]] = None,
                  activation: T1 = nn.ReLU,
                  normalization: T1 = nn.BatchNorm2d,
-                 prenorm: bool = False,
-                 gcn_dims: List[int],
-                 g_proj_dim: Union[List[int], int],
+                 gcn_dims: List[int] = [128, 256, 256],
+                 gcn_residual: Union[List[int], int] = [0, 0, 0],
+                 gcn_prenorm: bool = False,
+                 g_proj_dim: Union[List[int], int] = 256,
                  g_kernel: int = 1,
                  g_proj_shared: bool = False,
                  g_activation: T1 = nn.Softmax,
-                 g_residual: Union[List[int], int] = [0, 0, 0],
                  ffn_mode: int = 0,
                  return_g: bool = True
                  ):
@@ -1081,21 +1082,19 @@ class GCNSpatialBlock(Module):
                                               bias=bias,
                                               dropout=dropout,
                                               activation=activation,
-                                              normalization=normalization,
-                                              prenorm=prenorm)
+                                              normalization=normalization)
         self.return_g = return_g
         self.num_blocks = len(gcn_dims) - 1
         self.g_shared = isinstance(g_proj_dim, int)
         if self.g_shared:
-            self.gcn_g = GCNSpatialG(gcn_dims[0],
-                                     g_proj_dim,
-                                     bias=self.bias,
-                                     kernel_size=g_kernel,
-                                     padding=g_kernel//2,
-                                     activation=g_activation,
-                                     normalization=self.normalization,
-                                     prenorm=self.prenorm,
-                                     g_proj_shared=g_proj_shared)
+            self.gcn_g1 = GCNSpatialG(gcn_dims[0],
+                                      g_proj_dim,
+                                      bias=self.bias,
+                                      kernel_size=g_kernel,
+                                      padding=g_kernel//2,
+                                      activation=g_activation,
+                                      normalization=self.normalization,
+                                      g_proj_shared=g_proj_shared)
         else:
             for i in range(self.num_blocks):
                 setattr(self, f'gcn_g{i+1}',
@@ -1106,7 +1105,6 @@ class GCNSpatialBlock(Module):
                                     padding=g_kernel//2,
                                     activation=g_activation,
                                     normalization=self.normalization,
-                                    prenorm=self.prenorm,
                                     g_proj_shared=g_proj_shared))
 
         for i in range(self.num_blocks):
@@ -1119,29 +1117,34 @@ class GCNSpatialBlock(Module):
                                    dropout=self.dropout,
                                    activation=self.activation,
                                    normalization=self.normalization,
-                                   prenorm=self.prenorm))
+                                   prenorm=gcn_prenorm))
 
-        self.res = null_fn
-        for i in range(self.num_blocks):
-            setattr(self, f'res{i+1}', null_fn)
+        if gcn_prenorm:
+            for i in range(self.num_blocks):
+                setattr(self, f'gcn_prenorm{i+1}',
+                        self.normalization(gcn_dims[i]))
 
-        if isinstance(g_residual, list):
-            assert len(g_residual) == self.num_blocks
-            for i, r in enumerate(g_residual):
+        if isinstance(gcn_residual, list):
+            assert len(gcn_residual) == self.num_blocks
+            for i, r in enumerate(gcn_residual):
                 if r == 0:
-                    setattr(self, f'res{i+1}', null_fn)
+                    setattr(self, f'gcn_res{i+1}', null_fn)
                 elif r == 1:
                     if gcn_dims[i] == gcn_dims[i+1]:
-                        setattr(self, f'res{i+1}', nn.Identity())
+                        setattr(self, f'gcn_res{i+1}', nn.Identity())
                     else:
-                        setattr(self, f'res{i+1}', Conv(gcn_dims[i],
-                                                        gcn_dims[i+1],
-                                                        bias=self.bias))
+                        setattr(self, f'gcn_res{i+1}', Conv(gcn_dims[i],
+                                                            gcn_dims[i+1],
+                                                            bias=self.bias))
                 else:
                     raise ValueError("Unknown residual modes...")
+            if gcn_dims[0] == gcn_dims[-1]:
+                self.res = nn.Identity()
+            else:
+                self.res = Conv(gcn_dims[0], gcn_dims[-1], bias=self.bias)
 
-        elif isinstance(g_residual, int):
-            if g_residual == 1:
+        elif isinstance(gcn_residual, int):
+            if gcn_residual == 1:
                 if gcn_dims[0] == gcn_dims[-1]:
                     self.res = nn.Identity()
                 else:
@@ -1155,80 +1158,7 @@ class GCNSpatialBlock(Module):
         if ffn_mode > 0:
             for i in range(self.num_blocks):
                 if ffn_mode == 1:
-                    idx = 2
-                    channels = [gcn_dims[i+1], gcn_dims[i+1], gcn_dims[i+1]]
-                    kernel_sizes = [1, 1]
-                    paddings = [0, 0]
-                    residuals = [0, 0]
-                    dropouts = [self.dropout, None]
-                    residual = 0
-                    prenorm = self.prenorm
-                    activations = [self.activation for _ in range(idx)]
-                    normalizations = [self.normalization for _ in range(idx)]
-                    biases = [self.bias for _ in range(idx)]
-                elif ffn_mode == 2:
-                    idx = 2
-                    channels = [gcn_dims[i+1], gcn_dims[i+1], gcn_dims[i+1]]
-                    kernel_sizes = [3, 1]
-                    paddings = [1, 0]
-                    residuals = [0, 0]
-                    dropouts = [self.dropout, None]
-                    residual = 0
-                    prenorm = self.prenorm
-                    activations = [self.activation for _ in range(idx)]
-                    normalizations = [self.normalization for _ in range(idx)]
-                    biases = [self.bias for _ in range(idx)]
-                elif ffn_mode == 3:
-                    idx = 2
-                    channels = [gcn_dims[i+1], gcn_dims[i+1], gcn_dims[i+1]]
-                    kernel_sizes = [1, 1]
-                    paddings = [0, 0]
-                    residuals = [0, 0]
-                    dropouts = [self.dropout, None]
-                    residual = 1
-                    prenorm = self.prenorm
-                    activations = [self.activation for _ in range(idx)]
-                    normalizations = [self.normalization for _ in range(idx)]
-                    biases = [self.bias for _ in range(idx)]
-                elif ffn_mode == 4:
-                    idx = 2
-                    channels = [gcn_dims[i+1], gcn_dims[i+1], gcn_dims[i+1]]
-                    kernel_sizes = [3, 1]
-                    paddings = [1, 0]
-                    residuals = [0, 0]
-                    dropouts = [self.dropout, None]
-                    residual = 1
-                    prenorm = self.prenorm
-                    activations = [self.activation for _ in range(idx)]
-                    normalizations = [self.normalization for _ in range(idx)]
-                    biases = [self.bias for _ in range(idx)]
-                elif ffn_mode == 5:
-                    idx = 2
-                    channels = [gcn_dims[i+1], gcn_dims[i+1]*4, gcn_dims[i+1]]
-                    kernel_sizes = [1, 1]
-                    paddings = [0, 0]
-                    residuals = [0, 0]
-                    dropouts = [self.dropout, None]
-                    residual = 1
-                    prenorm = self.prenorm
-                    activations = [self.activation for _ in range(idx)]
-                    normalizations = [self.normalization for _ in range(idx)]
-                    biases = [self.bias for _ in range(idx)]
-                elif ffn_mode == 6:
-                    idx = 2
-                    channels = [gcn_dims[i+1], gcn_dims[i+1]*4, gcn_dims[i+1]]
-                    kernel_sizes = [3, 1]
-                    paddings = [1, 0]
-                    residuals = [0, 0]
-                    dropouts = [self.dropout, None]
-                    residual = 1
-                    prenorm = self.prenorm
-                    activations = [self.activation for _ in range(idx)]
-                    normalizations = [self.normalization for _ in range(idx)]
-                    biases = [self.bias for _ in range(idx)]
-                elif ffn_mode == 101:
-                    # transformer style
-                    idx = 2
+                    # transformer style, prenorm
                     channels = [gcn_dims[i+1], gcn_dims[i+1]*4, gcn_dims[i+1]]
                     kernel_sizes = [1, 1]
                     paddings = [0, 0]
@@ -1237,8 +1167,20 @@ class GCNSpatialBlock(Module):
                     residual = 1
                     prenorm = True
                     activations = [self.activation, None]
-                    normalizations = [None for _ in range(idx)]
-                    biases = [self.bias for _ in range(idx)]
+                    normalizations = [None, None]
+                    biases = [self.bias, self.bias]
+                elif ffn_mode == 1:
+                    # transformer style, postnorm
+                    channels = [gcn_dims[i+1], gcn_dims[i+1]*4, gcn_dims[i+1]]
+                    kernel_sizes = [1, 1]
+                    paddings = [0, 0]
+                    residuals = [0, 0]
+                    dropouts = [self.dropout, self.dropout]
+                    residual = 1
+                    prenorm = False
+                    activations = [self.activation, None]
+                    normalizations = [None, self.normalization]
+                    biases = [self.bias, self.bias]
                 setattr(self,
                         f'ffn{i+1}',
                         MLPTemporal(
@@ -1254,26 +1196,31 @@ class GCNSpatialBlock(Module):
                             residual=residual,
                             prenorm=prenorm)
                         )
+                if prenorm:
+                    setattr(self, f'ffn_prenorm{i+1}',
+                            self.normalization(channels[0]))
         else:
             for i in range(self.num_blocks):
-                setattr(self, f'ffn{i+1}', nn.Identity())
+                setattr(self, f'ffn{i+1}', Identity())
 
     def forward(self, x: Tensor) -> Tensor:
         x0 = x
-        if self.g_shared:
-            g = self.gcn_g(x)
-            for i in range(self.num_blocks):
-                x = getattr(self, f'gcn{i+1}')(x, g) + \
-                    getattr(self, f'res{i+1}')(x)
-                x = getattr(self, f'ffn{i+1}')(x)
-        else:
-            g = []
-            for i in range(self.num_blocks):
-                g1 = getattr(self, f'gcn_g{i+1}')(x)
+        g = []
+        for i in range(self.num_blocks):
+            if self.prenorm:
+                x1 = getattr(self, f'gcn_prenorm{i+1}')(x)
+            else:
+                x1 = x
+            if (self.g_shared and len(g) == 0) or not self.g_shared:
+                g1 = getattr(self, f'gcn_g{i+1}')(x1)
                 g.append(g1)
-                x = getattr(self, f'gcn{i+1}')(x, g1) + \
-                    getattr(self, f'res{i+1}')(x)
-                x = getattr(self, f'ffn{i+1}')(x)
+            x = getattr(self, f'gcn{i+1}')(x1, g1) + \
+                getattr(self, f'gcn_res{i+1}')(x)
+            if self.prenorm:
+                x1 = getattr(self, f'ffn_prenorm{i+1}')(x)
+            else:
+                x1 = x
+            x = getattr(self, f'ffn{i+1}')(x1, x)
         x += self.res(x0)
         if self.return_g:
             return x, g
@@ -1363,13 +1310,11 @@ if __name__ == '__main__':
                 sem_fra_location=0,
                 x_emb_proj=0,
                 gcn_list=['spa', 'tem'],
-                gcn_fusion=1,
-
+                gcn_fusion=0,
                 gcn_tem=0,
                 # gcn_tem_dims=[c2*25, c3*25, c3*25],
-
-                t_mode=102,
-                t_gcn_dims=[256, 256, 256]
+                t_mode=1,
+                # t_gcn_dims=[256, 256, 256]
 
                 )
     model(inputs, subjects)
