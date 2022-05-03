@@ -401,6 +401,9 @@ class SGN(PyTorchModule):
                 g_activation=self.g_activation_fn,
                 **gcn_temporal_kwargs
             )
+        if 'dual' in self.gcn_list:
+            self.gcn_dual = DualGCNSpatialBlock(self.gcn_spatial,
+                                                self.gcn_temporal)
 
         # Frame level module ---------------------------------------------------
         # aspp + mlp
@@ -528,30 +531,33 @@ class SGN(PyTorchModule):
         # GCN ------------------------------------------------------------------
         s = x.shape
 
-        x_list, g_list = [], []
-        if hasattr(self, 'gcn_spatial'):
-            x_spa, g_spa = self.gcn_spatial(x)
-            x_list.append(x_spa)
-            g_list.append(g_spa)
-        if hasattr(self, 'gcn_temporal'):
-            if self.gcn_tem == 0:
-                # swap axis
-                x_tem = x.transpose(-1, -2)
-                x_tem, g_tem = self.gcn_temporal(x_tem)
-                x_tem = x_tem.transpose(-1, -2)
-            elif self.gcn_tem == 1:
-                # merge axis
-                x_tem = x.reshape((s[0], -1, s[-1], 1))
-                x_tem, g_tem = self.gcn_temporal(x_tem)
-                x_tem = x_tem.reshape((s[0], -1, s[2], s[3]))
-            x_list.append(x_tem)
-            g_list.append(g_tem)
+        if 'dual' in self.gcn_list:
+            x_list, g_list = self.gcn_dual(x)
+        else:
+            x_list, g_list = [], []
+            if hasattr(self, 'gcn_spatial'):
+                x_spa, g_spa = self.gcn_spatial(x)
+                x_list.append(x_spa)
+                g_list.append(g_spa)
+            if hasattr(self, 'gcn_temporal'):
+                if self.gcn_tem == 0:
+                    # swap axis
+                    x_tem = x.transpose(-1, -2)
+                    x_tem, g_tem = self.gcn_temporal(x_tem)
+                    x_tem = x_tem.transpose(-1, -2)
+                elif self.gcn_tem == 1:
+                    # merge axis
+                    x_tem = x.reshape((s[0], -1, s[-1], 1))
+                    x_tem, g_tem = self.gcn_temporal(x_tem)
+                    x_tem = x_tem.reshape((s[0], -1, s[2], s[3]))
+                x_list.append(x_tem)
+                g_list.append(g_tem)
 
         # Frame-level Module ---------------------------------------------------
         # spatial fusion post gcn
         if len(self.gcn_list) == 0:
             x = x
-        elif len(self.gcn_list) == 1:
+        elif len(self.gcn_list) == 1 or 'dual' in self.gcn_list:
             x = x_list[0]
         elif len(self.gcn_list) == 2:
             x = fuse(*x_list, self.gcn_fusion)
@@ -1044,6 +1050,7 @@ class GCNSpatialUnit(Module):
         self.w1 = Conv(self.in_channels, self.out_channels, bias=self.bias)
         self.w2 = Conv(self.in_channels, self.out_channels, bias=self.bias,
                        kernel_size=self.kernel_size, padding=self.padding)
+        print(self.in_channels, self.out_channels)
 
     def forward(self, x: Tensor, g: Tensor) -> Tensor:
         x1 = x.permute(0, 3, 2, 1).contiguous()  # n,t,v,c
@@ -1228,6 +1235,66 @@ class GCNSpatialBlock(Module):
             return x
 
 
+class DualGCNSpatialBlock(PyTorchModule):
+    def __init__(self, gcn1: Module, gcn2: Module, mode=1):
+        super(DualGCNSpatialBlock, self).__init__()
+        self.mode = 1
+        assert mode == 1
+        self.gcn1 = gcn1
+        self.gcn2 = gcn2
+        assert gcn1 is not None and gcn2 is not None
+        assert gcn1.num_blocks == gcn2.num_blocks
+
+    def forward(self, x: Tensor) -> Tensor:
+        # x: n,c,v,t
+        x0 = x
+        x_list, g_list = [], []
+        gcn_g1, gcn_g2 = [], []
+        for i in range(self.gcn1.num_blocks):
+            # gcn1 ----
+            if self.gcn1.prenorm:
+                x1 = getattr(self.gcn1, f'gcn_prenorm{i+1}')(x)
+            else:
+                x1 = x
+            if (self.gcn1.g_shared and len(gcn_g1) == 0) or not self.gcn1.g_shared:  # noqa
+                g1 = getattr(self.gcn1, f'gcn_g{i+1}')(x1)
+                gcn_g1.append(g1)
+            x1 = getattr(self.gcn1, f'gcn{i+1}')(x1, g1) + \
+                getattr(self.gcn1, f'gcn_res{i+1}')(x)
+            if self.gcn1.prenorm:
+                x2 = getattr(self.gcn1, f'ffn_prenorm{i+1}')(x1)
+            else:
+                x2 = x1
+            gcn1_x = getattr(self.gcn1, f'ffn{i+1}')(x2, x1)
+
+            # gcn2 -----
+            x = x.transpose(-1, -2)
+            if self.gcn2.prenorm:
+                x1 = getattr(self.gcn2, f'gcn_prenorm{i+1}')(x)
+            else:
+                x1 = x
+            if (self.gcn2.g_shared and len(gcn_g2) == 0) or not self.gcn2.g_shared:  # noqa
+                g2 = getattr(self.gcn2, f'gcn_g{i+1}')(x1)
+                gcn_g2.append(g2)
+            x1 = getattr(self.gcn2, f'gcn{i+1}')(x1, g2) + \
+                getattr(self.gcn2, f'gcn_res{i+1}')(x)
+            if self.gcn2.prenorm:
+                x2 = getattr(self.gcn2, f'ffn_prenorm{i+1}')(x1)
+            else:
+                x2 = x1
+            gcn2_x = getattr(self.gcn2, f'ffn{i+1}')(x2, x1)
+            gcn2_x = gcn2_x.transpose(-1, -2)
+
+            # aggregation ---
+            if self.mode == 1:
+                x = gcn1_x + gcn2_x
+
+        x += self.gcn1.res(x0)
+        x_list.append(x)
+        g_list.append([gcn_g1, gcn_g2])
+        return x_list, g_list
+
+
 class FeatureExtractor(PyTorchModule):
     def __init__(self,
                  in_pos: int,
@@ -1309,7 +1376,7 @@ if __name__ == '__main__':
                 sem_fra_fusion=1,
                 sem_fra_location=0,
                 x_emb_proj=0,
-                gcn_list=['spa', 'tem'],
+                gcn_list=['spa', 'tem', 'dual'],
                 gcn_fusion=0,
                 gcn_tem=0,
                 # gcn_tem_dims=[c2*25, c3*25, c3*25],

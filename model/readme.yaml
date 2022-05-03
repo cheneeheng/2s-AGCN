@@ -1735,7 +1735,7 @@ sgn_v9:
                   - separate projection for G
                   - 93.55%
         # - 220429183001_stgcn_gcnfusion0_gcntem0_gcntemgprojdim256256512512512_gcntemdims128128256256256:
-        - __:  
+        - __:
                   - SEG30 ************
                   - spatial and temporal gcn
                   - cat fusion
@@ -1756,13 +1756,13 @@ sgn_v9:
                   - cat fusion
                   - swap cv
                   - 5 gcn block for tem gcn
-                  - 
+                  - 94.69%
         - 220429183001_stgcn_gcnfusion0_gcntem0_gcntemdims128128256256_20seg:
                   - spatial and temporal gcn
                   - cat fusion
                   - swap cv
                   - 4 gcn block for tem gcn
-                  - 
+                  - 94.90%
         - 220429183001_stgcn_gcnfusion0_gcntem0_gcntemdims128256:
                   - spatial and temporal gcn
                   - cat fusion
