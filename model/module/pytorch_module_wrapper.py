@@ -1,5 +1,7 @@
 from collections import OrderedDict
-from typing import Tuple, Optional, Union, Type
+from typing import Optional, Union, Type
+
+import inspect
 
 import torch
 from torch import nn
@@ -213,12 +215,17 @@ class ASPP(Module):
                     deterministic=False
                 )
             })
-        self.proj = Conv(self.out_channels * len(self.dilation),
-                         self.out_channels,
-                         bias=self.bias,
-                         normalization=lambda: self.normalization(
-                             self.out_channels),
-                         dropout=lambda: self.dropout(0.2))
+        if len(inspect.getargspec(self.dropout).args) != 0:
+            def dropout(): return self.dropout(0.2)
+        else:
+            dropout = self.dropout
+        self.proj = Conv(
+            self.out_channels * len(self.dilation),
+            self.out_channels,
+            bias=self.bias,
+            normalization=lambda: self.normalization(self.out_channels),
+            dropout=dropout
+        )
         if self.in_channels == self.out_channels:
             self.res = nn.Identity()
         else:
@@ -226,7 +233,10 @@ class ASPP(Module):
                             self.out_channels,
                             bias=self.bias)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self,
+                x: torch.Tensor,
+                x_n: Optional[torch.Tensor] = None
+                ) -> torch.Tensor:
         # x: n,c,v,t
         res = []
         for _, block in self.aspp.items():

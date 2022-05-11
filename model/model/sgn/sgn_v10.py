@@ -101,7 +101,7 @@ def normalization_fn(norm_type: str) -> Tuple[Type[PyTorchModule],
 class SGN(PyTorchModule):
 
     # CONSTANTS
-    ffn_mode = [0, 1, 2, 3, 4, 5, 6]
+    ffn_mode = [0, 1, 2, 3, 4, 5, 6, 101, 102, 103]
     emb_modes = [0, 1, 2, 3, 4, 5, 6, 7, 8]
     c1, c2, c3, c4 = c1, c2, c3, c4
     g_activation_fn = nn.Softmax
@@ -1478,8 +1478,8 @@ if __name__ == '__main__':
                 gcn_spa_dropout=0.0,
                 gcn_spa_gcn_residual=[0, 0, 0],
                 gcn_spa_dims=[64, 128, 256],
-                gcn_spa_ffn=1,
-                gcn_spa_prenorm=True,
+                gcn_spa_ffn=101,
+                gcn_spa_prenorm=False,
                 gcn_tem=0,
                 # gcn_tem_dims=[c2*25, c3*25, c3*25],
                 t_mode=1,
