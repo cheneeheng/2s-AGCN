@@ -101,7 +101,7 @@ def normalization_fn(norm_type: str) -> Tuple[Type[PyTorchModule],
 class SGN(PyTorchModule):
 
     # CONSTANTS
-    ffn_mode = [0, 1]
+    ffn_mode = [0, 1, 2, 3]
     emb_modes = [0, 1, 2, 3, 4, 5, 6, 7, 8]
     c1, c2, c3, c4 = c1, c2, c3, c4
     g_activation_fn = nn.Softmax
@@ -493,7 +493,7 @@ class SGN(PyTorchModule):
                 if f'w1.block.conv.conv.weight' in p_name:
                     init_0(param)
 
-    def forward(self, x: Tensor, *args, **kwargs) -> Tuple[Tensor, list]:
+    def forward(self, x: Tensor) -> Tuple[Tensor, list]:
         """Model forward pass.
 
         Args:
@@ -713,6 +713,7 @@ class MLPTemporal(PyTorchModule):
                  channels: List[int],
                  kernel_sizes: List[int] = [3, 1],
                  paddings: List[int] = [1, 0],
+                 dilations: List[int] = [1, 1],
                  biases: List[int] = [0, 0],
                  residuals: List[int] = [0, 0],
                  dropouts: T2 = [nn.Dropout2d, None],
@@ -751,6 +752,7 @@ class MLPTemporal(PyTorchModule):
                          channels[i+1],
                          kernel_size=kernel_sizes[i],
                          padding=paddings[i],
+                         dilation=dilations[i],
                          bias=biases[i],
                          activation=activations[i],
                          normalization=norm_func,
@@ -1050,7 +1052,6 @@ class GCNSpatialUnit(Module):
         self.w1 = Conv(self.in_channels, self.out_channels, bias=self.bias)
         self.w2 = Conv(self.in_channels, self.out_channels, bias=self.bias,
                        kernel_size=self.kernel_size, padding=self.padding)
-        print(self.in_channels, self.out_channels)
 
     def forward(self, x: Tensor, g: Tensor) -> Tensor:
         x1 = x.permute(0, 3, 2, 1).contiguous()  # n,t,v,c
@@ -1169,31 +1170,58 @@ class GCNSpatialBlock(Module):
                     channels = [gcn_dims[i+1], gcn_dims[i+1]*4, gcn_dims[i+1]]
                     kernel_sizes = [1, 1]
                     paddings = [0, 0]
+                    biases = [self.bias, self.bias]
                     residuals = [0, 0]
                     dropouts = [self.dropout, self.dropout]
-                    residual = 1
-                    prenorm = True
                     activations = [self.activation, None]
                     normalizations = [None, None]
-                    biases = [self.bias, self.bias]
-                elif ffn_mode == 1:
+                    residual = 1
+                    prenorm = True
+                elif ffn_mode == 2:
                     # transformer style, postnorm
                     channels = [gcn_dims[i+1], gcn_dims[i+1]*4, gcn_dims[i+1]]
                     kernel_sizes = [1, 1]
                     paddings = [0, 0]
+                    biases = [self.bias, self.bias]
                     residuals = [0, 0]
                     dropouts = [self.dropout, self.dropout]
-                    residual = 1
-                    prenorm = False
                     activations = [self.activation, None]
                     normalizations = [None, self.normalization]
+                    residual = 1
+                    prenorm = False
+                elif ffn_mode == 3:
+                    # dilation, prenorm
+                    channels = [gcn_dims[i+1], gcn_dims[i+1]]
+                    kernel_sizes = [3]
+                    paddings = [3+(i*2)]
+                    dilations = [3+(i*2)]
+                    biases = [self.bias]
+                    residuals = [0]
+                    dropouts = [self.dropout]
+                    activations = [self.activation]
+                    normalizations = [None]
+                    residual = 1
+                    prenorm = True
+                elif ffn_mode == 4:
+                    # dilation + 1x1proj, prenorm
+                    channels = [gcn_dims[i+1], gcn_dims[i+1], gcn_dims[i+1]]
+                    kernel_sizes = [3, 1]
+                    paddings = [3+(i*2), 0]
+                    dilations = [3+(i*2), 1]
                     biases = [self.bias, self.bias]
+                    residuals = [0, 0]
+                    dropouts = [self.dropout, self.dropout]
+                    activations = [self.activation, None]
+                    normalizations = [None, None]
+                    residual = 1
+                    prenorm = True
                 setattr(self,
                         f'ffn{i+1}',
                         MLPTemporal(
                             channels=channels,
                             kernel_sizes=kernel_sizes,
                             paddings=paddings,
+                            dilations=dilations,
                             biases=biases,
                             residuals=residuals,
                             dropouts=dropouts,
@@ -1376,15 +1404,25 @@ if __name__ == '__main__':
                 sem_fra_fusion=1,
                 sem_fra_location=0,
                 x_emb_proj=0,
-                gcn_list=['spa', 'tem', 'dual'],
+                # gcn_list=['spa', 'tem', 'dual'],
+                gcn_list=['spa'],
                 gcn_fusion=0,
+                gcn_spa_g_kernel=1,
+                gcn_spa_g_proj_shared=False,
+                gcn_spa_g_proj_dim=256,
+                gcn_spa_t_kernel=1,
+                gcn_spa_dropout=0.0,
+                gcn_spa_gcn_residual=[0, 0, 0],
+                gcn_spa_dims=[128, 256, 256],
+                gcn_spa_ffn=3,
+                gcn_spa_prenorm=True,
                 gcn_tem=0,
                 # gcn_tem_dims=[c2*25, c3*25, c3*25],
                 t_mode=1,
                 # t_gcn_dims=[256, 256, 256]
 
                 )
-    model(inputs, subjects)
+    model(inputs)
     # print(model)
 
     # try:

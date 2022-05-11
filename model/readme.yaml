@@ -1668,12 +1668,12 @@ sgn_v9:
         - 220427193001_stgcn_gcnfusion0_gcntem0:
                   - spatial and temporal gcn
                   - cat fusion
-                  - swap cv
+                  - swap vt
                   - 94.83%
         - 220427193001_stgcn_gcnfusion1_gcntem0:
                   - spatial and temporal gcn
                   - add fusion
-                  - swap cv
+                  - swap vt
                   - 94.36%
         - 220427193001_stgcn_gcnfusion0_gcntem1:
                   - spatial and temporal gcn
@@ -1688,19 +1688,19 @@ sgn_v9:
         - 220427193001_stgcn_gcnfusion0_gcntem0_30seg:
                   - spatial and temporal gcn
                   - cat fusion
-                  - swap cv
+                  - swap vt
                   - 30seg
                   - 93.80%
         - 220427193001_stgcn_gcnfusion0_gcntem0_40seg:
                   - spatial and temporal gcn
                   - cat fusion
-                  - swap cv
+                  - swap vt
                   - 40seg
                   - 93.37%
         - 220427193001_stgcn_gcnfusion0_gcntem0_50seg:
                   - spatial and temporal gcn
                   - cat fusion
-                  - swap cv
+                  - swap vt
                   - 50seg
                   - 93.02%
 
@@ -1708,21 +1708,21 @@ sgn_v9:
                   - SEG30 ************
                   - spatial and temporal gcn
                   - cat fusion
-                  - swap cv
+                  - swap vt
                   - separate projection for G
                   - 93.93%
         - 220429183001_stgcn_gcnfusion0_gcntem0_gcntemdims128128256256:
                   - SEG30 ************
                   - spatial and temporal gcn
                   - cat fusion
-                  - swap cv
+                  - swap vt
                   - 4 gcn block for tem gcn
                   - 93.67%
         - 220429183001_stgcn_gcnfusion0_gcntem0_gcntemdims128128256256256:
                   - SEG30 ************
                   - spatial and temporal gcn
                   - cat fusion
-                  - swap cv
+                  - swap vt
                   - 5 gcn block for tem gcn
                   - 93.90%
         # - 220429183001_stgcn_gcnfusion0_gcntem0_gcntemgprojdim256256512512_gcntemdims128128256256:
@@ -1730,7 +1730,7 @@ sgn_v9:
                   - SEG30 ************
                   - spatial and temporal gcn
                   - cat fusion
-                  - swap cv
+                  - swap vt
                   - 4 gcn block for tem gcn
                   - separate projection for G
                   - 93.55%
@@ -1739,7 +1739,7 @@ sgn_v9:
                   - SEG30 ************
                   - spatial and temporal gcn
                   - cat fusion
-                  - swap cv
+                  - swap vt
                   - 5 gcn block for tem gcn
                   - separate projection for G
                   - 94.06%
@@ -1747,34 +1747,47 @@ sgn_v9:
         - __:
                   - spatial and temporal gcn
                   - cat fusion
-                  - swap cv
+                  - swap vt
                   - 5 gcn block for tem gcn
                   - separate projection for G
                   - 94.47%
         - 220429183001_stgcn_gcnfusion0_gcntem0_gcntemdims128128256256256_20seg:
                   - spatial and temporal gcn
                   - cat fusion
-                  - swap cv
+                  - swap vt
                   - 5 gcn block for tem gcn
                   - 94.69%
         - 220429183001_stgcn_gcnfusion0_gcntem0_gcntemdims128128256256_20seg:
                   - spatial and temporal gcn
                   - cat fusion
-                  - swap cv
+                  - swap vt
                   - 4 gcn block for tem gcn
                   - 94.90%
         - 220429183001_stgcn_gcnfusion0_gcntem0_gcntemdims128256:
                   - spatial and temporal gcn
                   - cat fusion
-                  - swap cv
+                  - swap vt
                   - 2 gcn block for tem gcn
                   - 94.59%
         - 220429183001_stgcn_gcnfusion0_gcntem0_gcntemdims256:
                   - spatial and temporal gcn
                   - cat fusion
-                  - swap cv
+                  - swap vt
                   - 1 gcn block for tem gcn
                   - 94.42%
+
+sgn_v10:
+        - 220503140001_spatemgcnprenorm_spatemgcnffn1:
+                  - dual gcn for spatial and temporal
+                  - ffn after gcn similar to transformer
+                  - prenorm in gcn
+                  - 93.00%
+        - 220503140001_spatemgcnprenorm_spatemgcnffn1_dual:
+                  - dual gcn for spatial and temporal
+                  - ffn after gcn similar to transformer
+                  - prenorm in gcn
+                  - output per gcn block is merged, i.e. H structure.
+                  - 93.46%
 
 sgn-code:
         - original sgn repo code
