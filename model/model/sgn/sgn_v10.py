@@ -101,7 +101,7 @@ def normalization_fn(norm_type: str) -> Tuple[Type[PyTorchModule],
 class SGN(PyTorchModule):
 
     # CONSTANTS
-    ffn_mode = [0, 1, 2, 3]
+    ffn_mode = [0, 1, 2, 3, 4]
     emb_modes = [0, 1, 2, 3, 4, 5, 6, 7, 8]
     c1, c2, c3, c4 = c1, c2, c3, c4
     g_activation_fn = nn.Softmax
@@ -211,10 +211,12 @@ class SGN(PyTorchModule):
         if self.in_pos == 0 and self.sem_pos > 0:
             raise ValueError("in_pos is 0 but sem_position is not")
 
+        # 0: concat, 1: sum
         self.sem_pos_fusion = sem_pos_fusion
+        # 0: concat, 1: sum
         self.sem_fra_fusion = sem_fra_fusion
-        self.sem_fra_location = sem_fra_location
         # 0 = add after GCN, 1 = add before GCN
+        self.sem_fra_location = sem_fra_location
         assert self.sem_fra_location in [0, 1]
 
         # spa, tem
@@ -757,7 +759,8 @@ class MLPTemporal(PyTorchModule):
                          activation=activations[i],
                          normalization=norm_func,
                          dropout=dropouts[i],
-                         prenorm=prenorm)
+                         prenorm=prenorm,
+                         deterministic=False if dilations[i] > 1 else True)
                     )
             if residuals[i] == 0:
                 setattr(self, f'res{i+1}', null_fn)
@@ -1170,6 +1173,7 @@ class GCNSpatialBlock(Module):
                     channels = [gcn_dims[i+1], gcn_dims[i+1]*4, gcn_dims[i+1]]
                     kernel_sizes = [1, 1]
                     paddings = [0, 0]
+                    dilations = [1, 1]
                     biases = [self.bias, self.bias]
                     residuals = [0, 0]
                     dropouts = [self.dropout, self.dropout]
@@ -1182,6 +1186,7 @@ class GCNSpatialBlock(Module):
                     channels = [gcn_dims[i+1], gcn_dims[i+1]*4, gcn_dims[i+1]]
                     kernel_sizes = [1, 1]
                     paddings = [0, 0]
+                    dilations = [1, 1]
                     biases = [self.bias, self.bias]
                     residuals = [0, 0]
                     dropouts = [self.dropout, self.dropout]
@@ -1400,21 +1405,21 @@ if __name__ == '__main__':
     subjects = torch.ones(batch_size, 20, 1)
 
     model = SGN(num_segment=20,
-                sem_pos_fusion=0,
+                sem_pos_fusion=1,
                 sem_fra_fusion=1,
                 sem_fra_location=0,
-                x_emb_proj=0,
+                x_emb_proj=2,
                 # gcn_list=['spa', 'tem', 'dual'],
                 gcn_list=['spa'],
                 gcn_fusion=0,
                 gcn_spa_g_kernel=1,
                 gcn_spa_g_proj_shared=False,
-                gcn_spa_g_proj_dim=256,
+                gcn_spa_g_proj_dim=128,
                 gcn_spa_t_kernel=1,
                 gcn_spa_dropout=0.0,
                 gcn_spa_gcn_residual=[0, 0, 0],
-                gcn_spa_dims=[128, 256, 256],
-                gcn_spa_ffn=3,
+                gcn_spa_dims=[64, 128, 256],
+                gcn_spa_ffn=1,
                 gcn_spa_prenorm=True,
                 gcn_tem=0,
                 # gcn_tem_dims=[c2*25, c3*25, c3*25],
@@ -1425,10 +1430,10 @@ if __name__ == '__main__':
     model(inputs)
     # print(model)
 
-    # try:
-    #     flops = FlopCountAnalysis(model, inputs)
-    #     # print(flops.total())
-    #     # print(flops.by_module_and_operator())
-    #     print(flop_count_table(flops))
-    # except NameError:
-    #     print("Warning: fvcore is not found")
+    try:
+        flops = FlopCountAnalysis(model, inputs)
+        print(flops.total())
+        # print(flops.by_module_and_operator())
+        # print(flop_count_table(flops))
+    except NameError:
+        print("Warning: fvcore is not found")
