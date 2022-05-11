@@ -479,7 +479,7 @@ class SGN(PyTorchModule):
                 if f'w1.block.conv.conv.weight' in p_name:
                     init_0(param)
 
-    def forward(self, x: Tensor, *args, **kwargs) -> Tuple[Tensor, list]:
+    def forward(self, x: Tensor) -> Tuple[Tensor, list]:
         """Model forward pass.
 
         Args:

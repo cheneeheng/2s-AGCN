@@ -1,4 +1,4 @@
-work_dir: ./data/data/ntu_result/xview/sgn/sgn_v10/220503140001
+work_dir: ./data/data/ntu_result/xview/sgn/sgn_v10/220511150001_spagcnres_spagcnffn6
 
 phase: train
 save_score: True
@@ -71,7 +71,7 @@ model_args:
   # sem_fra_fusion: 1
   # sem_fra_location: 0
   ### GCN args
-  gcn_list: ["spa", "tem"]
+  gcn_list: ["spa"]
   gcn_tem: 0
   gcn_fusion: 0
   gcn_spa_g_kernel: 1
@@ -79,19 +79,19 @@ model_args:
   gcn_spa_g_proj_dim: 256
   gcn_spa_t_kernel: 1
   gcn_spa_dropout: 0.0
-  gcn_spa_gcn_residual: [0, 0, 0]
+  gcn_spa_gcn_residual: [1, 1, 1]
   gcn_spa_dims: [128, 256, 256]
-  gcn_spa_ffn: 1
-  gcn_spa_prenorm: True
-  gcn_tem_g_kernel: 1
-  gcn_tem_g_proj_shared: False
-  gcn_tem_g_proj_dim: 256
-  gcn_tem_t_kernel: 1
-  gcn_tem_dropout: 0.0
-  gcn_tem_gcn_residual: [0, 0, 0]
-  gcn_tem_dims: [128, 256, 256]
-  gcn_tem_ffn: 1
-  gcn_tem_prenorm: True
+  gcn_spa_ffn: 6
+  gcn_spa_prenorm: False
+  # gcn_tem_g_kernel: 1
+  # gcn_tem_g_proj_shared: False
+  # gcn_tem_g_proj_dim: 256
+  # gcn_tem_t_kernel: 1
+  # gcn_tem_dropout: 0.0
+  # gcn_tem_gcn_residual: [0, 0, 0]
+  # gcn_tem_dims: [128, 256, 256]
+  # gcn_tem_ffn: 0
+  # gcn_tem_prenorm: False
   # t_g_kernel: 1
   # t_g_proj_shared: False
   # t_g_proj_dim: 512

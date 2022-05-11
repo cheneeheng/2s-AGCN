@@ -1,4 +1,4 @@
-work_dir: ./data/data/ntu_result/xview/sgn/sgn_v9/220427193001
+work_dir: ./data/data/ntu_result/xview/sgn/sgn_v9/220429183001_stgcn_gcnfusion0_gcntem0_gcntemdims128128256256256_20seg
 
 phase: train
 save_score: True
@@ -85,10 +85,10 @@ model_args:
   gcn_tem_g_kernel: 1
   gcn_tem_g_proj_shared: False
   gcn_tem_g_proj_dim: 256
-  gcn_tem_g_residual: [0, 0, 0]
+  gcn_tem_g_residual: [0, 0, 0, 0, 0]
   gcn_tem_t_kernel: 1
   gcn_tem_dropout: 0.0
-  gcn_tem_dims: [128, 256, 256]
+  gcn_tem_dims: [128, 128, 256, 256, 256]
   gcn_tem_ffn: 0
   # t_g_kernel: 1
   # t_g_proj_shared: False

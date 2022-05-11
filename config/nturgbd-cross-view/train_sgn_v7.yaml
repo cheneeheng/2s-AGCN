@@ -1,4 +1,4 @@
-work_dir: ./data/data/ntu_result/xview/sgn/sgn_v7/220413153001
+work_dir: ./data/data/ntu_result/xview/sgn/sgn_v7/220427173001_dualgcn1_nosharedproj
 
 phase: train
 save_score: True
@@ -57,36 +57,55 @@ model_args:
   bias: 1
   dropout: 0.0
   dropout2d: 0.2
-  # c_multiplier: [1.0, 1.0, 1.0, 1.0]
-  norm_type: bn
+  # c_multiplier: [1.0, 1.0, 2.0, 1.0]
+  # norm_type: ln-pre
+  # act_type: gelu
   ## input args
-  # in_position: 1
-  # in_velocity: 1
-  # in_part_type: 2
+  # in_position: 8
+  # in_velocity: 8
+  # in_part_type: 0
   # in_part: 1
   # in_motion: 1
+  # xpos_proj: 1
   # ## secondary input args
   # subject: 0
   # ## semantic args
   # sem_part: 1
   # sem_position: 1
+  # sem_position2: 1
   # sem_frame: 1
-  # par_pos_fusion: 1
+  # par_pos_fusion: 5
   # sem_par_fusion: 0
   # sem_pos_fusion: 0
   # sem_fra_fusion: 1
   # subject_fusion: 1
+  dual_gcn_fusion: 1
   # ## GCN args
+  # g_part: 1
+  # g_kernel: 3
   # g_proj_shared: False
-  # g_proj_dim: 256
-  # gcn_t_kernel: 1
+  g_proj_dim: [256, 512, 512]
+  # g_residual: 1
+  # g_residual: [0, 0, 0, 0, 0]
+  # gcn_t_kernel: 3
+  # gcn_dropout: 0.2
+  # gcn_dims: [128, 128, 512]
+  # gcn_ffn: 1
+  gcn_tem: 1
   # ## Temporal MLP args
-  # t_mode: 1
+  # t_mode: 102
   # t_kernel: 3
   # t_maxpool_kwargs:
   #   kernel_size: [1, 3]
   #   stride: [1, 1]
+  # t_g_proj_shared: False
+  # t_g_proj_dim: 512
+  # t_g_residual: [1]
+  # t_gcn_dropout: 0.0
+  # t_gcn_dims: [256]
   # aspp: [0, 1, 2, 3]
+  # spatial_maxpool: 0
+  # temporal_maxpool: 3
 
 label_smoothing: 0.1
 

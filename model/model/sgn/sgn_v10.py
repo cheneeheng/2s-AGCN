@@ -101,7 +101,7 @@ def normalization_fn(norm_type: str) -> Tuple[Type[PyTorchModule],
 class SGN(PyTorchModule):
 
     # CONSTANTS
-    ffn_mode = [0, 1, 2, 3, 4]
+    ffn_mode = [0, 1, 2, 3, 4, 5, 6]
     emb_modes = [0, 1, 2, 3, 4, 5, 6, 7, 8]
     c1, c2, c3, c4 = c1, c2, c3, c4
     g_activation_fn = nn.Softmax
@@ -1169,7 +1169,7 @@ class GCNSpatialBlock(Module):
         if ffn_mode > 0:
             for i in range(self.num_blocks):
                 if ffn_mode == 1:
-                    # transformer style, prenorm
+                    # transformer style, prenorm, residual
                     channels = [gcn_dims[i+1], gcn_dims[i+1]*4, gcn_dims[i+1]]
                     kernel_sizes = [1, 1]
                     paddings = [0, 0]
@@ -1182,7 +1182,7 @@ class GCNSpatialBlock(Module):
                     residual = 1
                     prenorm = True
                 elif ffn_mode == 2:
-                    # transformer style, postnorm
+                    # transformer style, postnorm, residual
                     channels = [gcn_dims[i+1], gcn_dims[i+1]*4, gcn_dims[i+1]]
                     kernel_sizes = [1, 1]
                     paddings = [0, 0]
@@ -1195,7 +1195,7 @@ class GCNSpatialBlock(Module):
                     residual = 1
                     prenorm = False
                 elif ffn_mode == 3:
-                    # dilation, prenorm
+                    # dilation, no norm, residual
                     channels = [gcn_dims[i+1], gcn_dims[i+1]]
                     kernel_sizes = [3]
                     paddings = [3+(i*2)]
@@ -1208,7 +1208,7 @@ class GCNSpatialBlock(Module):
                     residual = 1
                     prenorm = True
                 elif ffn_mode == 4:
-                    # dilation + 1x1proj, prenorm
+                    # dilation + 1x1proj, no norm, residual
                     channels = [gcn_dims[i+1], gcn_dims[i+1], gcn_dims[i+1]]
                     kernel_sizes = [3, 1]
                     paddings = [3+(i*2), 0]
@@ -1218,6 +1218,32 @@ class GCNSpatialBlock(Module):
                     dropouts = [self.dropout, self.dropout]
                     activations = [self.activation, None]
                     normalizations = [None, None]
+                    residual = 1
+                    prenorm = True
+                elif ffn_mode == 5:
+                    # dilation, norm, residual
+                    channels = [gcn_dims[i+1], gcn_dims[i+1]]
+                    kernel_sizes = [3]
+                    paddings = [3+(i*2)]
+                    dilations = [3+(i*2)]
+                    biases = [self.bias]
+                    residuals = [0]
+                    dropouts = [self.dropout]
+                    activations = [self.activation]
+                    normalizations = [self.normalization]
+                    residual = 1
+                    prenorm = True
+                elif ffn_mode == 6:
+                    # dilation + 1x1proj, norm, residual
+                    channels = [gcn_dims[i+1], gcn_dims[i+1], gcn_dims[i+1]]
+                    kernel_sizes = [3, 1]
+                    paddings = [3+(i*2), 0]
+                    dilations = [3+(i*2), 1]
+                    biases = [self.bias, self.bias]
+                    residuals = [0, 0]
+                    dropouts = [self.dropout, self.dropout]
+                    activations = [self.activation, self.activation]
+                    normalizations = [self.normalization, self.normalization]
                     residual = 1
                     prenorm = True
                 setattr(self,

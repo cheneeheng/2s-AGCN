@@ -1,4 +1,4 @@
-work_dir: ./data/data/ntu_result/xview/sgn/sgn_v8/220427003001
+work_dir: ./data/data/ntu_result/xview/sgn/sgn_v8/220427003001_gcntem1_dualfuse0
 
 phase: train
 save_score: True
@@ -74,10 +74,10 @@ model_args:
   # g_proj_shared: False
   # g_proj_dim: 256
   # gcn_t_kernel: 1
-  dual_gcn_fusion: 1
+  dual_gcn_fusion: 0
   gcn_tem: 1
   gcn_tem_dims: [128, 256, 256]
-  # gcn_tem_dims: [128*25, 256*25, 256*25]
+  # gcn_tem_dims: [3200, 6400, 6400]
   # ## Temporal MLP args
   # t_mode: 1
   # t_kernel: 3

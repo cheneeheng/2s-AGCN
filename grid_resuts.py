@@ -96,6 +96,38 @@ def grid_seg():
     # plt.show()
 
 
+def grid_dropout():
+    GRID_DIR = 'data/data/ntu_result/xview/sgn_v7/grid_dropout'
+    LOG_PATH = [os.path.join(GRID_DIR, i, 'log.txt')
+                for i in sorted(os.listdir(GRID_DIR))
+                if '.' not in i]
+
+    for path in LOG_PATH:
+        if not os.path.exists(path):
+            print(path, 'does not exists...')
+
+    result_f = open(os.path.join(GRID_DIR, 'results.txt'), 'w+')
+
+    var = []
+    acc = []
+    for path_i, path in enumerate(LOG_PATH):
+        with open(path, 'r') as log_f:
+            for line_i, line in enumerate(log_f):
+                if line_i == 963:
+                    var += [path.split('/')[-2][-2:]]
+                    print(var[-1], line[-7:-1], file=result_f)
+                    acc.append(float(line[-7:-2]))
+
+    result_f.close()
+
+    acc = np.array(acc).reshape((1, -1))
+    plt.imshow(acc, cmap='jet')
+    plt.xticks([i for i in range(len(var))], var)
+    plt.savefig(os.path.join(GRID_DIR, 'results.png'))
+    # plt.show()
+
+
 if __name__ == '__main__':
     # grid_cmulti()
-    grid_seg()
+    # grid_seg()
+    grid_dropout()
