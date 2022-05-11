@@ -34,6 +34,7 @@ from utils.utils import *
 
 T1 = Type[PyTorchModule]
 T2 = List[Optional[Type[PyTorchModule]]]
+T3 = Union[List[int], int]
 
 
 class Identity(PyTorchModule):
@@ -135,31 +136,31 @@ class SGN(PyTorchModule):
 
                  gcn_spa_g_kernel: int = 1,
                  gcn_spa_g_proj_shared: bool = False,
-                 gcn_spa_g_proj_dim: Union[List[int], int] = c3,  # c3
-                 gcn_spa_gcn_residual: Union[List[int], int] = [0, 0, 0],
+                 gcn_spa_g_proj_dim: Optional[T3] = None,  # c3
+                 gcn_spa_gcn_residual: T3 = [0, 0, 0],
                  gcn_spa_prenorm: bool = True,
                  gcn_spa_t_kernel: int = 1,
                  gcn_spa_dropout: float = 0.0,
-                 gcn_spa_dims: list = [c2, c3, c3],
+                 gcn_spa_dims: Optional[list] = None,  # [c2, c3, c3],
                  gcn_spa_ffn: int = 1,
 
                  gcn_tem_g_kernel: int = 1,
                  gcn_tem_g_proj_shared: bool = False,
-                 gcn_tem_g_proj_dim: Union[List[int], int] = c3,  # c3
-                 gcn_tem_gcn_residual: Union[List[int], int] = [0, 0, 0],
+                 gcn_tem_g_proj_dim: Optional[T3] = None,  # c3
+                 gcn_tem_gcn_residual: T3 = [0, 0, 0],
                  gcn_tem_prenorm: bool = True,
                  gcn_tem_t_kernel: int = 1,
                  gcn_tem_dropout: float = 0.0,
-                 gcn_tem_dims: list = [c2, c3, c3],
+                 gcn_tem_dims: Optional[list] = None,  # [c2, c3, c3],
                  gcn_tem_ffn: int = 1,
 
                  t_g_kernel: int = 1,
                  t_g_proj_shared: bool = False,
-                 t_g_proj_dim: Union[List[int], int] = c4,
-                 t_gcn_residual: Union[List[int], int] = [0, 0, 0],
+                 t_g_proj_dim: Optional[T3] = None,  # c4,
+                 t_gcn_residual: T3 = [0, 0, 0],
                  t_gcn_t_kernel: int = 1,
                  t_gcn_dropout: float = 0.0,
-                 t_gcn_dims: list = [c3, c4, c4],
+                 t_gcn_dims: Optional[list] = None,  # [c3, c4, c4],
                  t_gcn_ffn: int = 0,
                  t_gcn_prenorm: bool = False,
 
@@ -235,6 +236,10 @@ class SGN(PyTorchModule):
                 self.gcn_in_ch = self.c1
 
         # Spatial GCN
+        if gcn_spa_dims is None:
+            gcn_spa_dims = [self.c2, self.c3, self.c3]
+        if gcn_spa_g_proj_dim is None:
+            gcn_spa_g_proj_dim = self.c3
         gcn_spatial_kwargs = dict(
             kernel_size=gcn_spa_t_kernel,
             padding=gcn_spa_t_kernel//2,
@@ -250,9 +255,13 @@ class SGN(PyTorchModule):
         assert gcn_spa_ffn in self.ffn_mode
 
         # Temporal GCN
+        if gcn_tem_dims is None:
+            gcn_tem_dims = [self.c2, self.c3, self.c3]
         gcn_dims = [self.gcn_in_ch] + gcn_tem_dims
         if self.gcn_tem == 1:
             gcn_dims = [i*self.num_point for i in gcn_dims]
+        if gcn_tem_g_proj_dim is None:
+            gcn_tem_g_proj_dim = self.c3
         gcn_temporal_kwargs = dict(
             kernel_size=gcn_tem_t_kernel,
             padding=gcn_tem_t_kernel//2,
@@ -260,7 +269,7 @@ class SGN(PyTorchModule):
             gcn_dims=gcn_dims,
             gcn_residual=gcn_tem_gcn_residual,
             gcn_prenorm=gcn_tem_prenorm,
-            g_proj_dim=gcn_tem_g_proj_dim,
+            g_proj_dim=gcn_tem_g_proj_dim,  # noqa
             g_kernel=gcn_tem_g_kernel,
             g_proj_shared=gcn_tem_g_proj_shared,
             ffn_mode=gcn_tem_ffn,
@@ -268,6 +277,10 @@ class SGN(PyTorchModule):
         assert gcn_tem_ffn in self.ffn_mode
 
         # GCN in temporal mlp
+        if t_g_proj_dim is None:
+            t_g_proj_dim = self.c4
+        if t_gcn_dims is None:
+            t_gcn_dims = [self.c3, self.c4, self.c4]
         self.t_gcn_kwargs = dict(
             kernel_size=t_gcn_t_kernel,
             padding=t_gcn_t_kernel//2,
@@ -472,6 +485,8 @@ class SGN(PyTorchModule):
         self.fc_dropout = nn.Dropout(dropout)
         if self.t_mode == 0:
             fc_in_ch = self.c3
+        elif self.temporal_maxpool == 0:
+            fc_in_ch = self.c4 * self.num_segment * self.num_point
         elif self.temporal_maxpool == 3:
             fc_in_ch = self.c4 * self.num_segment
         else:
@@ -1078,9 +1093,9 @@ class GCNSpatialBlock(Module):
                  activation: T1 = nn.ReLU,
                  normalization: T1 = nn.BatchNorm2d,
                  gcn_dims: List[int] = [128, 256, 256],
-                 gcn_residual: Union[List[int], int] = [0, 0, 0],
+                 gcn_residual: T3 = [0, 0, 0],
                  gcn_prenorm: bool = False,
-                 g_proj_dim: Union[List[int], int] = 256,
+                 g_proj_dim: T3 = 256,
                  g_kernel: int = 1,
                  g_proj_shared: bool = False,
                  g_activation: T1 = nn.Softmax,
@@ -1464,26 +1479,30 @@ if __name__ == '__main__':
     subjects = torch.ones(batch_size, 20, 1)
 
     model = SGN(num_segment=20,
-                sem_pos_fusion=1,
-                sem_fra_fusion=1,
-                sem_fra_location=0,
-                x_emb_proj=2,
-                # gcn_list=['spa', 'tem', 'dual'],
-                gcn_list=['spa'],
-                gcn_fusion=0,
-                gcn_spa_g_kernel=1,
-                gcn_spa_g_proj_shared=False,
-                gcn_spa_g_proj_dim=128,
-                gcn_spa_t_kernel=1,
-                gcn_spa_dropout=0.0,
-                gcn_spa_gcn_residual=[0, 0, 0],
-                gcn_spa_dims=[64, 128, 256],
-                gcn_spa_ffn=101,
-                gcn_spa_prenorm=False,
-                gcn_tem=0,
-                # gcn_tem_dims=[c2*25, c3*25, c3*25],
-                t_mode=1,
-                # t_gcn_dims=[256, 256, 256]
+                # c_multiplier=[0.25, 0.25, 0.25, 0.25],
+                # gcn_spa_dims=[c2*0.25, c3*0.25, c3*0.25],
+                # sem_pos_fusion=1,
+                # sem_fra_fusion=1,
+                # sem_fra_location=0,
+                # x_emb_proj=2,
+                # # gcn_list=['spa', 'tem', 'dual'],
+                # gcn_list=['spa'],
+                # gcn_fusion=0,
+                # gcn_spa_g_kernel=1,
+                # gcn_spa_g_proj_shared=False,
+                # gcn_spa_g_proj_dim=128,
+                # gcn_spa_t_kernel=1,
+                # gcn_spa_dropout=0.0,
+                # gcn_spa_gcn_residual=[0, 0, 0],
+                # gcn_spa_dims=[64, 128, 256],
+                # gcn_spa_ffn=101,
+                # gcn_spa_prenorm=False,
+                # gcn_tem=0,
+                # # gcn_tem_dims=[c2*25, c3*25, c3*25],
+                # t_mode=1,
+                # # t_gcn_dims=[256, 256, 256]
+                spatial_maxpool=1,
+                temporal_maxpool=1,
 
                 )
     model(inputs)
