@@ -102,7 +102,7 @@ def normalization_fn(norm_type: str) -> Tuple[Type[PyTorchModule],
 class SGN(PyTorchModule):
 
     # CONSTANTS
-    ffn_mode = [0, 1, 2, 3, 4, 5, 6, 101, 102, 103]
+    ffn_mode = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 101, 102, 103]
     emb_modes = [0, 1, 2, 3, 4, 5, 6, 7, 8]
     c1, c2, c3, c4 = c1, c2, c3, c4
     g_activation_fn = nn.Softmax
@@ -485,9 +485,9 @@ class SGN(PyTorchModule):
         self.fc_dropout = nn.Dropout(dropout)
         if self.t_mode == 0:
             fc_in_ch = self.c3
-        elif self.temporal_maxpool == 0:
+        elif self.spatial_maxpool == 0 and self.temporal_maxpool == 0:
             fc_in_ch = self.c4 * self.num_segment * self.num_point
-        elif self.temporal_maxpool == 3:
+        elif self.temporal_maxpool in [0, 3]:
             fc_in_ch = self.c4 * self.num_segment
         else:
             fc_in_ch = self.c4
@@ -1294,6 +1294,45 @@ class GCNSpatialBlock(Module):
                     normalizations = [self.normalization, self.normalization]
                     residual = 1
                     prenorm = True
+                elif ffn_mode == 7:
+                    # dilation, postnorm, residual
+                    channels = [gcn_dims[i+1], gcn_dims[i+1]]
+                    kernel_sizes = [3]
+                    paddings = [3+(i*2)]
+                    dilations = [3+(i*2)]
+                    biases = [self.bias]
+                    residuals = [0]
+                    dropouts = [self.dropout]
+                    activations = [self.activation]
+                    normalizations = [self.normalization]
+                    residual = 1
+                    prenorm = False
+                elif ffn_mode == 8:
+                    # dilation + 1x1proj, postnorm, residual
+                    channels = [gcn_dims[i+1], gcn_dims[i+1], gcn_dims[i+1]]
+                    kernel_sizes = [3, 1]
+                    paddings = [3+(i*2), 0]
+                    dilations = [3+(i*2), 1]
+                    biases = [self.bias, self.bias]
+                    residuals = [0, 0]
+                    dropouts = [self.dropout, self.dropout]
+                    activations = [self.activation, self.activation]
+                    normalizations = [self.normalization, self.normalization]
+                    residual = 1
+                    prenorm = False
+                elif ffn_mode == 9:
+                    # bottleneck, postnorm
+                    channels = [gcn_dims[i+1], gcn_dims[i+1]//4, gcn_dims[i+1]]
+                    kernel_sizes = [1, 1]
+                    paddings = [0, 0]
+                    dilations = [1, 1]
+                    biases = [self.bias, self.bias]
+                    residuals = [0, 0]
+                    dropouts = [self.dropout, self.dropout]
+                    activations = [self.activation, self.activation]
+                    normalizations = [self.normalization, self.normalization]
+                    residual = 1
+                    prenorm = False
                 setattr(self,
                         f'ffn{i+1}',
                         MLPTemporal(
@@ -1481,28 +1520,28 @@ if __name__ == '__main__':
     model = SGN(num_segment=20,
                 # c_multiplier=[0.25, 0.25, 0.25, 0.25],
                 # gcn_spa_dims=[c2*0.25, c3*0.25, c3*0.25],
-                # sem_pos_fusion=1,
-                # sem_fra_fusion=1,
-                # sem_fra_location=0,
+                sem_pos_fusion=1,
+                sem_fra_fusion=1,
+                sem_fra_location=0,
                 # x_emb_proj=2,
-                # # gcn_list=['spa', 'tem', 'dual'],
-                # gcn_list=['spa'],
-                # gcn_fusion=0,
-                # gcn_spa_g_kernel=1,
-                # gcn_spa_g_proj_shared=False,
-                # gcn_spa_g_proj_dim=128,
-                # gcn_spa_t_kernel=1,
-                # gcn_spa_dropout=0.0,
-                # gcn_spa_gcn_residual=[0, 0, 0],
-                # gcn_spa_dims=[64, 128, 256],
-                # gcn_spa_ffn=101,
-                # gcn_spa_prenorm=False,
-                # gcn_tem=0,
-                # # gcn_tem_dims=[c2*25, c3*25, c3*25],
-                # t_mode=1,
-                # # t_gcn_dims=[256, 256, 256]
-                spatial_maxpool=1,
-                temporal_maxpool=1,
+                # gcn_list=['spa', 'tem', 'dual'],
+                gcn_list=['spa'],
+                gcn_fusion=0,
+                gcn_spa_g_kernel=1,
+                gcn_spa_g_proj_shared=False,
+                gcn_spa_g_proj_dim=128,
+                gcn_spa_t_kernel=1,
+                gcn_spa_dropout=0.0,
+                gcn_spa_gcn_residual=[0, 0, 0],
+                gcn_spa_dims=[64, 128, 256],
+                gcn_spa_ffn=9,
+                gcn_spa_prenorm=False,
+                gcn_tem=0,
+                # gcn_tem_dims=[c2*25, c3*25, c3*25],
+                t_mode=1,
+                # t_gcn_dims=[256, 256, 256]
+                # spatial_maxpool=1,
+                # temporal_maxpool=0,
 
                 )
     model(inputs)
