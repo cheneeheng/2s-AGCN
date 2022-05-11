@@ -1788,6 +1788,13 @@ sgn_v10:
                   - prenorm in gcn
                   - output per gcn block is merged, i.e. H structure.
                   - 93.46%
+        - 220503140001_spatemgcn_spatemgcn_dual:
+                  - dual gcn for spatial and temporal
+                  - 94.27%
+        - 220503140001_spatemgcnprenorm_spatemgcn_dual:
+                  - dual gcn for spatial and temporal
+                  - prenorm in gcn
+                  - 93.25%
 
 sgn-code:
         - original sgn repo code

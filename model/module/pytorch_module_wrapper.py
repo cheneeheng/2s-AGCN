@@ -219,6 +219,12 @@ class ASPP(Module):
                          normalization=lambda: self.normalization(
                              self.out_channels),
                          dropout=lambda: self.dropout(0.2))
+        if self.in_channels == self.out_channels:
+            self.res = nn.Identity()
+        else:
+            self.res = Conv(self.in_channels,
+                            self.out_channels,
+                            bias=self.bias)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: n,c,v,t
@@ -231,5 +237,5 @@ class ASPP(Module):
                                    mode="bilinear",
                                    align_corners=False)
         res = torch.cat(res, dim=1)
-        x = self.proj(res)
+        x = self.proj(res) + self.res(x)
         return x

@@ -1168,7 +1168,40 @@ class GCNSpatialBlock(Module):
 
         if ffn_mode > 0:
             for i in range(self.num_blocks):
-                if ffn_mode == 1:
+                if ffn_mode == 101:
+                    setattr(self,
+                            f'ffn{i+1}',
+                            ASPP(gcn_dims[i+1],
+                                 gcn_dims[i+1],
+                                 bias=self.bias,
+                                 dilation=[1, 3, 5],
+                                 dropout=self.dropout,
+                                 activation=self.activation,
+                                 normalization=self.normalization))
+                    continue
+                elif ffn_mode == 102:
+                    setattr(self,
+                            f'ffn{i+1}',
+                            ASPP(gcn_dims[i+1],
+                                 gcn_dims[i+1],
+                                 bias=self.bias,
+                                 dilation=[0, 1, 3, 5],
+                                 dropout=self.dropout,
+                                 activation=self.activation,
+                                 normalization=self.normalization))
+                    continue
+                elif ffn_mode == 103:
+                    setattr(self,
+                            f'ffn{i+1}',
+                            ASPP(gcn_dims[i+1],
+                                 gcn_dims[i+1],
+                                 bias=self.bias,
+                                 dilation=[0, 1, 3, 5, 7],
+                                 dropout=self.dropout,
+                                 activation=self.activation,
+                                 normalization=self.normalization))
+                    continue
+                elif ffn_mode == 1:
                     # transformer style, prenorm, residual
                     channels = [gcn_dims[i+1], gcn_dims[i+1]*4, gcn_dims[i+1]]
                     kernel_sizes = [1, 1]
