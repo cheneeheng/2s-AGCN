@@ -1795,6 +1795,46 @@ sgn_v10:
                   - dual gcn for spatial and temporal
                   - prenorm in gcn
                   - 93.25%
+        - 220511150001_spagcnprenorm_spagcnres_spagcnffn3:
+                  - 1 dilation layer + residual
+                  - prenorm in gcn
+                  - 93.37%
+        - 220511150001_spagcnprenorm_spagcnres_spagcnffn4:
+                  - 1 dilation layer + residual
+                  - prenorm in gcn
+                  - 93.40%
+        - 220511150001_spagcnres_spagcnffn4:
+                  - 1 dilation layer + 1 proj + residual
+                  - 93.99%
+        - 220511150001_spagcnres_spagcnffn5:
+                  - 1 dilation layer + residual + prenorm
+                  - 93.95%
+        - 220511150001_spagcnres_spagcnffn6:
+                  - 1 dilation layer + 1 proj + residual + prenorm
+                  - 94.07%
+        - 220511150001_spagcnres_spagcnffn7:
+                  - 1 dilation layer + residual + postnorm
+                  - 94.51%
+        - 220511150001_spagcnres_spagcnffn8:
+                  - 1 dilation layer + 1 proj + residual + postnorm
+                  - 94.36%
+        - 220511150001_spagcnres_spagcnffn9:
+                  - .25dim bottleneck
+                  - 93.86%
+        - 220511150001_spagcnres_spagcnffn101:
+                  - aspp 135 + res
+                  - 94.56%
+        - 220511150001_spagcnres_spagcnffn102:
+                  - aspp 0135 + res
+                  - 94.40%
+        - 220511150001_spagcnres_spagcnffn103:
+                  - aspp 01357 + res
+                  - 94.62%
+
+        - 220511200001_cmulti025025025025_nopooling:
+                  - 87.83%
+        - 220511200001_cmulti025025025025_notmp:
+                  - 88.89%
 
 sgn-code:
         - original sgn repo code

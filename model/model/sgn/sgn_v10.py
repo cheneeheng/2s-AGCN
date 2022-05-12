@@ -102,7 +102,7 @@ def normalization_fn(norm_type: str) -> Tuple[Type[PyTorchModule],
 class SGN(PyTorchModule):
 
     # CONSTANTS
-    ffn_mode = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 101, 102, 103]
+    ffn_mode = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 101, 102, 103, 104, 105]
     emb_modes = [0, 1, 2, 3, 4, 5, 6, 7, 8]
     c1, c2, c3, c4 = c1, c2, c3, c4
     g_activation_fn = nn.Softmax
@@ -582,7 +582,7 @@ class SGN(PyTorchModule):
             raise ValueError("too many gcn definitions")
 
         # temporal fusion post gcn
-        if self.sem_fra > 0 and self.sem_fra_fusion == 0:
+        if self.sem_fra > 0 and self.sem_fra_location == 0:
             x = x + tem1
 
         # spatial pooling
@@ -1192,7 +1192,8 @@ class GCNSpatialBlock(Module):
                                  dilation=[1, 3, 5],
                                  dropout=self.dropout,
                                  activation=self.activation,
-                                 normalization=self.normalization))
+                                 normalization=self.normalization,
+                                 residual=1))
                     continue
                 elif ffn_mode == 102:
                     setattr(self,
@@ -1203,7 +1204,8 @@ class GCNSpatialBlock(Module):
                                  dilation=[0, 1, 3, 5],
                                  dropout=self.dropout,
                                  activation=self.activation,
-                                 normalization=self.normalization))
+                                 normalization=self.normalization,
+                                 residual=1))
                     continue
                 elif ffn_mode == 103:
                     setattr(self,
@@ -1214,7 +1216,32 @@ class GCNSpatialBlock(Module):
                                  dilation=[0, 1, 3, 5, 7],
                                  dropout=self.dropout,
                                  activation=self.activation,
-                                 normalization=self.normalization))
+                                 normalization=self.normalization,
+                                 residual=1))
+                    continue
+                elif ffn_mode == 104:
+                    setattr(self,
+                            f'ffn{i+1}',
+                            ASPP(gcn_dims[i+1],
+                                 gcn_dims[i+1],
+                                 bias=self.bias,
+                                 dilation=[3, 5, 7],
+                                 dropout=self.dropout,
+                                 activation=self.activation,
+                                 normalization=self.normalization,
+                                 residual=1))
+                    continue
+                elif ffn_mode == 105:
+                    setattr(self,
+                            f'ffn{i+1}',
+                            ASPP(gcn_dims[i+1],
+                                 gcn_dims[i+1],
+                                 bias=self.bias,
+                                 dilation=[3, 7, 11],
+                                 dropout=self.dropout,
+                                 activation=self.activation,
+                                 normalization=self.normalization,
+                                 residual=1))
                     continue
                 elif ffn_mode == 1:
                     # transformer style, prenorm, residual
@@ -1534,7 +1561,7 @@ if __name__ == '__main__':
                 gcn_spa_dropout=0.0,
                 gcn_spa_gcn_residual=[0, 0, 0],
                 gcn_spa_dims=[64, 128, 256],
-                gcn_spa_ffn=9,
+                gcn_spa_ffn=104,
                 gcn_spa_prenorm=False,
                 gcn_tem=0,
                 # gcn_tem_dims=[c2*25, c3*25, c3*25],

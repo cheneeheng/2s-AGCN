@@ -179,7 +179,8 @@ class ASPP(Module):
                  bias: int = 0,
                  dropout: Type[PyTorchModule] = nn.Dropout2d,
                  activation: Type[PyTorchModule] = nn.ReLU,
-                 normalization: Type[PyTorchModule] = nn.BatchNorm2d):
+                 normalization: Type[PyTorchModule] = nn.BatchNorm2d,
+                 residual: int = 0):
         super(ASPP, self).__init__(in_channels,
                                    out_channels,
                                    kernel_size=kernel_size,
@@ -226,7 +227,9 @@ class ASPP(Module):
             normalization=lambda: self.normalization(self.out_channels),
             dropout=dropout
         )
-        if self.in_channels == self.out_channels:
+        if residual == 0:
+            self.res = lambda x: 0
+        elif self.in_channels == self.out_channels:
             self.res = nn.Identity()
         else:
             self.res = Conv(self.in_channels,
