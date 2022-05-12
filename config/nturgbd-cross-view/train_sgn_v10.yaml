@@ -1,4 +1,4 @@
-work_dir: ./data/data/ntu_result/xview/sgn/sgn_v10/220511150001_spagcnres_spagcnffn6
+work_dir: ./data/data/ntu_result/xview/sgn/sgn_v10/220512100001_spagcnresffn1_
 
 phase: train
 save_score: True
@@ -81,7 +81,8 @@ model_args:
   gcn_spa_dropout: 0.0
   gcn_spa_gcn_residual: [1, 1, 1]
   gcn_spa_dims: [128, 256, 256]
-  gcn_spa_ffn: 6
+  gcn_spa_ffn: 1
+  gcn_spa_ffn_prenorm: False
   gcn_spa_prenorm: False
   # gcn_tem_g_kernel: 1
   # gcn_tem_g_proj_shared: False
@@ -91,6 +92,7 @@ model_args:
   # gcn_tem_gcn_residual: [0, 0, 0]
   # gcn_tem_dims: [128, 256, 256]
   # gcn_tem_ffn: 0
+  # gcn_tem_ffn_prenorm: False
   # gcn_tem_prenorm: False
   # t_g_kernel: 1
   # t_g_proj_shared: False
