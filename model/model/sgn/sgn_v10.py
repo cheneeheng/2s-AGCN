@@ -1168,10 +1168,7 @@ class GCNSpatialBlock(Module):
                                                             bias=self.bias))
                 else:
                     raise ValueError("Unknown residual modes...")
-            if gcn_dims[0] == gcn_dims[-1]:
-                self.res = nn.Identity()
-            else:
-                self.res = Conv(gcn_dims[0], gcn_dims[-1], bias=self.bias)
+            self.res = null_fn
 
         elif isinstance(gcn_residual, int):
             if gcn_residual == 1:
@@ -1226,7 +1223,7 @@ class GCNSpatialBlock(Module):
                     # bottleneck 1x3, postnorm
                     channels = [gcn_dims[i+1], gcn_dims[i+1]//4, gcn_dims[i+1]]
                     kernel_sizes = [3, 3]
-                    paddings = [0, 0]
+                    paddings = [1, 1]
                     dilations = [1, 1]
                     biases = [self.bias, self.bias]
                     residuals = [0, 0]
@@ -1449,7 +1446,7 @@ if __name__ == '__main__':
                 gcn_spa_dims=[128, 256, 256],
                 gcn_spa_prenorm=False,
                 gcn_spa_ffn_prenorm=False,
-                gcn_spa_ffn=3,
+                gcn_spa_ffn=2,
                 # gcn_tem=0,
                 # gcn_tem_dims=[c2*25, c3*25, c3*25],
                 # t_mode=1,
