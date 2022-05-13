@@ -101,7 +101,7 @@ def normalization_fn(norm_type: str) -> Tuple[Type[PyTorchModule],
 class SGN(PyTorchModule):
 
     # CONSTANTS
-    ffn_mode = [0, 1, 2, 3, 101, 102, 103, 104, 201]
+    ffn_mode = [0, 1, 2, 3, 101, 102, 103, 104, 201, 202]
     emb_modes = [0, 1, 2, 3, 4, 5, 6, 7, 8]
     c1, c2, c3, c4 = c1, c2, c3, c4
     g_activation_fn = nn.Softmax
@@ -1225,6 +1225,47 @@ class GCNSpatialBlock(Module):
                 else:
                     raise ValueError("Unknown residual modes...")
 
+        elif ffn_mode == 202:
+            self.ffn_smp = nn.AdaptiveMaxPool2d((segments, 1))
+            
+            _g_proj_dim = [512, 512, 512]
+            for i in range(self.num_blocks):
+                setattr(self, f'ffn_gcn_g{i+1}',
+                        GCNSpatialG(gcn_dims[i+1],
+                                    _g_proj_dim[i],
+                                    bias=self.bias,
+                                    kernel_size=g_kernel,
+                                    padding=g_kernel//2,
+                                    activation=g_activation,
+                                    normalization=self.normalization,
+                                    g_proj_shared=g_proj_shared))
+                setattr(self,
+                        f'ffn_gcn{i+1}',
+                        GCNSpatialUnit(gcn_dims[i+1],
+                                       gcn_dims[i+1],
+                                       bias=self.bias,
+                                       kernel_size=self.kernel_size,
+                                       padding=self.padding,
+                                       dropout=self.dropout,
+                                       activation=self.activation,
+                                       normalization=self.normalization,
+                                       prenorm=gcn_prenorm))
+
+            if gcn_prenorm:
+                for i in range(self.num_blocks):
+                    setattr(self,
+                            f'ffn_gcn_prenorm{i+1}',
+                            self.normalization(gcn_dims[i]))
+
+            assert len(gcn_residual) == self.num_blocks
+            for i, r in enumerate(gcn_residual):
+                if r == 0:
+                    setattr(self, f'ffn_gcn_res{i+1}', null_fn)
+                elif r == 1:
+                    setattr(self, f'ffn_gcn_res{i+1}', nn.Identity())
+                else:
+                    raise ValueError("Unknown residual modes...")
+
         elif ffn_mode > 100:
             for i in range(self.num_blocks):
                 if ffn_mode == 101:
@@ -1324,14 +1365,17 @@ class GCNSpatialBlock(Module):
             x = getattr(self, f'gcn{i+1}')(x1, g1) + \
                 getattr(self, f'gcn_res{i+1}')(x)
 
-            if self.ffn_mode == 201:
+            if self.ffn_mode in [201, 202]:
                 x = x.transpose(-1, -2)  # nctv
                 if hasattr(self, f'ffn_gcn_prenorm{i+1}'):
                     x1 = getattr(self, f'ffn_gcn_prenorm{i+1}')(x)
                 else:
                     x1 = x
                 x2 = self.ffn_smp(x1)  # nc1t
-                if (self.g_shared and len(ffn_g) == 0) or not self.g_shared:
+                if self.ffn_mode == 201 and len(ffn_g) == 0:
+                    ffn_g1 = getattr(self, f'ffn_gcn_g{i+1}')(x2)
+                    ffn_g.append(ffn_g1)
+                elif self.ffn_mode == 202:
                     ffn_g1 = getattr(self, f'ffn_gcn_g{i+1}')(x2)
                     ffn_g.append(ffn_g1)
                 x = getattr(self, f'ffn_gcn{i+1}')(x1, ffn_g1) + \
@@ -1513,7 +1557,7 @@ if __name__ == '__main__':
                 gcn_spa_dims=[128, 256, 256],
                 gcn_spa_prenorm=False,
                 gcn_spa_ffn_prenorm=False,
-                gcn_spa_ffn=201,
+                gcn_spa_ffn=202,
                 # gcn_tem=0,
                 # gcn_tem_dims=[c2*25, c3*25, c3*25],
                 # t_mode=1,
