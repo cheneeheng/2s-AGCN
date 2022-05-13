@@ -1836,6 +1836,31 @@ sgn_v10:
                   - 220511200001_cmulti025025025025_notmp:
                             - 88.89%
 
+        - 220512100001_spagcnresffn1_prenorm:
+                  - ffn transformer style
+                  - 93.68%
+        - 220512100001_spagcnresffn1:
+                  - ffn transformer style
+                  - 93.36%
+        - 220512100001_spagcnresffn2:
+                  - ffn bottleneck
+                  - 94.32%
+        - 220512100001_spagcnresffn3:
+                  - ffn dilation
+                  - 94.25%
+        - 220512100001_spagcnresffn101:
+                  - ffn aspp 013
+                  - 94.12%
+        - 220512100001_spagcnresffn102:
+                  - ffn aspp 135
+                  - 94.43%
+        - 220512100001_spagcnresffn103:
+                  - ffn aspp 357
+                  - 93.81%
+        - 220512100001_spagcnresffn104:
+                  - ffn aspp 5711
+                  - 93.80%
+
 sgn-code:
         - original sgn repo code
         - 220324170001:

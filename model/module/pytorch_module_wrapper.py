@@ -236,10 +236,7 @@ class ASPP(Module):
                             self.out_channels,
                             bias=self.bias)
 
-    def forward(self,
-                x: torch.Tensor,
-                x_n: Optional[torch.Tensor] = None
-                ) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: n,c,v,t
         res = []
         for _, block in self.aspp.items():

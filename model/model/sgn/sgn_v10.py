@@ -101,7 +101,7 @@ def normalization_fn(norm_type: str) -> Tuple[Type[PyTorchModule],
 class SGN(PyTorchModule):
 
     # CONSTANTS
-    ffn_mode = [0, 1, 2, 3, 101, 102, 103, 104]
+    ffn_mode = [0, 1, 2, 3, 101, 102, 103, 104, 201]
     emb_modes = [0, 1, 2, 3, 4, 5, 6, 7, 8]
     c1, c2, c3, c4 = c1, c2, c3, c4
     g_activation_fn = nn.Softmax
@@ -1104,7 +1104,8 @@ class GCNSpatialBlock(Module):
                  g_activation: T1 = nn.Softmax,
                  ffn_mode: int = 0,
                  ffn_prenorm: int = 0,
-                 return_g: bool = True
+                 return_g: bool = True,
+                 segments: int = 20,
                  ):
         super(GCNSpatialBlock, self).__init__(*args,
                                               kernel_size=kernel_size,
@@ -1113,6 +1114,7 @@ class GCNSpatialBlock(Module):
                                               dropout=dropout,
                                               activation=activation,
                                               normalization=normalization)
+        self.ffn_mode = ffn_mode
         self.return_g = return_g
         self.num_blocks = len(gcn_dims) - 1
         self.g_shared = isinstance(g_proj_dim, int)
@@ -1171,7 +1173,9 @@ class GCNSpatialBlock(Module):
             self.res = null_fn
 
         elif isinstance(gcn_residual, int):
-            if gcn_residual == 1:
+            if gcn_residual == 0:
+                self.res = null_fn
+            elif gcn_residual == 1:
                 if gcn_dims[0] == gcn_dims[-1]:
                     self.res = nn.Identity()
                 else:
@@ -1182,7 +1186,46 @@ class GCNSpatialBlock(Module):
         else:
             raise ValueError("Unknown residual modes...")
 
-        if ffn_mode > 100:
+        if ffn_mode == 201:
+            self.ffn_smp = nn.AdaptiveMaxPool2d((segments, 1))
+            self.ffn_gcn_g1 = GCNSpatialG(gcn_dims[1],
+                                          g_proj_dim,
+                                          bias=self.bias,
+                                          kernel_size=g_kernel,
+                                          padding=g_kernel//2,
+                                          activation=g_activation,
+                                          normalization=self.normalization,
+                                          g_proj_shared=g_proj_shared)
+
+            for i in range(self.num_blocks):
+                setattr(self,
+                        f'ffn_gcn{i+1}',
+                        GCNSpatialUnit(gcn_dims[i+1],
+                                       gcn_dims[i+1],
+                                       bias=self.bias,
+                                       kernel_size=self.kernel_size,
+                                       padding=self.padding,
+                                       dropout=self.dropout,
+                                       activation=self.activation,
+                                       normalization=self.normalization,
+                                       prenorm=gcn_prenorm))
+
+            if gcn_prenorm:
+                for i in range(self.num_blocks):
+                    setattr(self,
+                            f'ffn_gcn_prenorm{i+1}',
+                            self.normalization(gcn_dims[i]))
+
+            assert len(gcn_residual) == self.num_blocks
+            for i, r in enumerate(gcn_residual):
+                if r == 0:
+                    setattr(self, f'ffn_gcn_res{i+1}', null_fn)
+                elif r == 1:
+                    setattr(self, f'ffn_gcn_res{i+1}', nn.Identity())
+                else:
+                    raise ValueError("Unknown residual modes...")
+
+        elif ffn_mode > 100:
             for i in range(self.num_blocks):
                 if ffn_mode == 101:
                     dilation = [0, 1, 3]
@@ -1269,6 +1312,7 @@ class GCNSpatialBlock(Module):
     def forward(self, x: Tensor) -> Tensor:
         x0 = x
         g = []
+        ffn_g = []
         for i in range(self.num_blocks):
             if hasattr(self, f'gcn_prenorm{i+1}'):
                 x1 = getattr(self, f'gcn_prenorm{i+1}')(x)
@@ -1279,14 +1323,37 @@ class GCNSpatialBlock(Module):
                 g.append(g1)
             x = getattr(self, f'gcn{i+1}')(x1, g1) + \
                 getattr(self, f'gcn_res{i+1}')(x)
-            if hasattr(self, f'ffn_prenorm{i+1}'):
-                x1 = getattr(self, f'ffn_prenorm{i+1}')(x)
+
+            if self.ffn_mode == 201:
+                if hasattr(self, f'ffn_gcn_prenorm{i+1}'):
+                    x1 = getattr(self, f'ffn_gcn_prenorm{i+1}')(x)
+                else:
+                    x1 = x
+                x1 = x1.transpose(-1, -2)  # nct1
+                x2 = self.ffn_smp(x1)  # nc1t
+                if (self.g_shared and len(ffn_g) == 0) or not self.g_shared:
+                    ffn_g1 = getattr(self, f'ffn_gcn_g{i+1}')(x2)
+                    ffn_g.append(ffn_g1)
+                x = getattr(self, f'ffn_gcn{i+1}')(x1, ffn_g1) + \
+                    getattr(self, f'ffn_gcn_res{i+1}')(x)
+                x = x.transpose(-1, -2)  # nct1
+
             else:
-                x1 = x
-            x = getattr(self, f'ffn{i+1}')(x1, x)
+                if hasattr(self, f'ffn_prenorm{i+1}'):
+                    x1 = getattr(self, f'ffn_prenorm{i+1}')(x)
+                else:
+                    x1 = x
+                try:
+                    x = getattr(self, f'ffn{i+1}')(x1, x)
+                except TypeError:
+                    x = getattr(self, f'ffn{i+1}')(x1)
+                except Exception:
+                    raise ValueError("Missing ffn init or wrong inputs.")
+
         x += self.res(x0)
+
         if self.return_g:
-            return x, g
+            return x, g+ffn_g
         else:
             return x
 
@@ -1446,7 +1513,7 @@ if __name__ == '__main__':
                 gcn_spa_dims=[128, 256, 256],
                 gcn_spa_prenorm=False,
                 gcn_spa_ffn_prenorm=False,
-                gcn_spa_ffn=2,
+                gcn_spa_ffn=201,
                 # gcn_tem=0,
                 # gcn_tem_dims=[c2*25, c3*25, c3*25],
                 # t_mode=1,
