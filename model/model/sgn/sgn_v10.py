@@ -1325,11 +1325,11 @@ class GCNSpatialBlock(Module):
                 getattr(self, f'gcn_res{i+1}')(x)
 
             if self.ffn_mode == 201:
+                x = x.transpose(-1, -2)  # nctv
                 if hasattr(self, f'ffn_gcn_prenorm{i+1}'):
                     x1 = getattr(self, f'ffn_gcn_prenorm{i+1}')(x)
                 else:
                     x1 = x
-                x1 = x1.transpose(-1, -2)  # nct1
                 x2 = self.ffn_smp(x1)  # nc1t
                 if (self.g_shared and len(ffn_g) == 0) or not self.g_shared:
                     ffn_g1 = getattr(self, f'ffn_gcn_g{i+1}')(x2)
