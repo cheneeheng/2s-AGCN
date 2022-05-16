@@ -241,32 +241,33 @@ class NTUDataLoaders(object):
             intervals = intervals[:-1]
 
         # sampling that focuses on center of seq.
-        # we assume that frames from 2 actors are equally sampled
-        # since they are intertwined => [0,1,0,1,0,1,0,1,0,1,0,1]
+        # - sampling based on minimum value w.r.t. the average range.
+        # - we assume that frames from 2 actors are equally sampled
+        #   since they are intertwined => [0,1,0,1,0,1,0,1,0,1,0,1]
         elif self.center_sampler > 0:
-            offset = skeleton_seq.shape[0] // self.seg
-            offset = (offset / self.center_sampler) - (self.seg // 4)
+            avg_range = skeleton_seq.shape[0] / self.seg
+            min_range = avg_range * self.center_sampler
+            slope = 2*(avg_range - min_range) / ((self.seg / 2) - 1)
             intervals = np.cumsum(
-                np.multiply(
-                    [0] + [i + offset
+                np.array(
+                    [0] + [i * slope + min_range
                            for j in [reversed(range(self.seg//2)),
                                      range(self.seg//2)]
-                           for i in j],
-                    self.center_sampler
+                           for i in j]
                 )
             ).astype(int)
             intervals_range = intervals[1:] - intervals[:-1]
-
             assert 0 not in intervals_range, \
                 f"0 in intervals_range for center_sampler = {self.center_sampler}"  # noqa
-
             random_intervals_range_fn = partial(np.random.randint,
                                                 low=0,
                                                 high=intervals_range)
             intervals = intervals[:-1]
+            assert len(intervals) == self.seg
 
         # equal interval sampling
         else:
+            # TODO: this floors the value and will cause data to be dropped.
             avg_range = skeleton_seq.shape[0] // self.seg
             intervals = np.multiply(list(range(self.seg)), avg_range)
             random_intervals_range_fn = partial(np.random.randint,
