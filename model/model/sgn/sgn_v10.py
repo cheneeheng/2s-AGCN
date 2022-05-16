@@ -1376,8 +1376,10 @@ class GCNSpatialBlock(Module):
                 g1 = g1.permute(0, 3, 2, 1).contiguous()
                 g1 = getattr(self, f'gcn_maxpool{i+1}')(g1)
                 g1 = g1.permute(0, 3, 2, 1).contiguous()
-            x = getattr(self, f'gcn{i+1}')(x1, g1) + \
-                getattr(self, f'gcn_res{i+1}')(x)
+            r = getattr(self, f'gcn_res{i+1}')(x)
+            if hasattr(self, f'gcn_maxpool{i+1}'):
+                r = getattr(self, f'gcn_maxpool{i+1}')(r)
+            x = getattr(self, f'gcn{i+1}')(x1, g1) + r
 
             if self.ffn_mode in [201, 202]:
                 x1 = x.transpose(-1, -2)  # nctv
@@ -1567,7 +1569,7 @@ if __name__ == '__main__':
                 gcn_spa_g_proj_dim=256,
                 gcn_spa_t_kernel=1,
                 gcn_spa_dropout=0.0,
-                gcn_spa_gcn_residual=[0, 0, 0],
+                gcn_spa_gcn_residual=[1, 1, 1],
                 gcn_spa_dims=[128, 256, 256],
                 gcn_spa_prenorm=False,
                 gcn_spa_ffn_prenorm=False,
