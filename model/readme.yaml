@@ -1869,6 +1869,10 @@ sgn_v10:
         - 220512100001_spagcnresffn201res:
                   - second gcn for ffn after spatial
                   - 93.08%
+        - 220512100001_spagcnresffn202res:
+                  - second gcn for ffn after spatial with no shared g
+                  - 93.39%
+
 
 sgn-code:
         - original sgn repo code

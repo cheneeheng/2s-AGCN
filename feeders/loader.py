@@ -37,6 +37,7 @@ class NTUDataLoaders(object):
                  multi_test: int = 5,
                  motion_sampler: int = 0,
                  motion_norm: int = 0,
+                 center_sampler: float = 0.0,
                  **kwargs):
         self.dataset = dataset
         self.aug = aug
@@ -45,6 +46,7 @@ class NTUDataLoaders(object):
         self.multi_test = multi_test
         self.motion_sampler = motion_sampler
         self.motion_norm = motion_norm
+        self.center_sampler = center_sampler
 
     def get_train_loader(self, batch_size: int, num_workers: int):
         if self.aug == 0:
@@ -233,6 +235,31 @@ class NTUDataLoaders(object):
         if self.motion_sampler == 1:
             intervals, _ = tools.split_idx_using_auc(skeleton_seq, self.seg)
             intervals_range = intervals[1:] - intervals[:-1]
+            random_intervals_range_fn = partial(np.random.randint,
+                                                low=0,
+                                                high=intervals_range)
+            intervals = intervals[:-1]
+
+        # sampling that focuses on center of seq.
+        # we assume that frames from 2 actors are equally sampled
+        # since they are intertwined => [0,1,0,1,0,1,0,1,0,1,0,1]
+        elif self.center_sampler > 0:
+            offset = skeleton_seq.shape[0] // self.seg
+            offset = (offset / self.center_sampler) - (self.seg // 4)
+            intervals = np.cumsum(
+                np.multiply(
+                    [0] + [i + offset
+                           for j in [reversed(range(self.seg//2)),
+                                     range(self.seg//2)]
+                           for i in j],
+                    self.center_sampler
+                )
+            ).astype(int)
+            intervals_range = intervals[1:] - intervals[:-1]
+
+            assert 0 not in intervals_range, \
+                f"0 in intervals_range for center_sampler = {self.center_sampler}"  # noqa
+
             random_intervals_range_fn = partial(np.random.randint,
                                                 low=0,
                                                 high=intervals_range)
