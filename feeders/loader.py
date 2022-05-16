@@ -246,7 +246,7 @@ class NTUDataLoaders(object):
         #   since they are intertwined => [0,1,0,1,0,1,0,1,0,1,0,1]
         elif self.center_sampler > 0:
             avg_range = skeleton_seq.shape[0] / self.seg
-            min_range = avg_range * self.center_sampler
+            min_range = max(avg_range * self.center_sampler, 1.0)
             slope = 2*(avg_range - min_range) / ((self.seg / 2) - 1)
             intervals = np.cumsum(
                 np.array(

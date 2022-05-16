@@ -143,6 +143,7 @@ class SGN(PyTorchModule):
                  gcn_spa_dims: Optional[list] = None,  # [c2, c3, c3],
                  gcn_spa_ffn: int = 1,
                  gcn_spa_ffn_prenorm: bool = False,
+                 gcn_spa_maxpool: List[int] = [0, 2, 2],
 
                  gcn_tem_g_kernel: int = 1,
                  gcn_tem_g_proj_shared: bool = False,
@@ -253,6 +254,7 @@ class SGN(PyTorchModule):
             g_proj_shared=gcn_spa_g_proj_shared,
             ffn_mode=gcn_spa_ffn,
             ffn_prenorm=gcn_spa_ffn_prenorm,
+            gcn_maxpool=gcn_spa_maxpool
         )
         assert gcn_spa_ffn in self.ffn_mode
 
@@ -370,7 +372,7 @@ class SGN(PyTorchModule):
                 mode=self.sem_pos
             ),
             tem_embed_kwargs=dict(
-                in_channels=self.num_segment,
+                in_channels=self.num_segment//sum(gcn_spa_maxpool),
                 out_channels=out_channels,
                 bias=self.bias,
                 dropout=self.dropout_fn,
@@ -1055,7 +1057,7 @@ class GCNSpatialUnit(Module):
                  dropout: Optional[Type[PyTorchModule]] = None,
                  activation: T1 = nn.ReLU,
                  normalization: T1 = nn.BatchNorm2d,
-                 prenorm: bool = False
+                 prenorm: bool = False,
                  ):
         super(GCNSpatialUnit, self).__init__(in_channels,
                                              out_channels,
@@ -1098,6 +1100,7 @@ class GCNSpatialBlock(Module):
                  gcn_dims: List[int] = [128, 256, 256],
                  gcn_residual: T3 = [0, 0, 0],
                  gcn_prenorm: bool = False,
+                 gcn_maxpool: List[int] = [0, 2, 2],
                  g_proj_dim: T3 = 256,
                  g_kernel: int = 1,
                  g_proj_shared: bool = False,
@@ -1155,6 +1158,15 @@ class GCNSpatialBlock(Module):
             for i in range(self.num_blocks):
                 setattr(self, f'gcn_prenorm{i+1}',
                         self.normalization(gcn_dims[i]))
+
+        if gcn_maxpool:
+            for i in range(self.num_blocks):
+                if gcn_maxpool[i] > 1:
+                    setattr(self, f'gcn_maxpool{i+1}',
+                            nn.MaxPool2d((1, gcn_maxpool[i])))
+                else:
+                    setattr(self, f'gcn_maxpool{i+1}',
+                            nn.Identity())
 
         if isinstance(gcn_residual, list):
             assert len(gcn_residual) == self.num_blocks
@@ -1227,7 +1239,7 @@ class GCNSpatialBlock(Module):
 
         elif ffn_mode == 202:
             self.ffn_smp = nn.AdaptiveMaxPool2d((segments, 1))
-            
+
             _g_proj_dim = [512, 512, 512]
             for i in range(self.num_blocks):
                 setattr(self, f'ffn_gcn_g{i+1}',
@@ -1346,31 +1358,31 @@ class GCNSpatialBlock(Module):
                 if ffn_prenorm:
                     setattr(self, f'ffn_prenorm{i+1}',
                             self.normalization(channels[0]))
-        else:
-            for i in range(self.num_blocks):
-                setattr(self, f'ffn{i+1}', Identity())
 
     def forward(self, x: Tensor) -> Tensor:
         x0 = x
         g = []
         ffn_g = []
         for i in range(self.num_blocks):
+            x1 = x
+            if hasattr(self, f'gcn_maxpool{i+1}'):
+                x1 = getattr(self, f'gcn_maxpool{i+1}')(x1)
             if hasattr(self, f'gcn_prenorm{i+1}'):
-                x1 = getattr(self, f'gcn_prenorm{i+1}')(x)
-            else:
-                x1 = x
+                x1 = getattr(self, f'gcn_prenorm{i+1}')(x1)
             if (self.g_shared and len(g) == 0) or not self.g_shared:
                 g1 = getattr(self, f'gcn_g{i+1}')(x1)
                 g.append(g1)
+            if hasattr(self, f'gcn_maxpool{i+1}'):
+                g1 = g1.permute(0, 3, 2, 1).contiguous()
+                g1 = getattr(self, f'gcn_maxpool{i+1}')(g1)
+                g1 = g1.permute(0, 3, 2, 1).contiguous()
             x = getattr(self, f'gcn{i+1}')(x1, g1) + \
                 getattr(self, f'gcn_res{i+1}')(x)
 
             if self.ffn_mode in [201, 202]:
-                x = x.transpose(-1, -2)  # nctv
+                x1 = x.transpose(-1, -2)  # nctv
                 if hasattr(self, f'ffn_gcn_prenorm{i+1}'):
-                    x1 = getattr(self, f'ffn_gcn_prenorm{i+1}')(x)
-                else:
-                    x1 = x
+                    x1 = getattr(self, f'ffn_gcn_prenorm{i+1}')(x1)
                 x2 = self.ffn_smp(x1)  # nc1t
                 if self.ffn_mode == 201 and len(ffn_g) == 0:
                     ffn_g1 = getattr(self, f'ffn_gcn_g{i+1}')(x2)
@@ -1383,16 +1395,16 @@ class GCNSpatialBlock(Module):
                 x = x.transpose(-1, -2)  # nct1
 
             else:
+                x1 = x
                 if hasattr(self, f'ffn_prenorm{i+1}'):
-                    x1 = getattr(self, f'ffn_prenorm{i+1}')(x)
-                else:
-                    x1 = x
-                try:
-                    x = getattr(self, f'ffn{i+1}')(x1, x)
-                except TypeError:
-                    x = getattr(self, f'ffn{i+1}')(x1)
-                except Exception:
-                    raise ValueError("Missing ffn init or wrong inputs.")
+                    x1 = getattr(self, f'ffn_prenorm{i+1}')(x1)
+                if hasattr(self, f'ffn{i+1}'):
+                    try:
+                        x = getattr(self, f'ffn{i+1}')(x1, x)
+                    except TypeError:
+                        x = getattr(self, f'ffn{i+1}')(x1)
+                    except Exception:
+                        raise ValueError("Missing ffn init or wrong inputs.")
 
         x += self.res(x0)
 
@@ -1515,11 +1527,13 @@ class SemanticEmbedding(PyTorchModule):
         self.sem_fra = sem_fra
         # Joint Embedding
         if self.sem_pos > 0:
-            self.spa = OneHotTensor(self.num_point, self.num_segment, mode=0)
+            self.spa = OneHotTensor(spa_embed_kwargs['in_channels'],
+                                    self.num_segment, mode=0)
             self.spa_embed = Embedding(**spa_embed_kwargs)
         # Frame Embedding
         if self.sem_fra > 0:
-            self.tem = OneHotTensor(self.num_segment, self.num_point, mode=1)
+            self.tem = OneHotTensor(tem_embed_kwargs['in_channels'],
+                                    self.num_point, mode=1)
             self.tem_embed = Embedding(**tem_embed_kwargs)
 
     def forward(self, x: Tensor) -> Tuple[Optional[Tensor], Optional[Tensor]]:
@@ -1535,10 +1549,10 @@ if __name__ == '__main__':
 
     batch_size = 64
 
-    inputs = torch.ones(batch_size, 20, 75)
-    subjects = torch.ones(batch_size, 20, 1)
+    inputs = torch.ones(batch_size, 40, 75)
+    # subjects = torch.ones(batch_size, 40, 1)
 
-    model = SGN(num_segment=20,
+    model = SGN(num_segment=40,
                 # c_multiplier=[0.25, 0.25, 0.25, 0.25],
                 # gcn_spa_dims=[c2*0.25, c3*0.25, c3*0.25],
                 # sem_pos_fusion=1,
@@ -1557,7 +1571,7 @@ if __name__ == '__main__':
                 gcn_spa_dims=[128, 256, 256],
                 gcn_spa_prenorm=False,
                 gcn_spa_ffn_prenorm=False,
-                gcn_spa_ffn=202,
+                gcn_spa_ffn=0,
                 # gcn_tem=0,
                 # gcn_tem_dims=[c2*25, c3*25, c3*25],
                 # t_mode=1,
