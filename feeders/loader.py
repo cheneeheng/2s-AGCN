@@ -231,10 +231,16 @@ class NTUDataLoaders(object):
                            subject_seqs: list,
                            sampling_frequency: int = 1) -> Tuple[list, list]:
 
+        def intervals_check(intervals: np.ndarray) -> np.ndarray:
+            intervals_range = intervals[1:] - intervals[:-1]
+            if 0 in intervals_range:
+                raise ValueError("0 in intervals_range")
+
         # sampling based on ~equal motion using AUC.
         if self.motion_sampler == 1:
             intervals, _ = tools.split_idx_using_auc(skeleton_seq, self.seg)
-            # intervals_check(intervals)
+            intervals = intervals.round().astype(int)
+            intervals_check(intervals)
             random_intervals_range_fn = partial(np.random.randint,
                                                 low=intervals[:-1],
                                                 high=intervals[1:])
@@ -254,8 +260,9 @@ class NTUDataLoaders(object):
                                      range(self.seg//2)]
                            for i in j]
                 )
-            ).round().astype(int)
-            # intervals_check(intervals)
+            )
+            intervals = intervals.round().astype(int)
+            intervals_check(intervals)
             random_intervals_range_fn = partial(np.random.randint,
                                                 low=intervals[:-1],
                                                 high=intervals[1:])
@@ -264,21 +271,15 @@ class NTUDataLoaders(object):
         else:
             avg_range = skeleton_seq.shape[0] / self.seg
             intervals = np.multiply(list(range(self.seg + 1)), avg_range)
-            # intervals_check(intervals)
+            intervals = intervals.round().astype(int)
+            intervals_check(intervals)
             random_intervals_range_fn = partial(np.random.randint,
                                                 low=intervals[:-1],
                                                 high=intervals[1:])
 
-        def get_valid_intervals():
-            while True:
-                intervals = random_intervals_range_fn()
-                if 0 not in intervals[1:] - intervals[:-1]:
-                    break
-            return intervals
-
         assert sampling_frequency >= 1
         for _ in range(sampling_frequency):
-            idxs = get_valid_intervals()
+            idxs = random_intervals_range_fn()
             assert len(idxs) == self.seg, f"{len(idxs)} =/= {self.seg}"
             ske = skeleton_seq[idxs]
             if self.motion_norm == 1:
