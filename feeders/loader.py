@@ -255,7 +255,7 @@ class NTUDataLoaders(object):
                                      range(self.seg//2)]
                            for i in j]
                 )
-            ).astype(int)
+            ).round().astype(int)
             intervals_range = intervals[1:] - intervals[:-1]
             assert 0 not in intervals_range, \
                 f"0 in intervals_range for center_sampler = {self.center_sampler}"  # noqa

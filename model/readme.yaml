@@ -1873,6 +1873,49 @@ sgn_v10:
                   - second gcn for ffn after spatial with no shared g
                   - 93.39%
 
+        - 220516140001_centersampler01:
+                  - v shaped segmentation of input data
+                  - 93.19%
+        - 220516140001_centersampler05:
+                  - v shaped segmentation of input data
+                  - 93.62%
+        - 220516140001_centersampler06:
+                  - v shaped segmentation of input data
+                  - 93.68%
+        - 220516140001_centersampler07:
+                  - v shaped segmentation of input data
+                  - 93.63%
+        - 220516140001_centersampler08:
+                  - v shaped segmentation of input data
+                  - 93.82%
+        - 220516140001_centersampler09:
+                  - v shaped segmentation of input data
+                  - 93.60%
+        - 220516140001_centersampler10:
+                  - v shaped segmentation of input data
+                  - 93.85%
+
+        - 220516140001_gcnmaxpool022:
+                  - gradual maxpool prior to each gcn unit
+                  - 90.22%
+        - 220516140001_gcnmaxpool022_seg32:
+                  - gradual maxpool prior to each gcn unit
+                  - 90.80%
+        - 220516140001_gcnmaxpool022_seg40:
+                  - gradual maxpool prior to each gcn unit
+                  - 90.42%
+        - 220516140001_gcnmaxpool022_seg40_res111:
+                  - gradual maxpool prior to each gcn unit + residual
+                  - 91.77%
+        - 220516140001_gcnmaxpool022_seg48:
+                  - gradual maxpool prior to each gcn unit
+                  - 90.04%
+        - 220516140001_gcnmaxpool022_seg64:
+                  - gradual maxpool prior to each gcn unit
+                  - 90.23%
+        - 220516140001_gcnmaxpool022_seg80:
+                  - gradual maxpool prior to each gcn unit
+                  - 90.05%
 
 sgn-code:
         - original sgn repo code
