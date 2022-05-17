@@ -238,10 +238,10 @@ class NTUDataLoaders(object):
         # sampling based on ~equal motion using AUC.
         if self.motion_sampler == 1:
             intervals, _ = tools.split_idx_using_auc(skeleton_seq, self.seg)
+            intervals = intervals_check(intervals)
             random_intervals_range_fn = partial(np.random.randint,
                                                 low=intervals[:-1],
-                                                high=intervals[1:])
-            intervals_check(intervals)
+                                                high=intervals[1:]+1)
 
         # sampling that focuses on center of seq.
         # - sampling based on minimum value w.r.t. the average range.
@@ -259,19 +259,19 @@ class NTUDataLoaders(object):
                            for i in j]
                 )
             ).round().astype(int)
+            intervals = intervals_check(intervals)
             random_intervals_range_fn = partial(np.random.randint,
                                                 low=intervals[:-1],
-                                                high=intervals[1:])
-            intervals_check(intervals)
+                                                high=intervals[1:]+1)
 
         # equal interval sampling
         else:
             avg_range = skeleton_seq.shape[0] / self.seg
             intervals = np.multiply(list(range(self.seg + 1)), avg_range)
+            intervals = intervals_check(intervals)
             random_intervals_range_fn = partial(np.random.randint,
                                                 low=intervals[:-1],
-                                                high=intervals[1:])
-            intervals_check(intervals)
+                                                high=intervals[1:]+1)
 
         assert sampling_frequency >= 1
         for _ in range(sampling_frequency):
