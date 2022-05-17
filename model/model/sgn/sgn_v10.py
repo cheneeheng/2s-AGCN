@@ -372,7 +372,7 @@ class SGN(PyTorchModule):
                 mode=self.sem_pos
             ),
             tem_embed_kwargs=dict(
-                in_channels=self.num_segment//sum(gcn_spa_maxpool),
+                in_channels=self.num_segment//max(sum(gcn_spa_maxpool), 1),
                 out_channels=out_channels,
                 bias=self.bias,
                 dropout=self.dropout_fn,
