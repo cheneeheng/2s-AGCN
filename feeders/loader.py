@@ -231,14 +231,17 @@ class NTUDataLoaders(object):
                            subject_seqs: list,
                            sampling_frequency: int = 1) -> Tuple[list, list]:
 
+        def intervals_check(intervals):
+            intervals_range = intervals[1:] - intervals[:-1]
+            assert 0 not in intervals_range, f"0 in intervals_range"  # noqa
+
         # sampling based on ~equal motion using AUC.
         if self.motion_sampler == 1:
             intervals, _ = tools.split_idx_using_auc(skeleton_seq, self.seg)
-            intervals_range = intervals[1:] - intervals[:-1]
             random_intervals_range_fn = partial(np.random.randint,
-                                                low=0,
-                                                high=intervals_range)
-            intervals = intervals[:-1]
+                                                low=intervals[:-1],
+                                                high=intervals[1:])
+            intervals_check(intervals)
 
         # sampling that focuses on center of seq.
         # - sampling based on minimum value w.r.t. the average range.
@@ -256,27 +259,23 @@ class NTUDataLoaders(object):
                            for i in j]
                 )
             ).round().astype(int)
-            intervals_range = intervals[1:] - intervals[:-1]
-            assert 0 not in intervals_range, \
-                f"0 in intervals_range for center_sampler = {self.center_sampler}"  # noqa
             random_intervals_range_fn = partial(np.random.randint,
-                                                low=0,
-                                                high=intervals_range)
-            intervals = intervals[:-1]
-            assert len(intervals) == self.seg
+                                                low=intervals[:-1],
+                                                high=intervals[1:])
+            intervals_check(intervals)
 
         # equal interval sampling
         else:
-            # TODO: this floors the value and will cause data to be dropped.
-            avg_range = skeleton_seq.shape[0] // self.seg
-            intervals = np.multiply(list(range(self.seg)), avg_range)
+            avg_range = skeleton_seq.shape[0] / self.seg
+            intervals = np.multiply(list(range(self.seg + 1)), avg_range)
             random_intervals_range_fn = partial(np.random.randint,
-                                                low=avg_range,
-                                                size=self.seg)
+                                                low=intervals[:-1],
+                                                high=intervals[1:])
+            intervals_check(intervals)
 
         assert sampling_frequency >= 1
         for _ in range(sampling_frequency):
-            offsets = intervals + random_intervals_range_fn()
+            offsets = random_intervals_range_fn()
             assert len(offsets) == self.seg, f"{len(offsets)} =/= {self.seg}"
             ske = skeleton_seq[offsets]
             if self.motion_norm == 1:
