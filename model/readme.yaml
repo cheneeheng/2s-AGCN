@@ -1921,14 +1921,18 @@ sgn_v10:
                   - 220516140001_rerun_equalsampling:
                             - faulty, has norm in semantic emb
                             - gcn has dropout
+                            - gcn w1 has bias
                             - 92.58%
                   - 220516140001_rerun_equalsampling_intdiv:
                             - faulty, has norm in semantic emb
                             - gcn has dropout
+                            - gcn w1 has bias
                             - 91.93%
 
         - 220518100001_rerun_equalsampling:
+                  - gcn w1 has bias
         - 220518100001_rerun_equalsampling_intdiv:
+                  - gcn w1 has bias
 
 sgn-code:
         - original sgn repo code

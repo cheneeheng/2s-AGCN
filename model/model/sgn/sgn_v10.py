@@ -156,6 +156,8 @@ class SGN(PyTorchModule):
                  gcn_tem_ffn: int = 1,
                  gcn_tem_ffn_prenorm: bool = False,
 
+                 gcn_fpn: int = 0,
+
                  t_g_kernel: int = 1,
                  t_g_proj_shared: bool = False,
                  t_g_proj_dim: Optional[T3] = None,  # c4,
@@ -173,6 +175,7 @@ class SGN(PyTorchModule):
                  t_mode: int = 1,
                  t_kernel: int = 3,
                  t_maxpool_kwargs: Optional[dict] = None,
+                 multi_t: int = 1,
 
                  ):
         super(SGN, self).__init__()
@@ -300,11 +303,27 @@ class SGN(PyTorchModule):
         )
         assert t_gcn_ffn in self.ffn_mode
 
+        self.gcn_fpn = gcn_fpn
+        if self.gcn_fpn == 1:
+            for i in range(len(gcn_spa_dims)):
+                setattr(self,
+                        f'fpn_proj{i+1}',
+                        Conv(gcn_spa_dims[i],
+                             gcn_spa_dims[-1],
+                             bias=self.bias,
+                             activation=self.activation_fn,
+                             normalization=lambda: self.normalization_fn(
+                                 gcn_spa_dims[-1]),
+                             #  dropout=self.dropout_fn,
+                             ))
+
         # 0 no pool, 1 pool, 2 projection, 3 no pool but merge channels
         self.spatial_maxpool = spatial_maxpool
         self.temporal_maxpool = temporal_maxpool
         assert self.spatial_maxpool in [0, 1, 2, 3]
 
+        assert multi_t > 0
+        self.multi_t = multi_t
         self.t_mode = t_mode
         self.t_kernel = t_kernel
         assert self.t_kernel >= 0
@@ -407,6 +426,8 @@ class SGN(PyTorchModule):
                 activation=self.activation_fn,
                 normalization=self.normalization_fn,
                 g_activation=self.g_activation_fn,
+                return_g=True,
+                return_gcn_list=True,
                 **gcn_spatial_kwargs
             )
         if 'tem' in self.gcn_list:
@@ -417,6 +438,8 @@ class SGN(PyTorchModule):
                 activation=self.activation_fn,
                 normalization=self.normalization_fn,
                 g_activation=self.g_activation_fn,
+                return_g=True,
+                return_gcn_list=True,
                 **gcn_temporal_kwargs
             )
         if 'dual' in self.gcn_list:
@@ -435,21 +458,41 @@ class SGN(PyTorchModule):
         if len(self.gcn_list) == 2 and self.gcn_fusion == 0:
             _c3 *= 2
 
-        self.tem_mlp = MLPTemporalBranch(
-            in_channels=_c3,
-            out_channels=_c4,
-            bias=self.bias,
-            dropout=self.dropout_fn,
-            activation=self.activation_fn,
-            normalization=self.normalization_fn,
-            prenorm=self.prenorm,
-            g_activation_fn=self.g_activation_fn,
-            aspp_rates=self.aspp_rates,
-            t_mode=self.t_mode,
-            t_kernel=self.t_kernel,
-            t_maxpool_kwargs=self.t_maxpool_kwargs,
-            t_gcn_kwargs=self.t_gcn_kwargs
-        )
+        if self.multi_t == 1:
+            self.tem_mlp = MLPTemporalBranch(
+                in_channels=_c3,
+                out_channels=_c4,
+                bias=self.bias,
+                dropout=self.dropout_fn,
+                activation=self.activation_fn,
+                normalization=self.normalization_fn,
+                prenorm=self.prenorm,
+                g_activation_fn=self.g_activation_fn,
+                aspp_rates=self.aspp_rates,
+                t_mode=self.t_mode,
+                t_kernel=self.t_kernel,
+                t_maxpool_kwargs=self.t_maxpool_kwargs,
+                t_gcn_kwargs=self.t_gcn_kwargs
+            )
+        else:
+            for i in range(self.multi_t):
+                setattr(self,
+                        f'tem_mlp{i+1}',
+                        MLPTemporalBranch(
+                            in_channels=_c3,
+                            out_channels=_c4,
+                            bias=self.bias,
+                            dropout=self.dropout_fn,
+                            activation=self.activation_fn,
+                            normalization=self.normalization_fn,
+                            prenorm=self.prenorm,
+                            g_activation_fn=self.g_activation_fn,
+                            aspp_rates=self.aspp_rates,
+                            t_mode=self.t_mode,
+                            t_kernel=self.t_kernel,
+                            t_maxpool_kwargs=self.t_maxpool_kwargs,
+                            t_gcn_kwargs=self.t_gcn_kwargs
+                        ))
 
         # 0=nn.Identity, 3= n,cv,1,t
         if self.spatial_maxpool == 0:
@@ -556,22 +599,30 @@ class SGN(PyTorchModule):
         else:
             x_list, g_list = [], []
             if hasattr(self, 'gcn_spatial'):
-                x_spa, g_spa = self.gcn_spatial(x)
+                x_spa, g_spa, x_spa_list = self.gcn_spatial(x)
                 x_list.append(x_spa)
                 g_list.append(g_spa)
             if hasattr(self, 'gcn_temporal'):
                 if self.gcn_tem == 0:
                     # swap axis
                     x_tem = x.transpose(-1, -2)
-                    x_tem, g_tem = self.gcn_temporal(x_tem)
+                    x_tem, g_tem, x_tem_list = self.gcn_temporal(x_tem)
                     x_tem = x_tem.transpose(-1, -2)
                 elif self.gcn_tem == 1:
                     # merge axis
                     x_tem = x.reshape((s[0], -1, s[-1], 1))
-                    x_tem, g_tem = self.gcn_temporal(x_tem)
+                    x_tem, g_tem, x_tem_list = self.gcn_temporal(x_tem)
                     x_tem = x_tem.reshape((s[0], -1, s[2], s[3]))
                 x_list.append(x_tem)
                 g_list.append(g_tem)
+
+        if self.gcn_fpn == 1:
+            assert 'dual' not in self.gcn_list
+            assert hasattr(self, 'gcn_spatial')
+            assert not hasattr(self, 'gcn_temporal')
+            x_list = [getattr(self, f'fpn_proj{i+1}')(x_spa_list[i])
+                      for i in range(len(x_spa_list))]
+            x_list = [x_list[2] + x_list[1] + x_list[0]]
 
         # Frame-level Module ---------------------------------------------------
         # spatial fusion post gcn
@@ -592,7 +643,12 @@ class SGN(PyTorchModule):
         x = self.smp(x)
 
         # temporal MLP
-        x = self.tem_mlp(x)
+        if self.multi_t == 1:
+            x = self.tem_mlp(x)
+        else:
+            x_list = [getattr(self, f'tem_mlp{i+1}')(x)
+                      for i in range(self.multi_t)]
+            x = torch.mean(torch.stack(x_list, dim=0), dim=0)
 
         # temporal pooling
         y = self.tmp(x)
@@ -947,6 +1003,8 @@ class MLPTemporalBranch(PyTorchModule):
                 activation=activation,
                 normalization=normalization,
                 g_activation=g_activation_fn,
+                return_g=False,
+                return_gcn_list=False,
                 **t_gcn_kwargs
             )
         # gcn + mlp
@@ -977,6 +1035,7 @@ class MLPTemporalBranch(PyTorchModule):
                         normalization=normalization,
                         g_activation=g_activation_fn,
                         return_g=False,
+                        return_gcn_list=False,
                         **t_gcn_kwargs
                     )),
                 ('MLP',
@@ -1000,7 +1059,7 @@ class MLPTemporalBranch(PyTorchModule):
         # x: n,c,v,t ; v=1 due to SMP
         x = self.aspp(x)
         if self.t_mode == 100:
-            x, _ = self.cnn(x.transpose(-1, -2))
+            x = self.cnn(x.transpose(-1, -2))
             x = x.transpose(-1, -2)
         elif self.t_mode in [101, 102]:
             x = self.cnn.GCN(x.transpose(-1, -2))
@@ -1107,6 +1166,7 @@ class GCNSpatialBlock(Module):
                  ffn_mode: int = 0,
                  ffn_prenorm: int = 0,
                  return_g: bool = True,
+                 return_gcn_list: bool = False,
                  segments: int = 20,
                  ):
         super(GCNSpatialBlock, self).__init__(*args,
@@ -1118,6 +1178,7 @@ class GCNSpatialBlock(Module):
                                               normalization=normalization)
         self.ffn_mode = ffn_mode
         self.return_g = return_g
+        self.return_gcn_list = return_gcn_list
         self.num_blocks = len(gcn_dims) - 1
         self.g_shared = isinstance(g_proj_dim, int)
         if self.g_shared:
@@ -1362,6 +1423,7 @@ class GCNSpatialBlock(Module):
         x0 = x
         g = []
         ffn_g = []
+        gcn_list = []
         for i in range(self.num_blocks):
             x1 = x
             if hasattr(self, f'gcn_maxpool{i+1}'):
@@ -1408,9 +1470,17 @@ class GCNSpatialBlock(Module):
                     except Exception:
                         raise ValueError("Missing ffn init or wrong inputs.")
 
+            gcn_list.append(x)
+
         x += self.res(x0)
 
-        if self.return_g:
+        output = [x]
+
+        if self.return_gcn_list and self.return_g:
+            return x, g+ffn_g, gcn_list
+        elif self.return_gcn_list:
+            return x, gcn_list
+        elif self.return_g:
             return x, g+ffn_g
         else:
             return x
@@ -1559,7 +1629,7 @@ if __name__ == '__main__':
                 # gcn_spa_dims=[c2*0.25, c3*0.25, c3*0.25],
                 # sem_pos_fusion=1,
                 # sem_fra_fusion=1,
-                # sem_fra_location=0,
+                sem_fra_location=1,
                 # x_emb_proj=2,
                 # gcn_list=['spa', 'tem', 'dual'],
                 dropout=0.0,
@@ -1580,7 +1650,9 @@ if __name__ == '__main__':
                 gcn_spa_ffn_prenorm=False,
                 gcn_spa_prenorm=False,
                 gcn_spa_maxpool=[0, 0, 0],
-                t_mode=1
+                t_mode=1,
+                multi_t=1,
+                gcn_fpn=1,
                 # gcn_tem_dims=[c2*25, c3*25, c3*25],
                 # t_mode=1,
                 # t_gcn_dims=[256, 256, 256]
@@ -1598,5 +1670,3 @@ if __name__ == '__main__':
         # print(flop_count_table(flops))
     except NameError:
         print("Warning: fvcore is not found")
-
-    print(model)
