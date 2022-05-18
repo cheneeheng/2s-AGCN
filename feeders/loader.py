@@ -14,7 +14,7 @@ from functools import partial
 from feeders import tools
 
 
-COLLATE_OUT_TYPE = Tuple[Tuple[torch.Tensor, torch.Tensor], torch.Tensor, None]
+COLLATE_OUT_TYPE = Tuple[Tuple[torch.Tensor, torch.Tensor], torch.Tensor, list]
 
 
 class NTUDataset(Dataset):
@@ -126,7 +126,7 @@ class NTUDataLoaders(object):
             x = list(x)
 
         # N,t,MVC
-        x, s, y = self.to_fix_length(x, y, sampling_frequency)
+        x, s, y, valid_frames = self.to_fix_length(x, y, sampling_frequency)
 
         if sort_data:
             # sort sequence by valid length in descending order
@@ -139,7 +139,7 @@ class NTUDataLoaders(object):
         x = torch.stack([torch.from_numpy(x[i]) for i in idx], 0)
         s = torch.stack([torch.from_numpy(s[i]) for i in idx], 0)
         y = torch.LongTensor(y)
-        return (x, s), y, None
+        return (x, s), y, valid_frames
 
     def collate_fn_fix_train(self, batch: list) -> COLLATE_OUT_TYPE:
         """Puts each data field into a tensor with outer dimension batch size
@@ -151,9 +151,9 @@ class NTUDataLoaders(object):
         Returns:
             COLLATE_OUT_TYPE: tuple of data, label, None
         """
-        (x, x1), y, _ = self.collate_fn_fix(batch,
-                                            sampling_frequency=1,
-                                            sort_data=True)
+        (x, x1), y, valid_frames = self.collate_fn_fix(batch,
+                                                       sampling_frequency=1,
+                                                       sort_data=True)
         # data augmentation
         if 'NTU60' in self.dataset:
             if 'CS' in self.dataset:
@@ -165,7 +165,7 @@ class NTUDataLoaders(object):
         else:
             raise ValueError("unknown dataset name")
         x = tools.torch_transform(x, theta)
-        return (x, x1), y, None
+        return (x, x1), y, valid_frames
 
     def collate_fn_fix_val(self, batch: list) -> COLLATE_OUT_TYPE:
         """Puts each data field into a tensor with outer dimension batch size
@@ -198,12 +198,13 @@ class NTUDataLoaders(object):
     def to_fix_length(self,
                       skeleton_seqs: list,
                       labels: Optional[list],
-                      sampling_frequency: int = 1
+                      sampling_frequency: int = 1,
                       ) -> Tuple[list, list, Optional[list]]:
         # skeleton_seqs: n,t,mvc
         # labels: n
         new_skeleton_seqs = []
         subject_seqs = []
+        valid_frames = []
         for _, skeleton_seq in enumerate(skeleton_seqs):
             zero_row = []
             for i in range(len(skeleton_seq)):
@@ -220,16 +221,18 @@ class NTUDataLoaders(object):
                 subject_seq=subject_seq,
                 skeleton_seqs=new_skeleton_seqs,
                 subject_seqs=subject_seqs,
-                sampling_frequency=sampling_frequency
+                sampling_frequency=sampling_frequency,
             )
-        return new_skeleton_seqs, subject_seqs, labels
+            valid_frames.append(skeleton_seq.shape[0])
+        return new_skeleton_seqs, subject_seqs, labels, valid_frames
 
     def subsample_sequence(self,
                            skeleton_seq: np.ndarray,
                            subject_seq: np.ndarray,
                            skeleton_seqs: list,
                            subject_seqs: list,
-                           sampling_frequency: int = 1) -> Tuple[list, list]:
+                           sampling_frequency: int = 1,
+                           ) -> Tuple[list, list]:
 
         def intervals_check(intervals: np.ndarray) -> np.ndarray:
             intervals_range = intervals[1:] - intervals[:-1]

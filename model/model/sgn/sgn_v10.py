@@ -366,7 +366,6 @@ class SGN(PyTorchModule):
                 dropout=self.dropout_fn,
                 activation=self.activation_fn,
                 normalization=self.normalization_fn,
-                in_norm=self.normalization_fn_1d,
                 inter_channels=get_inter_channels(self.sem_pos, self.c1),
                 num_point=self.num_point,
                 mode=self.sem_pos
@@ -378,7 +377,6 @@ class SGN(PyTorchModule):
                 dropout=self.dropout_fn,
                 activation=self.activation_fn,
                 normalization=self.normalization_fn,
-                in_norm=self.normalization_fn_1d,
                 inter_channels=get_inter_channels(self.sem_fra, self.c1),
                 num_point=self.num_point,
                 mode=self.sem_fra
@@ -1072,6 +1070,7 @@ class GCNSpatialUnit(Module):
             self.norm = self.normalization(self.out_channels)
         self.act = self.activation()
         self.drop = nn.Identity() if self.dropout is None else self.dropout()
+        # in original SGN bias for w1 is false
         self.w1 = Conv(self.in_channels, self.out_channels, bias=self.bias)
         self.w2 = Conv(self.in_channels, self.out_channels, bias=self.bias,
                        kernel_size=self.kernel_size, padding=self.padding)
@@ -1552,10 +1551,10 @@ if __name__ == '__main__':
 
     batch_size = 64
 
-    inputs = torch.ones(batch_size, 40, 75)
+    inputs = torch.ones(batch_size, 20, 75)
     # subjects = torch.ones(batch_size, 40, 1)
 
-    model = SGN(num_segment=40,
+    model = SGN(num_segment=20,
                 # c_multiplier=[0.25, 0.25, 0.25, 0.25],
                 # gcn_spa_dims=[c2*0.25, c3*0.25, c3*0.25],
                 # sem_pos_fusion=1,
@@ -1563,19 +1562,25 @@ if __name__ == '__main__':
                 # sem_fra_location=0,
                 # x_emb_proj=2,
                 # gcn_list=['spa', 'tem', 'dual'],
+                dropout=0.0,
+                dropout2d=0.2,
+                norm_type='bn',
+                act_type='relu',
                 gcn_list=['spa'],
+                gcn_tem=0,
                 gcn_fusion=0,
                 gcn_spa_g_kernel=1,
                 gcn_spa_g_proj_shared=False,
                 gcn_spa_g_proj_dim=256,
                 gcn_spa_t_kernel=1,
-                gcn_spa_dropout=0.0,
-                gcn_spa_gcn_residual=[1, 1, 1],
+                gcn_spa_dropout=0.2,
+                gcn_spa_gcn_residual=[0, 0, 0],
                 gcn_spa_dims=[128, 256, 256],
-                gcn_spa_prenorm=False,
-                gcn_spa_ffn_prenorm=False,
                 gcn_spa_ffn=0,
-                gcn_tem=0,
+                gcn_spa_ffn_prenorm=False,
+                gcn_spa_prenorm=False,
+                gcn_spa_maxpool=[0, 0, 0],
+                t_mode=1
                 # gcn_tem_dims=[c2*25, c3*25, c3*25],
                 # t_mode=1,
                 # t_gcn_dims=[256, 256, 256]
@@ -1593,3 +1598,5 @@ if __name__ == '__main__':
         # print(flop_count_table(flops))
     except NameError:
         print("Warning: fvcore is not found")
+
+    print(model)
