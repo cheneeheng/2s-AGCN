@@ -343,6 +343,18 @@ class SGN(PyTorchModule):
                              gcn_spa_dims[-1]),
                          #  dropout=self.dropout_fn,
                          ))
+        elif self.gcn_fpn == 3:
+            for i in range(len(gcn_spa_dims)):
+                setattr(self,
+                        f'fpn_proj{i+1}',
+                        Conv(gcn_spa_dims[i],
+                             gcn_spa_dims[0],
+                             bias=self.bias,
+                             activation=self.activation_fn,
+                             normalization=lambda: self.normalization_fn(
+                                 gcn_spa_dims[0]),
+                             #  dropout=self.dropout_fn,
+                             ))
 
         # 0 no pool, 1 pool, 2 projection, 3 no pool but merge channels
         self.spatial_maxpool = spatial_maxpool
@@ -511,6 +523,8 @@ class SGN(PyTorchModule):
                 in_ch = gcn_spa_dims
             elif self.gcn_fpn == 2 and self.multi_t_parallel:
                 in_ch = [_c3, gcn_spa_dims[0], gcn_spa_dims[0]]
+            elif self.gcn_fpn == 3:
+                in_ch = [gcn_spa_dims[0], gcn_spa_dims[0], gcn_spa_dims[0]]
             else:
                 in_ch = [_c3, _c3, _c3]
             for i, _t in enumerate(self.multi_t):
@@ -658,7 +672,7 @@ class SGN(PyTorchModule):
         # x_list => 1=lowest level, 3=highest level
         if self.gcn_fpn == 0:
             x_list = x_spa_list.copy()
-        elif self.gcn_fpn == 1:
+        elif self.gcn_fpn == 1 or self.gcn_fpn == 3:
             assert 'dual' not in self.gcn_list
             assert hasattr(self, 'gcn_spatial')
             assert not hasattr(self, 'gcn_temporal')
@@ -677,7 +691,7 @@ class SGN(PyTorchModule):
                       x_list[2] + x_list[1],
                       x_list[2]]
 
-        if self.multi_t_parallel and self.gcn_fpn in [0, 1, 2]:
+        if self.multi_t_parallel and self.gcn_fpn in [0, 1, 2, 3]:
             # temporal fusion post gcn
             if self.sem_fra > 0 and self.sem_fra_location == 0:
                 x_list = [i + tem1 for i in x_list]
@@ -1691,7 +1705,7 @@ if __name__ == '__main__':
     # subjects = torch.ones(batch_size, 40, 1)
 
     model = SGN(num_segment=20,
-                # c_multiplier=[0.25, 0.25, 0.25, 0.25],
+                # c_multiplier=[0.5, 0.5, 0.5, 0.5],
                 # gcn_spa_dims=[c2*0.25, c3*0.25, c3*0.25],
                 # sem_pos_fusion=1,
                 # sem_fra_fusion=1,
@@ -1711,16 +1725,16 @@ if __name__ == '__main__':
                 gcn_spa_t_kernel=1,
                 gcn_spa_dropout=0.2,
                 gcn_spa_gcn_residual=[0, 0, 0],
-                gcn_spa_dims=[256, 256, 256],
+                gcn_spa_dims=[128, 256, 512],
                 gcn_spa_ffn=0,
                 gcn_spa_ffn_prenorm=False,
                 gcn_spa_prenorm=False,
                 gcn_spa_maxpool=[0, 0, 0],
                 t_mode=1,
-                multi_t=[3, 3, 3],
+                multi_t=[3, 5, 7],
                 multi_t_shared=False,
                 multi_t_parallel=False,
-                gcn_fpn=2,
+                gcn_fpn=3,
                 # gcn_tem_dims=[c2*25, c3*25, c3*25],
                 # t_mode=1,
                 # t_gcn_dims=[256, 256, 256]

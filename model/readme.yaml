@@ -1947,10 +1947,24 @@ sgn_v10:
         - 220518100001_gcnfpn1:
                   - proj + add
                   - 94.53%
+        - 220518100001_gcnfpn2:
+                  - proj + add + up
+                  - 94.98%
         - 220518100001_multit3:
+                  - 3 temporal branches using final gcn features
                   - 95.11%
         - 220518100001_multit357:
+                  - 3 temporal branches using final gcn features
+                  - using 3,5,7 kernel sizes
                   - 95.48%
+        - 220518100001_multit357_pregcntemsem:
+                  - 3 temporal branches using final gcn features
+                  - using 3,5,7 kernel sizes
+                  - pre gcn frame semantics
+                  - 95.33%
+        - 220518100001_gcnall256:
+                  - all gcn has 256 dim
+                  - 94.34%
 
 sgn-code:
         - original sgn repo code
