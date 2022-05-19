@@ -194,11 +194,11 @@ class ASPP(PyTorchModule):
         super(ASPP, self).__init__()
 
         _dropout = dropout
-        if len(inspect.getargspec(dropout).args) != 0:
+        if len(inspect.getfullargspec(dropout).args) != 0:
             def _dropout(): return dropout(0.2)
 
         _normalization = normalization
-        if len(inspect.getargspec(normalization).args) != 0:
+        if len(inspect.getfullargspec(normalization).args) != 0:
             def _normalization(): return normalization(out_channels)
 
         self.block = torch.nn.ModuleDict()

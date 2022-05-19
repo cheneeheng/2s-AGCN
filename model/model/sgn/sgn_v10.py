@@ -157,7 +157,7 @@ class SGN(PyTorchModule):
                  gcn_tem_ffn: int = 1,
                  gcn_tem_ffn_prenorm: bool = False,
 
-                 gcn_fpn: int = 0,
+                 gcn_fpn: int = -1,
 
                  t_g_kernel: int = 1,
                  t_g_proj_shared: bool = False,
@@ -499,11 +499,15 @@ class SGN(PyTorchModule):
                 t_gcn_kwargs=self.t_gcn_kwargs
             )
         else:
+            if self.gcn_fpn == 0:
+                in_ch = [self.c2, _c3, _c3]
+            else:
+                in_ch = [_c3, _c3, _c3]
             for i in range(self.multi_t, 0, -1):
                 setattr(self,
                         f'tem_mlp{i}',
                         MLPTemporalBranch(
-                            in_channels=_c3,
+                            in_channels=in_ch[i-1],
                             out_channels=_c4,
                             bias=self.bias,
                             dropout=self.dropout_fn,
@@ -657,30 +661,44 @@ class SGN(PyTorchModule):
             x_list = [getattr(self, f'fpn_up')(x_list[0])]
 
         # Frame-level Module ---------------------------------------------------
-        # spatial fusion post gcn
-        if len(self.gcn_list) == 0:
-            x = x
-        elif len(self.gcn_list) == 1 or 'dual' in self.gcn_list:
-            x = x_list[0]
-        elif len(self.gcn_list) == 2:
-            x = fuse(*x_list, self.gcn_fusion)
-        else:
-            raise ValueError("too many gcn definitions")
 
-        # temporal fusion post gcn
-        if self.sem_fra > 0 and self.sem_fra_location == 0:
-            x = x + tem1
-
-        # spatial pooling
-        x = self.smp(x)
-
-        # temporal MLP
-        if self.multi_t == 1:
-            x = self.tem_mlp(x)
-        else:
-            x_list = [getattr(self, f'tem_mlp{i+1}')(x)
+        if self.gcn_fpn == 0:
+            # temporal fusion post gcn
+            if self.sem_fra > 0 and self.sem_fra_location == 0:
+                x_spa_list = [i + tem1 for i in x_spa_list]
+            # spatial pooling
+            x_list = [self.smp(i) for i in x_spa_list]
+            # temporal MLP
+            x_list = [getattr(self, f'tem_mlp{i}')(x_list[i-1])
                       for i in range(self.multi_t, 0, -1)]
             x = torch.mean(torch.stack(x_list, dim=0), dim=0)
+
+        else:
+
+            # spatial fusion post gcn
+            if len(self.gcn_list) == 0:
+                x = x
+            elif len(self.gcn_list) == 1 or 'dual' in self.gcn_list:
+                x = x_list[0]
+            elif len(self.gcn_list) == 2:
+                x = fuse(*x_list, self.gcn_fusion)
+            else:
+                raise ValueError("too many gcn definitions")
+
+            # temporal fusion post gcn
+            if self.sem_fra > 0 and self.sem_fra_location == 0:
+                x = x + tem1
+
+            # spatial pooling
+            x = self.smp(x)
+
+            # temporal MLP
+            if self.multi_t == 1:
+                x = self.tem_mlp(x)
+            else:
+                x_list = [getattr(self, f'tem_mlp{i}')(x)
+                          for i in range(self.multi_t, 0, -1)]
+                x = torch.mean(torch.stack(x_list, dim=0), dim=0)
 
         # temporal pooling
         y = self.tmp(x)
@@ -1496,18 +1514,16 @@ class GCNSpatialBlock(Module):
                     x1 = getattr(self, f'ffn_prenorm{i+1}')(x1)
                 if hasattr(self, f'ffn{i+1}'):
                     layer = getattr(self, f'ffn{i+1}')
-                    if len(inspect.getargspec(layer).args) == 2:
-                        x = getattr(self, f'ffn{i+1}')(x1, x)
-                    elif len(inspect.getargspec(layer).args) == 1:
-                        x = getattr(self, f'ffn{i+1}')(x1)
+                    if len(inspect.getfullargspec(layer).args) == 2:
+                        x = layer(x1, x)
+                    elif len(inspect.getfullargspec(layer).args) == 1:
+                        x = layer(x1)
                     else:
                         raise ValueError("Missing ffn init or wrong inputs.")
 
             gcn_list.append(x)
 
         x += self.res(x0)
-
-        output = [x]
 
         if self.return_gcn_list and self.return_g:
             return x, g+ffn_g, gcn_list
@@ -1662,7 +1678,7 @@ if __name__ == '__main__':
                 # gcn_spa_dims=[c2*0.25, c3*0.25, c3*0.25],
                 # sem_pos_fusion=1,
                 # sem_fra_fusion=1,
-                # sem_fra_location=1,
+                sem_fra_location=1,
                 # x_emb_proj=2,
                 # gcn_list=['spa', 'tem', 'dual'],
                 dropout=0.0,
@@ -1684,14 +1700,14 @@ if __name__ == '__main__':
                 gcn_spa_prenorm=False,
                 gcn_spa_maxpool=[0, 0, 0],
                 t_mode=1,
-                # multi_t=1,
-                # gcn_fpn=1,
+                multi_t=3,
+                gcn_fpn=0,
                 # gcn_tem_dims=[c2*25, c3*25, c3*25],
                 # t_mode=1,
                 # t_gcn_dims=[256, 256, 256]
                 # spatial_maxpool=1,
                 # temporal_maxpool=0,
-                aspp_rates=[0, 1, 3],
+                # aspp_rates=[0, 1, 3],
 
                 )
     model(inputs)
