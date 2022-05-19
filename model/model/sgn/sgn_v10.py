@@ -349,6 +349,9 @@ class SGN(PyTorchModule):
         self.temporal_maxpool = temporal_maxpool
         assert self.spatial_maxpool in [0, 1, 2, 3]
 
+        if gcn_fpn == 0:
+            assert multi_t_parallel
+
         self.multi_t_parallel = multi_t_parallel
         self.multi_t_shared = multi_t_shared
         self.multi_t = multi_t
@@ -506,7 +509,7 @@ class SGN(PyTorchModule):
             assert isinstance(self.multi_t, list)
             if self.gcn_fpn == 0:
                 in_ch = gcn_spa_dims
-            elif self.gcn_fpn == 2:
+            elif self.gcn_fpn == 2 and self.multi_t_parallel:
                 in_ch = [_c3, gcn_spa_dims[0], gcn_spa_dims[0]]
             else:
                 in_ch = [_c3, _c3, _c3]
@@ -1692,7 +1695,7 @@ if __name__ == '__main__':
                 # gcn_spa_dims=[c2*0.25, c3*0.25, c3*0.25],
                 # sem_pos_fusion=1,
                 # sem_fra_fusion=1,
-                # sem_fra_location=1,
+                sem_fra_location=1,
                 # x_emb_proj=2,
                 # gcn_list=['spa', 'tem', 'dual'],
                 dropout=0.0,
@@ -1716,7 +1719,7 @@ if __name__ == '__main__':
                 t_mode=1,
                 multi_t=[3, 3, 3],
                 multi_t_shared=False,
-                multi_t_parallel=True,
+                multi_t_parallel=False,
                 gcn_fpn=2,
                 # gcn_tem_dims=[c2*25, c3*25, c3*25],
                 # t_mode=1,
