@@ -1945,6 +1945,7 @@ sgn_v10:
         - 220518100001_rerun_equalsampling_pregcntemsem:
                   - 94.69%
         - 220518100001_gcnfpn1:
+                  - proj + add
                   - 94.53%
         - 220518100001_multit3:
                   - 95.11%

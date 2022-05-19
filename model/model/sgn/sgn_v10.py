@@ -178,6 +178,7 @@ class SGN(PyTorchModule):
                  t_maxpool_kwargs: Optional[dict] = None,
                  multi_t: Tuple[list, int] = 1,
                  multi_t_shared: bool = False,
+                 multi_t_parallel: bool = False,
 
                  ):
         super(SGN, self).__init__()
@@ -306,7 +307,7 @@ class SGN(PyTorchModule):
         )
         assert t_gcn_ffn in self.ffn_mode
 
-        # 0 no fpn, 1 proj and sum, 2 proj and up and sum
+        # 0 no fpn, 1 proj and sum, 2 proj to lower dim and up and sum
         self.gcn_fpn = gcn_fpn
         if self.gcn_fpn == 1:
             for i in range(len(gcn_spa_dims)):
@@ -348,6 +349,7 @@ class SGN(PyTorchModule):
         self.temporal_maxpool = temporal_maxpool
         assert self.spatial_maxpool in [0, 1, 2, 3]
 
+        self.multi_t_parallel = multi_t_parallel
         self.multi_t_shared = multi_t_shared
         self.multi_t = multi_t
         self.t_mode = t_mode
@@ -504,13 +506,15 @@ class SGN(PyTorchModule):
             assert isinstance(self.multi_t, list)
             if self.gcn_fpn == 0:
                 in_ch = gcn_spa_dims
+            elif self.gcn_fpn == 2:
+                in_ch = [_c3, gcn_spa_dims[0], gcn_spa_dims[0]]
             else:
                 in_ch = [_c3, _c3, _c3]
             for i, _t in enumerate(self.multi_t):
                 setattr(self,
-                        f'tem_mlp{i}',
+                        f'tem_mlp{i+1}',
                         MLPTemporalBranch(
-                            in_channels=in_ch[i-1],
+                            in_channels=in_ch[i],
                             out_channels=_c4,
                             bias=self.bias,
                             dropout=self.dropout_fn,
@@ -647,41 +651,38 @@ class SGN(PyTorchModule):
                 x_list.append(x_tem)
                 g_list.append(g_tem)
 
-        if self.gcn_fpn == 1:
+        # Frame-level Module ---------------------------------------------------
+        # x_list => 1=lowest level, 3=highest level
+        if self.gcn_fpn == 0:
+            x_list = x_spa_list.copy()
+        elif self.gcn_fpn == 1:
             assert 'dual' not in self.gcn_list
             assert hasattr(self, 'gcn_spatial')
             assert not hasattr(self, 'gcn_temporal')
             x_list = [getattr(self, f'fpn_proj{i+1}')(x_spa_list[i])
                       for i in range(len(x_spa_list))]
-            x_list = [x_list[2] + x_list[1] + x_list[0]]
+            x_list = [x_list[2] + x_list[1] + x_list[0],
+                      x_list[2] + x_list[1],
+                      x_list[2]]
         elif self.gcn_fpn == 2:
             assert 'dual' not in self.gcn_list
             assert hasattr(self, 'gcn_spatial')
             assert not hasattr(self, 'gcn_temporal')
             x_list = [getattr(self, f'fpn_proj{i+1}')(x_spa_list[i])
                       for i in range(len(x_spa_list))]
-            x_list = [x_list[2] + x_list[1] + x_list[0]]
-            x_list = [getattr(self, f'fpn_up')(x_list[0])]
+            x_list = [getattr(self, f'fpn_up')(x_list[2] + x_list[1] + x_list[0]),  # noqa
+                      x_list[2] + x_list[1],
+                      x_list[2]]
 
-        # Frame-level Module ---------------------------------------------------
-
-        if self.gcn_fpn == 0:
+        if self.multi_t_parallel and self.gcn_fpn in [0, 1, 2]:
             # temporal fusion post gcn
             if self.sem_fra > 0 and self.sem_fra_location == 0:
-                x_spa_list = [i + tem1 for i in x_spa_list]
+                x_list = [i + tem1 for i in x_list]
+
             # spatial pooling
-            x_list = [self.smp(i) for i in x_spa_list]
-            # temporal MLP
-            if self.multi_t_shared:
-                x_list = [getattr(self, f'tem_mlp')(x_list[i-1])
-                          for i in range(len(self.multi_t))]
-            else:
-                x_list = [getattr(self, f'tem_mlp{i}')(x_list[i-1])
-                          for i in range(len(self.multi_t))]
-            x = torch.mean(torch.stack(x_list, dim=0), dim=0)
+            x_list = [self.smp(i) for i in x_list]
 
         else:
-
             # spatial fusion post gcn
             if len(self.gcn_list) == 0:
                 x = x
@@ -699,17 +700,19 @@ class SGN(PyTorchModule):
             # spatial pooling
             x = self.smp(x)
 
-            # temporal MLP
-            if self.multi_t == 1:
-                x = self.tem_mlp(x)
-            else:
+        # temporal MLP
+        if self.multi_t == 1:
+            x = self.tem_mlp(x)
+        else:
+            _x_list = []
+            for i in range(len(self.multi_t)):
+                if self.multi_t_parallel:
+                    x = x_list[i]
                 if self.multi_t_shared:
-                    x_list = [getattr(self, f'tem_mlp')(x)
-                              for _ in range(len(self.multi_t))]
+                    _x_list.append(getattr(self, f'tem_mlp')(x))
                 else:
-                    x_list = [getattr(self, f'tem_mlp{i}')(x)
-                              for i in range(len(self.multi_t))]
-                x = torch.mean(torch.stack(x_list, dim=0), dim=0)
+                    _x_list.append(getattr(self, f'tem_mlp{i+1}')(x))
+            x = torch.mean(torch.stack(_x_list, dim=0), dim=0)
 
         # temporal pooling
         y = self.tmp(x)
@@ -1689,7 +1692,7 @@ if __name__ == '__main__':
                 # gcn_spa_dims=[c2*0.25, c3*0.25, c3*0.25],
                 # sem_pos_fusion=1,
                 # sem_fra_fusion=1,
-                sem_fra_location=1,
+                # sem_fra_location=1,
                 # x_emb_proj=2,
                 # gcn_list=['spa', 'tem', 'dual'],
                 dropout=0.0,
@@ -1712,7 +1715,8 @@ if __name__ == '__main__':
                 gcn_spa_maxpool=[0, 0, 0],
                 t_mode=1,
                 multi_t=[3, 3, 3],
-                multi_t_shared=True,
+                multi_t_shared=False,
+                multi_t_parallel=True,
                 gcn_fpn=2,
                 # gcn_tem_dims=[c2*25, c3*25, c3*25],
                 # t_mode=1,
