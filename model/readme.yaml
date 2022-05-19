@@ -1930,9 +1930,26 @@ sgn_v10:
                             - 91.93%
 
         - 220518100001_rerun_equalsampling:
-                  - gcn w1 has bias
+                  - 94.68%
         - 220518100001_rerun_equalsampling_intdiv:
-                  - gcn w1 has bias
+                  - 94.48%
+        - 220518100001_rerun_equalsampling_now1norm:
+                  - no gcn w1 bias
+                  - 94.64%
+        - 220518100001_spagcnresffn2:
+                  - ffn bottleneck
+                  - 95.06%
+        - 220518100001_spagcnresffn102:
+                  - ffn aspp 135
+                  - 95.05%
+        - 220518100001_rerun_equalsampling_pregcntemsem:
+                  - 94.69%
+        - 220518100001_gcnfpn1:
+                  - 94.53%
+        - 220518100001_multit3:
+                  - 95.11%
+        - 220518100001_multit357:
+                  - 95.48%
 
 sgn-code:
         - original sgn repo code

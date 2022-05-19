@@ -21,6 +21,7 @@ try:
 except ImportError:
     print("Warning: fvcore is not found")
 
+import inspect
 import math
 from typing import OrderedDict, Tuple, Optional, Union, Type, List, Any
 
@@ -260,6 +261,7 @@ class SGN(PyTorchModule):
             gcn_maxpool=gcn_spa_maxpool
         )
         assert gcn_spa_ffn in self.ffn_mode
+        self.gcn_spa_dims = gcn_spa_dims
 
         # Temporal GCN
         if gcn_tem_dims is None:
@@ -497,9 +499,9 @@ class SGN(PyTorchModule):
                 t_gcn_kwargs=self.t_gcn_kwargs
             )
         else:
-            for i in range(self.multi_t):
+            for i in range(self.multi_t, 0, -1):
                 setattr(self,
-                        f'tem_mlp{i+1}',
+                        f'tem_mlp{i}',
                         MLPTemporalBranch(
                             in_channels=_c3,
                             out_channels=_c4,
@@ -677,7 +679,7 @@ class SGN(PyTorchModule):
             x = self.tem_mlp(x)
         else:
             x_list = [getattr(self, f'tem_mlp{i+1}')(x)
-                      for i in range(self.multi_t)]
+                      for i in range(self.multi_t, 0, -1)]
             x = torch.mean(torch.stack(x_list, dim=0), dim=0)
 
         # temporal pooling
@@ -1493,11 +1495,12 @@ class GCNSpatialBlock(Module):
                 if hasattr(self, f'ffn_prenorm{i+1}'):
                     x1 = getattr(self, f'ffn_prenorm{i+1}')(x1)
                 if hasattr(self, f'ffn{i+1}'):
-                    try:
+                    layer = getattr(self, f'ffn{i+1}')
+                    if len(inspect.getargspec(layer).args) == 2:
                         x = getattr(self, f'ffn{i+1}')(x1, x)
-                    except TypeError:
+                    elif len(inspect.getargspec(layer).args) == 1:
                         x = getattr(self, f'ffn{i+1}')(x1)
-                    except Exception:
+                    else:
                         raise ValueError("Missing ffn init or wrong inputs.")
 
             gcn_list.append(x)
@@ -1659,7 +1662,7 @@ if __name__ == '__main__':
                 # gcn_spa_dims=[c2*0.25, c3*0.25, c3*0.25],
                 # sem_pos_fusion=1,
                 # sem_fra_fusion=1,
-                sem_fra_location=1,
+                # sem_fra_location=1,
                 # x_emb_proj=2,
                 # gcn_list=['spa', 'tem', 'dual'],
                 dropout=0.0,
@@ -1676,18 +1679,19 @@ if __name__ == '__main__':
                 gcn_spa_dropout=0.2,
                 gcn_spa_gcn_residual=[0, 0, 0],
                 gcn_spa_dims=[128, 256, 256],
-                gcn_spa_ffn=0,
+                gcn_spa_ffn=102,
                 gcn_spa_ffn_prenorm=False,
                 gcn_spa_prenorm=False,
                 gcn_spa_maxpool=[0, 0, 0],
                 t_mode=1,
-                multi_t=1,
-                gcn_fpn=1,
+                # multi_t=1,
+                # gcn_fpn=1,
                 # gcn_tem_dims=[c2*25, c3*25, c3*25],
                 # t_mode=1,
                 # t_gcn_dims=[256, 256, 256]
                 # spatial_maxpool=1,
                 # temporal_maxpool=0,
+                aspp_rates=[0, 1, 3],
 
                 )
     model(inputs)

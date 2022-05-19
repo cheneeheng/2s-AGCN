@@ -3,6 +3,13 @@ from typing import Optional, Union, Type
 
 import inspect
 
+
+try:
+    from fvcore.nn import FlopCountAnalysis
+    from fvcore.nn import flop_count_table
+except ImportError:
+    print("Warning: fvcore is not found")
+
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -11,6 +18,8 @@ from torch.nn import Sequential
 
 
 __all__ = ['Module', 'Conv1xN', 'Conv', 'Pool', 'ASPP']
+
+OTPM = Optional[Type[PyTorchModule]]
 
 
 class Module(PyTorchModule):
@@ -22,9 +31,9 @@ class Module(PyTorchModule):
                  dilation: Union[int, list] = 1,
                  bias: int = 0,
                  deterministic: Optional[bool] = None,
-                 dropout: Optional[Type[PyTorchModule]] = None,
-                 activation: Optional[Type[PyTorchModule]] = None,
-                 normalization: Optional[Type[PyTorchModule]] = None,
+                 dropout: OTPM = None,
+                 activation: OTPM = None,
+                 normalization: OTPM = None,
                  prenorm: bool = False
                  ):
         super(Module, self).__init__()
@@ -105,9 +114,9 @@ class Conv(Module):
                  dilation: int = 1,
                  bias: int = 0,
                  deterministic: Optional[bool] = None,
-                 dropout: Optional[Type[PyTorchModule]] = None,
-                 activation: Optional[Type[PyTorchModule]] = None,
-                 normalization: Optional[Type[PyTorchModule]] = None,
+                 dropout: OTPM = None,
+                 activation: OTPM = None,
+                 normalization: OTPM = None,
                  prenorm: bool = False
                  ):
         super(Conv, self).__init__(in_channels,
@@ -144,9 +153,9 @@ class Pool(Module):
                  dilation: int = 1,
                  bias: int = 0,
                  deterministic: Optional[bool] = None,
-                 dropout: Optional[Type[PyTorchModule]] = None,
-                 activation: Optional[Type[PyTorchModule]] = None,
-                 normalization: Optional[Type[PyTorchModule]] = None,
+                 dropout: OTPM = None,
+                 activation: OTPM = None,
+                 normalization: OTPM = None,
                  prenorm: bool = False
                  ):
         super(Pool, self).__init__(in_channels,
@@ -170,82 +179,85 @@ class Pool(Module):
         self.block = Sequential(block)
 
 
-class ASPP(Module):
+class ASPP(PyTorchModule):
     def __init__(self,
                  in_channels: int,
                  out_channels: int,
                  kernel_size: int = 3,
+                 #  padding: Optional[list] = None,
                  dilation: list = [1, 3, 5, 7],
                  bias: int = 0,
-                 dropout: Type[PyTorchModule] = nn.Dropout2d,
-                 activation: Type[PyTorchModule] = nn.ReLU,
-                 normalization: Type[PyTorchModule] = nn.BatchNorm2d,
+                 dropout: Type[PyTorchModule] = None,  # nn.Dropout2d,
+                 activation: Type[PyTorchModule] = None,  # nn.ReLU,
+                 normalization: Type[PyTorchModule] = None,  # nn.BatchNorm2d,
                  residual: int = 0):
-        super(ASPP, self).__init__(in_channels,
-                                   out_channels,
-                                   kernel_size=kernel_size,
-                                   dilation=dilation,
-                                   bias=bias,
-                                   dropout=dropout,
-                                   activation=activation,
-                                   normalization=normalization)
-        self.aspp = torch.nn.ModuleDict()
-        self.pool = 0 in self.dilation
-        if self.pool:
-            self.aspp.update({
-                'aspp_pool': Pool(self.in_channels,
-                                  self.out_channels,
-                                  bias=self.bias,
-                                  pooling=nn.AdaptiveAvgPool2d(1),
-                                  activation=self.activation)
-            })
-        for dil in self.dilation:
-            if dil == 0:
-                continue
-            self.aspp.update({
-                f'aspp_{dil}': Conv(
-                    self.in_channels,
-                    self.out_channels,
-                    kernel_size=self.kernel_size,
-                    padding=dil,
-                    dilation=dil,
-                    bias=self.bias,
-                    activation=self.activation,
-                    normalization=lambda: self.normalization(
-                        self.out_channels),
-                    deterministic=False
-                )
-            })
-        if len(inspect.getargspec(self.dropout).args) != 0:
-            def dropout(): return self.dropout(0.2)
-        else:
-            dropout = self.dropout
-        self.proj = Conv(
-            self.out_channels * len(self.dilation),
-            self.out_channels,
-            bias=self.bias,
-            normalization=lambda: self.normalization(self.out_channels),
-            dropout=dropout
-        )
+        super(ASPP, self).__init__()
+
+        _dropout = dropout
+        if len(inspect.getargspec(dropout).args) != 0:
+            def _dropout(): return dropout(0.2)
+
+        _normalization = normalization
+        if len(inspect.getargspec(normalization).args) != 0:
+            def _normalization(): return normalization(out_channels)
+
+        self.block = torch.nn.ModuleDict()
+
+        for i in range(len(dilation)):
+            if dilation[i] == 0:
+                self.block.update({
+                    'aspp_pool': Pool(in_channels,
+                                      out_channels,
+                                      bias=bias,
+                                      pooling=nn.AdaptiveAvgPool2d(1),
+                                      activation=activation)
+                })
+            else:
+                self.block.update({
+                    f'aspp_{dilation[i]}':
+                    Conv(in_channels,
+                         out_channels,
+                         kernel_size=kernel_size,
+                         padding=dilation[i],
+                         dilation=dilation[i],
+                         bias=bias,
+                         activation=activation,
+                         normalization=_normalization,
+                         deterministic=False)
+                })
+
+        self.proj = Conv(out_channels * len(dilation),
+                         out_channels,
+                         bias=bias,
+                         normalization=_normalization,
+                         dropout=_dropout)
+
         if residual == 0:
             self.res = lambda x: 0
-        elif self.in_channels == self.out_channels:
+        elif in_channels == out_channels:
             self.res = nn.Identity()
         else:
-            self.res = Conv(self.in_channels,
-                            self.out_channels,
-                            bias=self.bias)
+            self.res = Conv(in_channels, out_channels, bias=bias)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: n,c,v,t
         res = []
-        for _, block in self.aspp.items():
-            res.append(block(x))
-        if self.pool:
-            res[0] = F.interpolate(res[0],
+        for name, block in self.block.items():
+            x1 = block(x)
+            if name == 'aspp_pool':
+                x1 = F.interpolate(x1,
                                    size=x.shape[-2:],
                                    mode="bilinear",
                                    align_corners=False)
+            res.append(x1)
         res = torch.cat(res, dim=1)
         x = self.proj(res) + self.res(x)
         return x
+
+
+if __name__ == '__main__':
+    inputs = torch.ones(1, 3, 12, 12)
+    model = ASPP(3, 10)
+    flops = FlopCountAnalysis(model, inputs)
+    print(flops.total())
+    # print(flops.by_module_and_operator())

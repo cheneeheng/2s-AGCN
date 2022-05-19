@@ -633,7 +633,7 @@ class SGN(PyTorchModule):
                              bias=self.bias,
                              dilation=self.aspp,
                              dropout=self.dropout_fn,
-                             activation=self.activation,
+                             activation=self.activation_fn,
                              normalization=self.normalization_fn)
         # skip
         if self.t_mode == 0:
@@ -1671,8 +1671,8 @@ if __name__ == '__main__':
     subjects = torch.ones(batch_size, 20, 1)
 
     model = SGN(num_segment=20,
-                dual_gcn_fusion=0,
-                gcn_tem=1,
+                # dual_gcn_fusion=0,
+                # gcn_tem=1,
                 # gcn_ffn=3,
                 # g_proj_dim=[256, 512, 512],
                 # c_multiplier=[1.0, 1.0, 2.0, 1.0],
@@ -1700,14 +1700,15 @@ if __name__ == '__main__':
                 # temporal_maxpool=3,
                 # gcn_dims=[128, 128, 512],
                 # g_kernel=5,
+                aspp=[0, 1, 3, 5]
                 )
     model(inputs, subjects)
     # print(model)
 
-    # try:
-    #     flops = FlopCountAnalysis(model, inputs)
-    #     # print(flops.total())
-    #     # print(flops.by_module_and_operator())
-    #     print(flop_count_table(flops))
-    # except NameError:
-    #     print("Warning: fvcore is not found")
+    try:
+        flops = FlopCountAnalysis(model, inputs)
+        # print(flops.total())
+        # print(flops.by_module_and_operator())
+        print(flop_count_table(flops))
+    except NameError:
+        print("Warning: fvcore is not found")
