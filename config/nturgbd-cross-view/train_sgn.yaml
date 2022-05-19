@@ -1,7 +1,7 @@
 work_dir: ./data/data/ntu_result/xview/sgn_v2/220327213001_1337
 model_saved_name: ./data/data/ntu_result/xview/sgn_v2/220327213001_1337/sgn
 
-phase: train
+phase: train  
 save_score: True
 
 seed: 1337

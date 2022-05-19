@@ -1,4 +1,4 @@
-work_dir: ./data/data/ntu_result/xview/sgn/sgn_v10/220512100001_spagcnresffn1_
+work_dir: ./data/data/ntu_result/xview/sgn/sgn_v10/220518100001_gcnfpn2
 
 phase: train
 save_score: True
@@ -27,6 +27,7 @@ train_dataloader_args:
   multi_test: 1
   # motion_sampler: 1
   # motion_norm: 1
+  # center_sampler: 0.001
 
 test_feeder_args:
   debug: False
@@ -43,6 +44,7 @@ test_dataloader_args:
   multi_test: 5
   # motion_sampler: 1
   # motion_norm: 1
+  # center_sampler: 0.001
 
 use_sgn_dataloader: True
 
@@ -69,8 +71,9 @@ model_args:
   # sem_fra: 1
   # sem_pos_fusion: 0
   # sem_fra_fusion: 1
-  # sem_fra_location: 0
+  # sem_fra_location: 1
   ### GCN args
+  gcn_fpn: 2
   gcn_list: ["spa"]
   gcn_tem: 0
   gcn_fusion: 0
@@ -79,11 +82,12 @@ model_args:
   gcn_spa_g_proj_dim: 256
   gcn_spa_t_kernel: 1
   gcn_spa_dropout: 0.0
-  gcn_spa_gcn_residual: [1, 1, 1]
+  gcn_spa_gcn_residual: [0, 0, 0]
   gcn_spa_dims: [128, 256, 256]
-  gcn_spa_ffn: 1
+  gcn_spa_ffn: 0
   gcn_spa_ffn_prenorm: False
   gcn_spa_prenorm: False
+  gcn_spa_maxpool: [0, 0, 0]
   # gcn_tem_g_kernel: 1
   # gcn_tem_g_proj_shared: False
   # gcn_tem_g_proj_dim: 256
@@ -104,6 +108,7 @@ model_args:
   # t_gcn_ffn: 0
   ### Temporal MLP args
   t_mode: 1
+  # multi_t: 3
   # t_kernel: 3
   # t_maxpool_kwargs:
   #   kernel_size: [1, 3]

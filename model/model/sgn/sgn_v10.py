@@ -316,6 +316,28 @@ class SGN(PyTorchModule):
                                  gcn_spa_dims[-1]),
                              #  dropout=self.dropout_fn,
                              ))
+        elif self.gcn_fpn == 2:
+            for i in range(len(gcn_spa_dims)):
+                setattr(self,
+                        f'fpn_proj{i+1}',
+                        Conv(gcn_spa_dims[i],
+                             gcn_spa_dims[0],
+                             bias=self.bias,
+                             activation=self.activation_fn,
+                             normalization=lambda: self.normalization_fn(
+                                 gcn_spa_dims[0]),
+                             #  dropout=self.dropout_fn,
+                             ))
+            setattr(self,
+                    f'fpn_up',
+                    Conv(gcn_spa_dims[0],
+                         gcn_spa_dims[-1],
+                         bias=self.bias,
+                         #  activation=self.activation_fn,
+                         normalization=lambda: self.normalization_fn(
+                             gcn_spa_dims[-1]),
+                         #  dropout=self.dropout_fn,
+                         ))
 
         # 0 no pool, 1 pool, 2 projection, 3 no pool but merge channels
         self.spatial_maxpool = spatial_maxpool
@@ -489,7 +511,7 @@ class SGN(PyTorchModule):
                             g_activation_fn=self.g_activation_fn,
                             aspp_rates=self.aspp_rates,
                             t_mode=self.t_mode,
-                            t_kernel=self.t_kernel,
+                            t_kernel=self.t_kernel + (i*2),
                             t_maxpool_kwargs=self.t_maxpool_kwargs,
                             t_gcn_kwargs=self.t_gcn_kwargs
                         ))
@@ -623,6 +645,14 @@ class SGN(PyTorchModule):
             x_list = [getattr(self, f'fpn_proj{i+1}')(x_spa_list[i])
                       for i in range(len(x_spa_list))]
             x_list = [x_list[2] + x_list[1] + x_list[0]]
+        elif self.gcn_fpn == 2:
+            assert 'dual' not in self.gcn_list
+            assert hasattr(self, 'gcn_spatial')
+            assert not hasattr(self, 'gcn_temporal')
+            x_list = [getattr(self, f'fpn_proj{i+1}')(x_spa_list[i])
+                      for i in range(len(x_spa_list))]
+            x_list = [x_list[2] + x_list[1] + x_list[0]]
+            x_list = [getattr(self, f'fpn_up')(x_list[0])]
 
         # Frame-level Module ---------------------------------------------------
         # spatial fusion post gcn
