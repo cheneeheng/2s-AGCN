@@ -8,3 +8,4 @@ from . import sgn_v7
 from . import sgn_v8
 from . import sgn_v9
 from . import sgn_v10
+from . import sgn_v11

@@ -1,0 +1,117 @@
+work_dir: ./data/data/ntu_result/xview/sgn/sgn_v10/220518100001_gcnfpn2
+
+phase: train
+save_score: True
+
+seed: 1337
+log_interval: 100 # iter
+save_interval: 2 # epoch
+eval_interval: 1 # epoch
+print_log: true
+
+## feeder
+feeder: feeders.feeder.Feeder
+num_worker: 8
+train_feeder_args:
+  debug: False
+  data_path: ./data/data/ntu_sgn/processed_data/NTU_CV_train.pkl
+  label_path: ./data/data/ntu_sgn/processed_data/NTU_CV_train_label.pkl
+  dataset: NTU60-CV-SGN
+  # joint_15: True
+
+train_dataloader_args:
+  seg: 20
+  multi_test: 1
+  # motion_sampler: 1
+  # motion_norm: 1
+  # center_sampler: 0.001
+
+test_feeder_args:
+  debug: False
+  data_path: ./data/data/ntu_sgn/processed_data/NTU_CV_test.pkl
+  label_path: ./data/data/ntu_sgn/processed_data/NTU_CV_test_label.pkl
+  dataset: NTU60-CV-SGN
+  # joint_15: True
+
+test_dataloader_args:
+  seg: 20
+  multi_test: 5
+  # motion_sampler: 1
+  # motion_norm: 1
+  # center_sampler: 0.001
+
+use_sgn_dataloader: True
+
+## model
+model: model.sgn_v10.SGN
+model_args:
+  # main args ------------------------------------------------------------------
+  num_class: 60
+  num_point: 25
+  num_segment: 20
+  in_channels: 3
+  bias: 1
+  dropout: 0.0
+  dropout2d: 0.2
+  # c_multiplier: [1.0, 1.0, 1.0, 1.0]
+  norm_type: bn
+  act_type: relu
+  # input args -----------------------------------------------------------------
+  xem_projection: 0
+  input_position: 1
+  input_velocity: 1
+  semantic_joint: 1
+  semantic_frame: 1
+  semantic_joint_fusion: 0
+  semantic_frame_fusion: 1
+  semantic_frame_location: 0
+  # GCN args -------------------------------------------------------------------
+  sgcn_dims: [128, 256, 256]
+  sgcn_kernel: 1
+  sgcn_padding: 0
+  sgcn_dropout: 0.0
+  sgcn_residual: [0, 0, 0]
+  sgcn_prenorm: False
+  sgcn_g_kernel: 1
+  sgcn_g_proj_dim: 256
+  sgcn_g_proj_shared: False
+  gcn_fpn: -1
+  # Temporal MLP args ----------------------------------------------------------
+  spatial_maxpool: 1
+  temporal_maxpool: 1
+  multi_t: [[], [], [3]]
+  multi_t_shared: 0
+  t_mode: 1
+  # t_maxpool_kwargs:
+  #   kernel_size: [1, 3]
+  #   stride: [1, 1]
+  aspp_rates: None
+
+label_smoothing: 0.1
+
+# weights: ./data/data/ntu_result/xview/sgn_v2/220327213001_1337/sgn-119-70560.pt
+
+## optim
+device: [0]
+batch_size: 64
+test_batch_size: 4
+
+optimizer: Adam
+nesterov: True
+base_lr: 0.001
+step: [60, 90, 110]
+weight_decay: 0.0001
+# llrd_factor: 1.0
+# scheduler: onecyclelr
+# anneal_strategy: cos
+# eps: 0.0001
+
+start_epoch: 0
+num_epoch: 120
+warm_up_epoch: 0
+
+only_train_part: False
+only_train_epoch: 5
+
+world_size: 1
+ddp: False

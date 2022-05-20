@@ -307,7 +307,10 @@ class SGN(PyTorchModule):
         )
         assert t_gcn_ffn in self.ffn_mode
 
-        # 0 no fpn, 1 proj and sum, 2 proj to lower dim and up and sum
+        # 0 no fpn,
+        # 1 proj and sum,
+        # 2 proj to lower dim and up and sum,
+        # 3 proj to lower
         self.gcn_fpn = gcn_fpn
         if self.gcn_fpn == 1:
             for i in range(len(gcn_spa_dims)):
@@ -1725,7 +1728,7 @@ if __name__ == '__main__':
                 gcn_spa_t_kernel=1,
                 gcn_spa_dropout=0.2,
                 gcn_spa_gcn_residual=[0, 0, 0],
-                gcn_spa_dims=[128, 256, 512],
+                gcn_spa_dims=[128, 256, 256],
                 gcn_spa_ffn=0,
                 gcn_spa_ffn_prenorm=False,
                 gcn_spa_prenorm=False,
@@ -1733,8 +1736,8 @@ if __name__ == '__main__':
                 t_mode=1,
                 multi_t=[3, 5, 7],
                 multi_t_shared=False,
-                multi_t_parallel=False,
-                gcn_fpn=3,
+                multi_t_parallel=True,
+                gcn_fpn=1,
                 # gcn_tem_dims=[c2*25, c3*25, c3*25],
                 # t_mode=1,
                 # t_gcn_dims=[256, 256, 256]

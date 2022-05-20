@@ -1962,9 +1962,84 @@ sgn_v10:
                   - using 3,5,7 kernel sizes
                   - pre gcn frame semantics
                   - 95.33%
+        - 220519140001_multit357911:
+                  - 94.88%
         - 220518100001_gcnall256:
                   - all gcn has 256 dim
                   - 94.34%
+
+        - 220519140001_pregcntemsem_multit357:
+                  - multiple parallel temporal branches using final gcn output
+                  - 95.33%
+        - 220519140001_pregcntemsem_multit357_cmulti05050505:
+                  - multiple parallel temporal branches using final gcn output
+                  - cmulti 0.5 for all c dims
+                  - 94.01%
+        - 220519140001_pregcntemsem_gcnfpn0_multit333:
+                  - multiple parallel temporal branches
+                  - 94.90%
+        - 220519140001_pregcntemsem_gcnfpn0_multit333_allgcn256:
+                  - multiple parallel temporal branches
+                  - all gcn dim are 256
+                  - 94.95%
+        - 220519140001_pregcntemsem_gcnfpn0_multit333shared_allgcn256:
+                  - multiple parallel temporal branches + shared weights
+                  - all gcn dim are 256
+                  - 94.05%
+        - 220519140001_pregcntemsem_gcnfpn1_multit333:
+                  - proj and add the gcn in the fpn
+                  - multiple parallel temporal branches using final fpn output
+                  - 95.06%
+        - 220519140001_pregcntemsem_gcnfpn1_multit333paral:
+                  - proj and add the gcn in the fpn
+                  - multiple parallel temporal branches using 3 gcn outputs
+                  - 95.28%
+        - 220519140001_pregcntemsem_gcnfpn1_multit333paral_allgcn256:
+                  - proj and add the gcn in the fpn
+                  - multiple parallel temporal branches using 3 gcn outputs
+                  - 95.15%
+        - 220519140001_pregcntemsem_gcnfpn1_multit333paralshared_allgcn256:
+                  - proj and add the gcn in the fpn
+                  - multiple parallel temporal branches using 3 gcn outputs + shared
+                  - 95.07%
+        - 220519140001_pregcntemsem_gcnfpn1_multit357paral_3pergcn:
+                  - proj and add the gcn in the fpn
+                  - 3 kernel sizes for each gcn
+                  - 95.29%
+        - 220519140001_pregcntemsem_gcnfpn2_multit333:
+                  - proj (lower dim) and add the gcn in the fpn and final dim 256
+                  - multiple parallel temporal branches using final fpn output
+                  - 95.27%
+        - 220519140001_pregcntemsem_gcnfpn2_multit333paral:
+                  - proj (lower dim) and add the gcn in the fpn and final dim 256
+                  - multiple parallel temporal branches using 3 gcn outputs
+                  - 95.08%
+        - 220519140001_pregcntemsem_gcnfpn2_multit333paral_allgcn256:
+                  - proj (lower dim) and add the gcn in the fpn and final dim 256
+                  - multiple parallel temporal branches using 3 gcn outputs
+                  - 95.29%
+        - 220519140001_pregcntemsem_gcnfpn2_multit333paralshared_allgcn256:
+                  - proj (lower dim) and add the gcn in the fpn and final dim 256
+                  - multiple parallel temporal branches using 3 gcn outputs + shared
+                  - 94.90%
+        - 220519140001_pregcntemsem_gcnfpn3_multit333:
+                  - proj (lower dim) and add the gcn in the fpn
+                  - multiple parallel temporal branches using final fpn output
+                  - 94.84%
+        - 220519140001_pregcntemsem_gcnfpn3_multit333_gcndim128256512:
+                  - proj (lower dim) and add the gcn in the fpn
+                  - multiple parallel temporal branches using final fpn output
+                  - 94.54%
+        - 220519140001_pregcntemsem_gcnfpn3_multit333paral:
+                  - proj (lower dim) and add the gcn in the fpn
+                  - multiple parallel temporal branches using 3 gcn outputs
+                  - 94.42%
+        - 220519140001_pregcntemsem_gcnfpn3_multit333paral_gcndim128256512:
+                  - proj (lower dim) and add the gcn in the fpn
+                  - multiple parallel temporal branches using 3 gcn outputs
+                  - 94.64%
+
+
 
 sgn-code:
         - original sgn repo code
