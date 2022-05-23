@@ -1938,7 +1938,7 @@ sgn_v10:
                   - 94.64%
         - 220518100001_spagcnresffn2:
                   - ffn bottleneck
-                  - 95.06%
+                  - 95.06% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
         - 220518100001_spagcnresffn102:
                   - ffn aspp 135
                   - 95.05%
@@ -1952,16 +1952,16 @@ sgn_v10:
                   - 94.98%
         - 220518100001_multit3:
                   - 3 temporal branches using final gcn features
-                  - 95.11%
+                  - 95.11% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
         - 220518100001_multit357:
                   - 3 temporal branches using final gcn features
                   - using 3,5,7 kernel sizes
-                  - 95.48%
+                  - 95.48% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
         - 220518100001_multit357_pregcntemsem:
                   - 3 temporal branches using final gcn features
                   - using 3,5,7 kernel sizes
                   - pre gcn frame semantics
-                  - 95.33%
+                  - 95.33% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
         - 220519140001_multit357911:
                   - 94.88%
         - 220518100001_gcnall256:
@@ -1993,7 +1993,7 @@ sgn_v10:
         - 220519140001_pregcntemsem_gcnfpn1_multit333paral:
                   - proj and add the gcn in the fpn
                   - multiple parallel temporal branches using 3 gcn outputs
-                  - 95.28%
+                  - 95.28% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
         - 220519140001_pregcntemsem_gcnfpn1_multit333paral_allgcn256:
                   - proj and add the gcn in the fpn
                   - multiple parallel temporal branches using 3 gcn outputs
@@ -2005,11 +2005,11 @@ sgn_v10:
         - 220519140001_pregcntemsem_gcnfpn1_multit357paral_3pergcn:
                   - proj and add the gcn in the fpn
                   - 3 kernel sizes for each gcn
-                  - 95.29%
+                  - 95.29% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
         - 220519140001_pregcntemsem_gcnfpn2_multit333:
                   - proj (lower dim) and add the gcn in the fpn and final dim 256
                   - multiple parallel temporal branches using final fpn output
-                  - 95.27%
+                  - 95.27% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
         - 220519140001_pregcntemsem_gcnfpn2_multit333paral:
                   - proj (lower dim) and add the gcn in the fpn and final dim 256
                   - multiple parallel temporal branches using 3 gcn outputs
@@ -2017,7 +2017,7 @@ sgn_v10:
         - 220519140001_pregcntemsem_gcnfpn2_multit333paral_allgcn256:
                   - proj (lower dim) and add the gcn in the fpn and final dim 256
                   - multiple parallel temporal branches using 3 gcn outputs
-                  - 95.29%
+                  - 95.29% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
         - 220519140001_pregcntemsem_gcnfpn2_multit333paralshared_allgcn256:
                   - proj (lower dim) and add the gcn in the fpn and final dim 256
                   - multiple parallel temporal branches using 3 gcn outputs + shared
@@ -2039,7 +2039,40 @@ sgn_v10:
                   - multiple parallel temporal branches using 3 gcn outputs
                   - 94.64%
 
-
+sgn_v11:
+        - 220520150001_rerun_orisgn:
+                  - 94.56%
+        - 220520150001_multit333:
+                  - 95.14%
+        - 220520150001_multit357:
+                  - 95.03%
+        - 220520150001_gcnfpn0_multit333_pregcntemsem:
+                  - 94.83%
+        - 220520150001_gcnfpn0_multit555_pregcntemsem:
+                  - 94.90%
+        - 220520150001_gcnfpn0_multit357357357_pregcntemsem:
+                  - 94.94%
+        - 220520150001_gcnfpn1_multit333:
+                  - 95.12%
+        - 220520150001_gcnfpn1_multit333shared:
+                  - 95.12%
+        - 220520150001_gcnfpn1_multit555:
+                  - 95.25%
+                  - best epoch was 94
+        - 220520150001_gcnfpn1_multit357357357:
+                  - 95.21%
+        - 220520150001_gcnfpn1_multit357357357shared:
+                  - 95.52%
+        - 220520150001_gcnfpn2_multit333:
+                  - 94.78%
+        - 220520150001_gcnfpn2_multit333shared:
+                  - 94.02%
+        - 220520150001_gcnfpn2_multit555:
+                  - 94.72%
+        - 220520150001_gcnfpn2_multit357357357:
+                  - 95.11%
+        - 220520150001_gcnfpn2_multit357357357shared:
+                  - 95.05%
 
 sgn-code:
         - original sgn repo code

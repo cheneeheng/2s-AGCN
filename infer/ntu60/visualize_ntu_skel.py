@@ -3,6 +3,8 @@ Based on :
 https://programmer.ink/think/how-to-realize-ntu-rgb-d-skeleton-visualization-gracefully-with-matplotlib.html
 """
 
+from sklearn.cluster import KMeans
+
 import numpy as np
 
 from plotly import graph_objects as go
@@ -243,7 +245,7 @@ def draw_skeleton_offline(data, pause_sec=10, action=""):
 
 if __name__ == '__main__':
 
-    file_name = r'./data/data/nturgbd_raw/nturgb+d_skeletons/S001C001P001R001A008.skeleton'  # noqa
+    file_name = r'./data/data/nturgbd_raw/nturgb+d_skeletons/S001C001P001R001A011.skeleton'  # noqa
     max_V = 25  # Number of nodes
     max_M = 2  # Number of skeletons
     with open(file_name, 'r') as fr:
@@ -272,8 +274,48 @@ if __name__ == '__main__':
 
     graph = 'graph.ntu_rgb_d.Graph'
     data = data.reshape((1,) + data.shape)[:, :, :, :, 0:1]
-    data = np.concatenate([data for _ in range(100)], 2)
-    visualize_3dskeleton_in_matplotlib(data, graph=graph, is_3d=True)
+
+    # T, VC
+    data_i = data.transpose([0, 2, 3, 1, 4]).reshape((data.shape[2], 25*3))
+    # T-1, VC
+    data_j = data_i[1:] - data_i[:-1]
+    # T-1
+    data_k = np.linalg.norm(data_j, axis=1)
+    # T-1, VC
+    data_l = abs(data_k - (data_k.max() - data_k.min())/2)
+    # T-1, VC
+    data_m = np.expand_dims(np.cumsum(data_l), -1)
+    data_n = np.expand_dims(np.cumsum(data_k), -1)
+    kmeans1 = KMeans(n_clusters=20, random_state=0).fit(data_m)
+    kmeans2 = KMeans(n_clusters=20, random_state=0).fit(data_n)
+
+    print(kmeans1.labels_, kmeans2.labels_)
+
+    from matplotlib import pyplot as plt
+    plt.plot(data_l)
+    plt.plot(kmeans1.labels_/200)
+    plt.plot(data_k)
+    plt.plot(kmeans2.labels_/200)
+    plt.show()
+
+    # data_i = data.transpose([0, 2, 3, 1, 4]).reshape((data.shape[2], 25*3))
+    # data_j = data_i[1:] - data_i[:-1]
+    # data_k = np.linspace(0, 1, num=data_j.shape[0])
+    # data_k *= (np.max(data_j) - np.min(data_j))
+    # data_j = (data_j - np.min(data_j, axis=1, keepdims=True)) / \
+    #     (np.max(data_j, axis=1, keepdims=True) -
+    #      np.min(data_j, axis=1, keepdims=True))
+    # data_j = np.linalg.norm(data_j, axis=1, keepdims=True)
+    # data_j = np.concatenate([data_j, np.expand_dims(data_k, axis=-1)], axis=1)
+    # # data_j = np.concatenate([data_i[1:], data_j], axis=1)
+    # # data_j = np.concatenate([np.clip(1/data_j, 1e-8, 1e8), data_j], axis=1)
+    # kmeans = KMeans(n_clusters=20, random_state=0).fit(data_j)
+    # print(kmeans.labels_)
+
+    # .reshape((1,71,25,3,1)).transpose([0,3,1,2,4]).shape
+
+    # data = np.concatenate([data for _ in range(100)], 2)
+    # visualize_3dskeleton_in_matplotlib(data, graph=graph, is_3d=True)
 
     # draw_skeleton(data)
 

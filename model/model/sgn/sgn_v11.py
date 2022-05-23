@@ -313,10 +313,11 @@ class SGN(PyTorchModule):
         # 0 no fpn,
         # 1 proj and sum,
         # 2 proj to lower
+        # 3 proj
         self.gcn_fpn = gcn_fpn
         if self.gcn_fpn == 0:
             assert self.semantic_frame_location == 1
-        elif self.gcn_fpn == 1:
+        elif self.gcn_fpn == 1 or self.gcn_fpn == 3:
             for i in range(len(sgcn_dims)):
                 setattr(self,
                         f'fpn_proj{i+1}',
@@ -365,7 +366,7 @@ class SGN(PyTorchModule):
 
                 if self.gcn_fpn == 0:
                     in_ch = sgcn_dim
-                elif self.gcn_fpn == 1:
+                elif self.gcn_fpn == 1 or self.gcn_fpn == 3:
                     in_ch = sgcn_dims[-1]
                 elif self.gcn_fpn == 2:
                     in_ch = sgcn_dims[0]
@@ -497,6 +498,10 @@ class SGN(PyTorchModule):
             x_list = [x_list[2] + x_list[1] + x_list[0],
                       x_list[2] + x_list[1],
                       x_list[2]]
+        elif self.gcn_fpn == 3:
+            assert hasattr(self, 'sgcn')
+            x_list = [getattr(self, f'fpn_proj{i+1}')(x_spa_list[i])
+                      for i in range(len(x_spa_list))]
         else:
             x_list = [None, None, x_spa_list[-1]]
 
@@ -1091,7 +1096,7 @@ if __name__ == '__main__':
         sgcn_g_kernel=1,
         sgcn_g_proj_dim=None,  # c3
         sgcn_g_proj_shared=False,
-        gcn_fpn=0,
+        gcn_fpn=3,
         spatial_maxpool=1,
         temporal_maxpool=1,
         aspp_rates=None,
