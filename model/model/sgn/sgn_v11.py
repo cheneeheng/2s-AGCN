@@ -238,6 +238,8 @@ class SGN(PyTorchModule):
         if self.semantic_frame_location == 0:
             if gcn_fpn == 2:
                 out_channels = self.gcn_in_ch
+            elif gcn_fpn == 5:
+                out_channels = self.c3//4
             else:
                 out_channels = self.c3
         # pre gcn
@@ -315,6 +317,7 @@ class SGN(PyTorchModule):
         # 2 proj to lower
         # 3 proj
         # 4 proj and concat
+        # 5 proj to lower and concat
         self.gcn_fpn = gcn_fpn
         if self.gcn_fpn == 0:
             assert self.semantic_frame_location == 1
@@ -340,6 +343,18 @@ class SGN(PyTorchModule):
                              activation=self.activation_fn,
                              normalization=lambda: self.normalization_fn(
                                  sgcn_dims[0]),
+                             #  dropout=self.dropout_fn,
+                             ))
+        elif self.gcn_fpn == 5:
+            for i in range(len(sgcn_dims)):
+                setattr(self,
+                        f'fpn_proj{i+1}',
+                        Conv(sgcn_dims[i],
+                             sgcn_dims[-1]//4,
+                             bias=self.bias,
+                             activation=self.activation_fn,
+                             normalization=lambda: self.normalization_fn(
+                                 sgcn_dims[-1]//4),
                              #  dropout=self.dropout_fn,
                              ))
 
@@ -373,6 +388,8 @@ class SGN(PyTorchModule):
                     in_ch = sgcn_dims[0]
                 elif self.gcn_fpn == 4:
                     in_ch = sgcn_dims[-1]*3
+                elif self.gcn_fpn == 5:
+                    in_ch = sgcn_dims[-1]//4 * 3
                 else:
                     in_ch = sgcn_dims[-1]
 
@@ -501,7 +518,7 @@ class SGN(PyTorchModule):
             x_list = [x_list[2] + x_list[1] + x_list[0],
                       x_list[2] + x_list[1],
                       x_list[2]]
-        elif self.gcn_fpn in [3, 4]:
+        elif self.gcn_fpn in [3, 4, 5]:
             assert hasattr(self, 'sgcn')
             x_list = [getattr(self, f'fpn_proj{i+1}')(x_spa_list[i])
                       for i in range(len(x_spa_list))]
@@ -516,7 +533,7 @@ class SGN(PyTorchModule):
         # spatial pooling
         x_list = [self.smp(i) if i is not None else None for i in x_list]
 
-        if self.gcn_fpn == 4:
+        if self.gcn_fpn in [4, 5]:
             x_list = [None, None, torch.cat(x_list, dim=1)]
 
         # temporal MLP
@@ -1081,7 +1098,7 @@ if __name__ == '__main__':
         bias=1,
         dropout=0.0,  # classifier
         dropout2d=0.0,  # the rest
-        c_multiplier=1,
+        c_multiplier=[1.0, 1.0, 1.0, 0.25],
         norm_type='bn-pre',
         act_type='relu',
         xem_projection=0,
@@ -1102,14 +1119,14 @@ if __name__ == '__main__':
         sgcn_g_kernel=1,
         sgcn_g_proj_dim=None,  # c3
         sgcn_g_proj_shared=False,
-        gcn_fpn=4,
+        gcn_fpn=5,
         spatial_maxpool=1,
         temporal_maxpool=1,
         aspp_rates=None,
         t_mode=1,
         t_maxpool_kwargs=None,
         multi_t=[[], [], [3, 5, 7]],
-        multi_t_shared=0,
+        multi_t_shared=2,
     )
     model(inputs)
     print(model)
