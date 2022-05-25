@@ -6,7 +6,9 @@ https://programmer.ink/think/how-to-realize-ntu-rgb-d-skeleton-visualization-gra
 from sklearn.cluster import KMeans
 
 import numpy as np
+import os
 
+from matplotlib import pyplot as plt
 from plotly import graph_objects as go
 from time import sleep
 
@@ -245,58 +247,111 @@ def draw_skeleton_offline(data, pause_sec=10, action=""):
 
 if __name__ == '__main__':
 
-    file_name = r'./data/data/nturgbd_raw/nturgb+d_skeletons/S001C001P001R001A011.skeleton'  # noqa
-    max_V = 25  # Number of nodes
-    max_M = 2  # Number of skeletons
-    with open(file_name, 'r') as fr:
-        frame_num = int(fr.readline())
-        data = np.zeros((3, frame_num, 25, 2))
-        for frame in range(frame_num):
-            person_num = int(fr.readline())
-            for person in range(person_num):
-                fr.readline()
-                joint_num = int(fr.readline())
-                for joint in range(joint_num):
-                    v = fr.readline().split(' ')
-                    if joint < max_V and person < max_M:
-                        data[0, frame, joint, person] = float(
-                            v[0])  # A coordinate of a joint
-                        data[1, frame, joint, person] = float(v[1])
-                        data[2, frame, joint, person] = float(v[2])
-    data = pre_normalization(np.expand_dims(data, 0),
-                             #  xaxis=None,
-                             #  zaxis=None,
-                             verbose=False,
-                             tqdm=False)[0]
+    fig, axs = plt.subplots(2)
 
-    print('read data done!')
-    print(data.shape)  # C, T, V, M
+    base_path = './data/data/nturgbd_raw/nturgb+d_skeletons'
+    paths = [os.path.join(base_path, f) for f in sorted(os.listdir(base_path))]
+    paths = [i for i in paths if 'A012' in i]
 
-    graph = 'graph.ntu_rgb_d.Graph'
-    data = data.reshape((1,) + data.shape)[:, :, :, :, 0:1]
+    for file_name in paths:
+        # file_name = r'./data/data/nturgbd_raw/nturgb+d_skeletons/S001C001P001R001A012.skeleton'  # noqa
+        max_V = 25  # Number of nodes
+        max_M = 2  # Number of skeletons
+        with open(file_name, 'r') as fr:
+            frame_num = int(fr.readline())
+            data = np.zeros((3, frame_num, 25, 2))
+            for frame in range(frame_num):
+                person_num = int(fr.readline())
+                for person in range(person_num):
+                    fr.readline()
+                    joint_num = int(fr.readline())
+                    for joint in range(joint_num):
+                        v = fr.readline().split(' ')
+                        if joint < max_V and person < max_M:
+                            data[0, frame, joint, person] = float(
+                                v[0])  # A coordinate of a joint
+                            data[1, frame, joint, person] = float(v[1])
+                            data[2, frame, joint, person] = float(v[2])
+        data = pre_normalization(np.expand_dims(data, 0),
+                                 #  xaxis=None,
+                                 #  zaxis=None,
+                                 verbose=False,
+                                 tqdm=False)[0]
 
-    # T, VC
-    data_i = data.transpose([0, 2, 3, 1, 4]).reshape((data.shape[2], 25*3))
-    # T-1, VC
-    data_j = data_i[1:] - data_i[:-1]
-    # T-1
-    data_k = np.linalg.norm(data_j, axis=1)
-    # T-1, VC
-    data_l = abs(data_k - (data_k.max() - data_k.min())/2)
-    # T-1, VC
-    data_m = np.expand_dims(np.cumsum(data_l), -1)
-    data_n = np.expand_dims(np.cumsum(data_k), -1)
-    kmeans1 = KMeans(n_clusters=20, random_state=0).fit(data_m)
-    kmeans2 = KMeans(n_clusters=20, random_state=0).fit(data_n)
+        print('read data done!')
+        print(data.shape)  # C, T, V, M
 
-    print(kmeans1.labels_, kmeans2.labels_)
+        graph = 'graph.ntu_rgb_d.Graph'
+        data = data.reshape((1,) + data.shape)[:, :, :, :, 0:1]
 
-    from matplotlib import pyplot as plt
-    plt.plot(data_l)
-    plt.plot(kmeans1.labels_/200)
-    plt.plot(data_k)
-    plt.plot(kmeans2.labels_/200)
-    plt.show()
+        # T, VC
+        data_i = data.transpose([0, 2, 3, 1, 4]).reshape((data.shape[2], 25*3))
+        # T-1, VC
+        data_j = data_i[1:] - data_i[:-1]
+        # T-1 (l2 normed values)
+        data_k = np.linalg.norm(data_j, axis=1)
+        # T-1 (l2 normed and shifted to mid value range)
+        data_l = abs(data_k - (data_k.max() - data_k.min())/2)
+        # T-1, VC
+        data_m = np.expand_dims(np.cumsum(data_l), -1)
+        data_n = np.expand_dims(np.cumsum(data_k), -1)
+        kmeans1 = KMeans(n_clusters=20, random_state=0).fit(data_m)
+        kmeans2 = KMeans(n_clusters=20, random_state=0).fit(data_n)
+        center1 = kmeans1.labels_
+        center2 = kmeans2.labels_
+
+        print(center1, center2)
+
+        c = 0
+        i_mem = -1
+        idx1 = []
+        label_map1 = {i: -1 for i in range(20)}
+        for idx, i in enumerate(center1):
+            if i != i_mem:
+                label_map1[i] = c
+                i_mem = i
+                c += 1
+                idx1.append(idx)
+
+        c = 0
+        i_mem = -1
+        idx2 = []
+        label_map2 = {i: -1 for i in range(20)}
+        for idx, i in enumerate(center2):
+            if i != i_mem:
+                label_map2[i] = c
+                i_mem = i
+                c += 1
+                idx2.append(idx)
+
+        _center1 = center1*0 - 1
+        for k, v in label_map1.items():
+            _center1[center1 == k] = v
+        center1 = _center1
+
+        _center2 = center2*0 - 1
+        for k, v in label_map2.items():
+            _center2[center2 == k] = v
+        center2 = _center2
+
+        axs[0].set_title('Normed + Shifted')
+        axs[0].plot(data_l, 'b.-')
+        for i in range(len(idx1)-1):
+            axs[0].axvspan(idx1[i], idx1[i+1],
+                           facecolor='b' if i % 2 == 0 else 'g',
+                           alpha=0.3)
+        axs[0].plot(center1/20, 'r^-')
+        axs[1].set_title('Normed')
+        axs[1].plot(data_k, 'b.-')
+        for i in range(len(idx2)-1):
+            axs[1].axvspan(idx2[i], idx2[i+1],
+                           facecolor='b' if i % 2 == 0 else 'g',
+                           alpha=0.3)
+        axs[1].plot(center2/20, 'r^-')
+        plt.show(block=False)
+        plt.pause(200)
+        axs[0].cla()
+        axs[1].cla()
 
     # data_i = data.transpose([0, 2, 3, 1, 4]).reshape((data.shape[2], 25*3))
     # data_j = data_i[1:] - data_i[:-1]

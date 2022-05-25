@@ -38,6 +38,7 @@ class NTUDataLoaders(object):
                  motion_sampler: int = 0,
                  motion_norm: int = 0,
                  center_sampler: float = 0.0,
+                 midvel_sampler: int = 0,
                  **kwargs):
         self.dataset = dataset
         self.aug = aug
@@ -47,6 +48,7 @@ class NTUDataLoaders(object):
         self.motion_sampler = motion_sampler
         self.motion_norm = motion_norm
         self.center_sampler = center_sampler
+        self.midvel_sampler = midvel_sampler
 
     def get_train_loader(self, batch_size: int, num_workers: int):
         if self.aug == 0:
@@ -239,8 +241,16 @@ class NTUDataLoaders(object):
             if 0 in intervals_range:
                 raise ValueError("0 in intervals_range")
 
+        if self.midvel_sampler == 1:
+            intervals = tools.split_idx_using_kmeans(skeleton_seq, self.seg)
+            intervals = intervals.round().astype(int)
+            intervals_check(intervals)
+            random_intervals_range_fn = partial(np.random.randint,
+                                                low=intervals[:-1],
+                                                high=intervals[1:])
+
         # sampling based on ~equal motion using AUC.
-        if self.motion_sampler == 1:
+        elif self.motion_sampler == 1:
             intervals, _ = tools.split_idx_using_auc(skeleton_seq, self.seg)
             intervals = intervals.round().astype(int)
             intervals_check(intervals)

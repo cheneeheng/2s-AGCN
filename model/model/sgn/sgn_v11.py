@@ -310,14 +310,15 @@ class SGN(PyTorchModule):
         )
 
         # GCN FPN --------------------------------------------------------------
-        # 0 no fpn,
-        # 1 proj and sum,
+        # 0 no fpn
+        # 1 proj and sum
         # 2 proj to lower
         # 3 proj
+        # 4 proj and concat
         self.gcn_fpn = gcn_fpn
         if self.gcn_fpn == 0:
             assert self.semantic_frame_location == 1
-        elif self.gcn_fpn == 1 or self.gcn_fpn == 3:
+        elif self.gcn_fpn in [1, 3, 4]:
             for i in range(len(sgcn_dims)):
                 setattr(self,
                         f'fpn_proj{i+1}',
@@ -366,10 +367,12 @@ class SGN(PyTorchModule):
 
                 if self.gcn_fpn == 0:
                     in_ch = sgcn_dim
-                elif self.gcn_fpn == 1 or self.gcn_fpn == 3:
+                elif self.gcn_fpn in [1, 3]:
                     in_ch = sgcn_dims[-1]
                 elif self.gcn_fpn == 2:
                     in_ch = sgcn_dims[0]
+                elif self.gcn_fpn == 4:
+                    in_ch = sgcn_dims[-1]*3
                 else:
                     in_ch = sgcn_dims[-1]
 
@@ -498,7 +501,7 @@ class SGN(PyTorchModule):
             x_list = [x_list[2] + x_list[1] + x_list[0],
                       x_list[2] + x_list[1],
                       x_list[2]]
-        elif self.gcn_fpn == 3:
+        elif self.gcn_fpn in [3, 4]:
             assert hasattr(self, 'sgcn')
             x_list = [getattr(self, f'fpn_proj{i+1}')(x_spa_list[i])
                       for i in range(len(x_spa_list))]
@@ -512,6 +515,9 @@ class SGN(PyTorchModule):
 
         # spatial pooling
         x_list = [self.smp(i) if i is not None else None for i in x_list]
+
+        if self.gcn_fpn == 4:
+            x_list = [None, None, torch.cat(x_list, dim=1)]
 
         # temporal MLP
         _x_list = []
@@ -1096,13 +1102,13 @@ if __name__ == '__main__':
         sgcn_g_kernel=1,
         sgcn_g_proj_dim=None,  # c3
         sgcn_g_proj_shared=False,
-        gcn_fpn=3,
+        gcn_fpn=4,
         spatial_maxpool=1,
         temporal_maxpool=1,
         aspp_rates=None,
         t_mode=1,
         t_maxpool_kwargs=None,
-        multi_t=[[3], [3, 5], [3, 5, 7]],
+        multi_t=[[], [], [3, 5, 7]],
         multi_t_shared=0,
     )
     model(inputs)

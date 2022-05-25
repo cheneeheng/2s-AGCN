@@ -1,6 +1,7 @@
 import numpy as np
 import random
 from scipy import interpolate
+from sklearn.cluster import KMeans
 from typing import Tuple
 
 import torch
@@ -377,6 +378,24 @@ def split_idx_using_auc(data_numpy: np.ndarray,
     seg_lbs[-1] = N
     return seg_lbs, cum_auc[-1]
 
+
+def split_idx_using_kmeans(data_numpy: np.ndarray,
+                           num_segments: int) -> Tuple[np.ndarray, float]:
+    # data_numpy: T, VC
+    # T-1, VC
+    data = data_numpy[1:] - data_numpy[:-1]
+    # T-1 (l2 normed values)
+    data = np.linalg.norm(data, axis=1)
+    # T-1 (l2 normed and shifted to mid value range)
+    data = abs(data - (data.max() - data.min())/2)
+    # T-1, 1
+    data = np.expand_dims(np.cumsum(data), -1)
+    kmeans = KMeans(n_clusters=num_segments, random_state=0).fit(data)
+    _, idxs = np.unique(kmeans.labels_, return_index=True)
+    idxs.sort()
+
+    # starting idx of each segs
+    return np.append(idxs, data_numpy.shape[0])
 
 # ##############################################################################
 # Tests
