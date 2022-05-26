@@ -240,6 +240,8 @@ class SGN(PyTorchModule):
                 out_channels = self.gcn_in_ch
             elif gcn_fpn == 5:
                 out_channels = self.c3//4
+            elif gcn_fpn == 6:
+                out_channels = 64
             else:
                 out_channels = self.c3
         # pre gcn
@@ -314,47 +316,34 @@ class SGN(PyTorchModule):
         # GCN FPN --------------------------------------------------------------
         # 0 no fpn
         # 1 proj and sum
-        # 2 proj to lower
+        # 2 proj to lower and sum
         # 3 proj
         # 4 proj and concat
         # 5 proj to lower and concat
+        # 6 proj to 64 and sum
         self.gcn_fpn = gcn_fpn
         if self.gcn_fpn == 0:
             assert self.semantic_frame_location == 1
-        elif self.gcn_fpn in [1, 3, 4]:
+        else:
             for i in range(len(sgcn_dims)):
+                if self.gcn_fpn in [1, 3, 4]:
+                    out_channels = sgcn_dims[-1]
+                elif self.gcn_fpn == 2:
+                    out_channels = sgcn_dims[0]
+                elif self.gcn_fpn == 5:
+                    out_channels = sgcn_dims[-1]//4
+                elif self.gcn_fpn == 6:
+                    out_channels = 64
+                else:
+                    raise ValueError
                 setattr(self,
                         f'fpn_proj{i+1}',
                         Conv(sgcn_dims[i],
-                             sgcn_dims[-1],
+                             out_channels,
                              bias=self.bias,
                              activation=self.activation_fn,
                              normalization=lambda: self.normalization_fn(
-                                 sgcn_dims[-1]),
-                             #  dropout=self.dropout_fn,
-                             ))
-        elif self.gcn_fpn == 2:
-            for i in range(len(sgcn_dims)):
-                setattr(self,
-                        f'fpn_proj{i+1}',
-                        Conv(sgcn_dims[i],
-                             sgcn_dims[0],
-                             bias=self.bias,
-                             activation=self.activation_fn,
-                             normalization=lambda: self.normalization_fn(
-                                 sgcn_dims[0]),
-                             #  dropout=self.dropout_fn,
-                             ))
-        elif self.gcn_fpn == 5:
-            for i in range(len(sgcn_dims)):
-                setattr(self,
-                        f'fpn_proj{i+1}',
-                        Conv(sgcn_dims[i],
-                             sgcn_dims[-1]//4,
-                             bias=self.bias,
-                             activation=self.activation_fn,
-                             normalization=lambda: self.normalization_fn(
-                                 sgcn_dims[-1]//4),
+                                 out_channels),
                              #  dropout=self.dropout_fn,
                              ))
 
@@ -390,6 +379,8 @@ class SGN(PyTorchModule):
                     in_ch = sgcn_dims[-1]*3
                 elif self.gcn_fpn == 5:
                     in_ch = sgcn_dims[-1]//4 * 3
+                elif self.gcn_fpn == 6:
+                    in_ch = 64
                 else:
                     in_ch = sgcn_dims[-1]
 
@@ -511,7 +502,7 @@ class SGN(PyTorchModule):
         # gcn fpn
         if self.gcn_fpn == 0:
             x_list = x_spa_list
-        elif self.gcn_fpn in [1, 2]:
+        elif self.gcn_fpn in [1, 2, 6]:
             assert hasattr(self, 'sgcn')
             x_list = [getattr(self, f'fpn_proj{i+1}')(x_spa_list[i])
                       for i in range(len(x_spa_list))]
@@ -1119,14 +1110,14 @@ if __name__ == '__main__':
         sgcn_g_kernel=1,
         sgcn_g_proj_dim=None,  # c3
         sgcn_g_proj_shared=False,
-        gcn_fpn=5,
+        gcn_fpn=6,
         spatial_maxpool=1,
         temporal_maxpool=1,
         aspp_rates=None,
         t_mode=1,
         t_maxpool_kwargs=None,
-        multi_t=[[], [], [3, 5, 7]],
-        multi_t_shared=2,
+        multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7]],
+        multi_t_shared=0,
     )
     model(inputs)
     print(model)
