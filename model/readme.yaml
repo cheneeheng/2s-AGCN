@@ -2040,6 +2040,11 @@ sgn_v10:
                   - 94.64%
 
 sgn_v11:
+        - 220525170001_midvel1:
+                  - 94.21%
+        - 220525170001_midvel1_multit357:
+                  - 94.82%
+
         - 220520150001_rerun_orisgn:
                   - 94.56%
         - 220520150001_multit333:
@@ -2122,10 +2127,24 @@ sgn_v11:
         - 220525170001_gcnfpn5_multit357_cmulti111025:
                   - 94.61%
 
-        - 220525170001_midvel1:
-                  - 94.21%
-        - 220525170001_midvel1_multit357:
-                  - 94.82%
+        - 220525170001_gcnfpn6_multit357___cmulti1111:
+                  - 93.09%
+        - 220525170001_gcnfpn6_multit357___cmulti11105:
+                  - 93.09%
+        - 220525170001_gcnfpn6_multit357___cmulti111025:
+                  - 93.25%
+        - 220525170001_gcnfpn6_multit357357357shared_cmulti1111:
+                  - 93.78%
+        - 220525170001_gcnfpn6_multit357357357shared_cmulti11105:
+                  - 93.53%
+        - 220525170001_gcnfpn6_multit357357357shared_cmulti111025:
+                  - 93.70%
+        - 220525170001_gcnfpn6_multit357357357_cmulti111025:
+                  - 93.74%
+        - 220525170001_gcnfpn6_multit357357357_cmulti11105:
+                  - 93.95%
+        - 220525170001_gcnfpn6_multit357357357_cmulti1111:
+                  - 93.37%
 
 sgn-code:
         - original sgn repo code

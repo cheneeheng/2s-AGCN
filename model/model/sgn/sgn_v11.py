@@ -21,9 +21,8 @@ try:
 except ImportError:
     print("Warning: fvcore is not found")
 
-import inspect
 import math
-from typing import OrderedDict, Tuple, Optional, Union, Type, List, Any
+from typing import Tuple, Optional, Union, Type, List, Any
 
 from model.module import *
 from model.module.layernorm import LayerNorm
@@ -129,6 +128,8 @@ class SGN(PyTorchModule):
                  # int for global res, list for individual gcn
                  sgcn_residual: T3 = [0, 0, 0],
                  sgcn_prenorm: bool = False,
+                 sgcn_ffn: int = 0,
+                 sgcn_v_kernel: int = 0,
                  sgcn_g_kernel: int = 1,
                  sgcn_g_proj_dim: Optional[T3] = None,  # c3
                  sgcn_g_proj_shared: bool = False,
@@ -305,12 +306,14 @@ class SGN(PyTorchModule):
             gcn_dims=[self.gcn_in_ch] + sgcn_dims,
             gcn_residual=sgcn_residual,
             gcn_prenorm=sgcn_prenorm,
+            gcn_v_kernel=sgcn_v_kernel,
+            gcn_ffn=sgcn_ffn,
             g_kernel=sgcn_g_kernel,
             g_proj_dim=sgcn_g_proj_dim,
             g_proj_shared=sgcn_g_proj_shared,
             g_activation=self.g_activation_fn,
-            return_g=True,
-            return_gcn_list=True,
+            # return_g=True,
+            # return_gcn_list=True,
         )
 
         # GCN FPN --------------------------------------------------------------
@@ -322,7 +325,9 @@ class SGN(PyTorchModule):
         # 5 proj to lower and concat
         # 6 proj to 64 and sum
         self.gcn_fpn = gcn_fpn
-        if self.gcn_fpn == 0:
+        if self.gcn_fpn < 0:
+            pass
+        elif self.gcn_fpn == 0:
             assert self.semantic_frame_location == 1
         else:
             for i in range(len(sgcn_dims)):
@@ -744,6 +749,47 @@ class SemanticEmbedding(PyTorchModule):
         return spa_emb, tem_emb
 
 
+class GCNSpatialFFN(Module):
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 kernel_size: int = 1,
+                 padding: int = 0,
+                 bias: int = 0,
+                 activation: T1 = nn.ReLU,
+                 normalization: T1 = nn.BatchNorm2d,
+                 multiplier: int = 4
+                 ):
+        super(GCNSpatialFFN, self).__init__(in_channels,
+                                            out_channels,
+                                            kernel_size=kernel_size,
+                                            padding=padding,
+                                            bias=bias,
+                                            activation=activation,
+                                            normalization=normalization)
+        self.ffn1 = Conv(self.in_channels,
+                         self.in_channels*multiplier,
+                         bias=self.bias,
+                         kernel_size=self.kernel_size,
+                         padding=self.padding,
+                         activation=self.activation,
+                         normalization=lambda: self.normalization(
+                             self.in_channels*multiplier))
+        self.ffn2 = Conv(self.in_channels*multiplier,
+                         self.out_channels,
+                         bias=self.bias,
+                         kernel_size=self.kernel_size,
+                         padding=self.padding,
+                         activation=self.activation,
+                         normalization=lambda: self.normalization(
+                             self.out_channels))
+
+    def forward(self, x: Tensor) -> Tensor:
+        x = self.ffn1(x)
+        x = self.ffn2(x)
+        return x
+
+
 class GCNSpatialG(Module):
     def __init__(self,
                  in_channels: int,
@@ -788,6 +834,7 @@ class GCNSpatialUnit(Module):
                  activation: T1 = nn.ReLU,
                  normalization: T1 = nn.BatchNorm2d,
                  prenorm: bool = False,
+                 v_kernel_size: int = 0,
                  ):
         super(GCNSpatialUnit, self).__init__(in_channels,
                                              out_channels,
@@ -798,22 +845,32 @@ class GCNSpatialUnit(Module):
                                              activation=activation,
                                              normalization=normalization,
                                              prenorm=prenorm)
-        if not self.prenorm:
-            self.norm = self.normalization(self.out_channels)
-        self.act = self.activation()
-        self.drop = nn.Identity() if self.dropout is None else self.dropout()
+        if v_kernel_size > 0:
+            self.w0 = Conv(self.in_channels,
+                           self.in_channels,
+                           kernel_size=v_kernel_size,
+                           padding=v_kernel_size//2,
+                           bias=self.bias)
+        else:
+            self.w0 = nn.Identity()
         # in original SGN bias for w1 is false
         self.w1 = Conv(self.in_channels, self.out_channels, bias=self.bias)
         self.w2 = Conv(self.in_channels, self.out_channels, bias=self.bias,
                        kernel_size=self.kernel_size, padding=self.padding)
+        if self.prenorm:
+            self.norm = nn.Identity()
+        else:
+            self.norm = self.normalization(self.out_channels)
+        self.act = self.activation()
+        self.drop = nn.Identity() if self.dropout is None else self.dropout()
 
     def forward(self, x: Tensor, g: Tensor) -> Tensor:
-        x1 = x.permute(0, 3, 2, 1).contiguous()  # n,t,v,c
+        x1 = self.w0(x)
+        x1 = x1.permute(0, 3, 2, 1).contiguous()  # n,t,v,c
         x1 = g.matmul(x1)
         x1 = x1.permute(0, 3, 2, 1).contiguous()  # n,c,v,t
         x1 = self.w1(x1) + self.w2(x)  # z + residual
-        if not self.prenorm:
-            x1 = self.norm(x1)
+        x1 = self.norm(x1)
         x1 = self.act(x1)
         x1 = self.drop(x1)
         return x1
@@ -830,16 +887,18 @@ class GCNSpatialBlock(PyTorchModule):
                  gcn_dims: List[int] = [128, 256, 256],
                  gcn_residual: T3 = [0, 0, 0],
                  gcn_prenorm: bool = False,
+                 gcn_v_kernel: int = 0,
+                 gcn_ffn: int = 0,
                  g_proj_dim: T3 = 256,
                  g_kernel: int = 1,
                  g_proj_shared: bool = False,
                  g_activation: T1 = nn.Softmax,
-                 return_g: bool = True,
-                 return_gcn_list: bool = False,
+                 #  return_g: bool = True,
+                 #  return_gcn_list: bool = False,
                  ):
         super(GCNSpatialBlock, self).__init__()
-        self.return_g = return_g
-        self.return_gcn_list = return_gcn_list
+        # self.return_g = return_g
+        # self.return_gcn_list = return_gcn_list
         self.num_blocks = len(gcn_dims) - 1
         self.g_shared = isinstance(g_proj_dim, int)
         if self.g_shared:
@@ -871,11 +930,22 @@ class GCNSpatialBlock(PyTorchModule):
                                    dropout=dropout,
                                    activation=activation,
                                    normalization=normalization,
-                                   prenorm=gcn_prenorm))
+                                   prenorm=gcn_prenorm,
+                                   v_kernel_size=gcn_v_kernel))
 
         if gcn_prenorm:
             for i in range(self.num_blocks):
                 setattr(self, f'gcn_prenorm{i+1}', normalization(gcn_dims[i]))
+
+        if gcn_ffn > 0:
+            for i in range(self.num_blocks):
+                setattr(self, f'gcn_ffn{i+1}',
+                        GCNSpatialFFN(gcn_dims[i+1],
+                                      gcn_dims[i+1],
+                                      bias=bias,
+                                      activation=activation,
+                                      normalization=normalization,
+                                      multiplier=gcn_ffn))
 
         if isinstance(gcn_residual, list):
             assert len(gcn_residual) == self.num_blocks
@@ -906,23 +976,24 @@ class GCNSpatialBlock(PyTorchModule):
                 g.append(g1)
 
             r = getattr(self, f'gcn_res{i+1}')(x)
-            if isinstance(r, Tensor):
-                if hasattr(self, f'gcn_maxpool{i+1}'):
-                    r = getattr(self, f'gcn_maxpool{i+1}')(r)
             x = getattr(self, f'gcn{i+1}')(x1, g1) + r
+
+            if hasattr(self, f'gcn_ffn{i+1}'):
+                x = getattr(self, f'gcn_ffn{i+1}')(x)
 
             gcn_list.append(x)
 
         x += self.res(x0)
 
-        if self.return_gcn_list and self.return_g:
-            return x, g, gcn_list
-        elif self.return_gcn_list:
-            return x, gcn_list
-        elif self.return_g:
-            return x, g
-        else:
-            return x
+        return x, g, gcn_list
+        # if self.return_gcn_list and self.return_g:
+        #     return x, g, gcn_list
+        # elif self.return_gcn_list:
+        #     return x, gcn_list
+        # elif self.return_g:
+        #     return x, g
+        # else:
+        #     return x
 
 
 class MLPTemporal(PyTorchModule):
@@ -1089,7 +1160,7 @@ if __name__ == '__main__':
         bias=1,
         dropout=0.0,  # classifier
         dropout2d=0.0,  # the rest
-        c_multiplier=[1.0, 1.0, 1.0, 0.25],
+        c_multiplier=[1.0, 1.0, 1.0, 1.0],
         norm_type='bn-pre',
         act_type='relu',
         xem_projection=0,
@@ -1107,16 +1178,18 @@ if __name__ == '__main__':
         # int for global res, list for individual gcn
         sgcn_residual=[0, 0, 0],
         sgcn_prenorm=False,
+        sgcn_ffn=2,
+        sgcn_v_kernel=1,
         sgcn_g_kernel=1,
         sgcn_g_proj_dim=None,  # c3
         sgcn_g_proj_shared=False,
-        gcn_fpn=6,
+        # gcn_fpn=0,
         spatial_maxpool=1,
         temporal_maxpool=1,
         aspp_rates=None,
         t_mode=1,
         t_maxpool_kwargs=None,
-        multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7]],
+        multi_t=[[], [], [3, 5, 7]],
         multi_t_shared=0,
     )
     model(inputs)
