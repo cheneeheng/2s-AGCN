@@ -122,9 +122,9 @@ class SGN(PyTorchModule):
                  semantic_frame_location: int = 0,
 
                  sgcn_dims: Optional[list] = None,  # [c2, c3, c3],
-                 sgcn_kernel: int = 1,  # residual connection in GCN
-                 sgcn_padding: int = 0,  # residual connection in GCN
-                 sgcn_dropout: float = 0.0,  # residual connection in GCN
+                 sgcn_kernel: int = 1,  # res connection in GCN, 0 = no res
+                 sgcn_padding: int = 0,  # res connection in GCN
+                 sgcn_dropout: float = 0.0,  # res connection in GCN
                  # int for global res, list for individual gcn
                  sgcn_residual: T3 = [0, 0, 0],
                  sgcn_prenorm: bool = False,
@@ -855,8 +855,11 @@ class GCNSpatialUnit(Module):
             self.w0 = nn.Identity()
         # in original SGN bias for w1 is false
         self.w1 = Conv(self.in_channels, self.out_channels, bias=self.bias)
-        self.w2 = Conv(self.in_channels, self.out_channels, bias=self.bias,
-                       kernel_size=self.kernel_size, padding=self.padding)
+        if self.kernel_size > 0:
+            self.w2 = Conv(self.in_channels, self.out_channels, bias=self.bias,
+                           kernel_size=self.kernel_size, padding=self.padding)
+        else:
+            self.w2 = null_fn
         if self.prenorm:
             self.norm = nn.Identity()
         else:
@@ -1181,7 +1184,7 @@ if __name__ == '__main__':
         sgcn_ffn=2,
         sgcn_v_kernel=1,
         sgcn_g_kernel=1,
-        sgcn_g_proj_dim=None,  # c3
+        # sgcn_g_proj_dim=[512, 512, 512],  # c3
         sgcn_g_proj_shared=False,
         # gcn_fpn=0,
         spatial_maxpool=1,
