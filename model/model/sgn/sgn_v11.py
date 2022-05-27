@@ -133,6 +133,7 @@ class SGN(PyTorchModule):
                  sgcn_g_kernel: int = 1,
                  sgcn_g_proj_dim: Optional[T3] = None,  # c3
                  sgcn_g_proj_shared: bool = False,
+                 sgcn_g_weighted: int = 0,
 
                  gcn_fpn: int = -1,
 
@@ -312,6 +313,7 @@ class SGN(PyTorchModule):
             g_proj_dim=sgcn_g_proj_dim,
             g_proj_shared=sgcn_g_proj_shared,
             g_activation=self.g_activation_fn,
+            g_weighted=sgcn_g_weighted,
             # return_g=True,
             # return_gcn_list=True,
         )
@@ -785,8 +787,9 @@ class GCNSpatialFFN(Module):
                              self.out_channels))
 
     def forward(self, x: Tensor) -> Tensor:
-        x = self.ffn1(x)
-        x = self.ffn2(x)
+        x1 = self.ffn1(x)
+        x1 = self.ffn2(x1)
+        x1 = x1 + x
         return x
 
 
@@ -814,12 +817,15 @@ class GCNSpatialG(Module):
             self.g2 = Conv(self.in_channels, self.out_channels, bias=self.bias,
                            kernel_size=self.kernel_size, padding=self.padding)
         self.act = self.activation(dim=-1)
+        self.alpha = nn.Parameter(torch.zeros(1))
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor, g: Optional[Tensor] = None) -> Tensor:
         g1 = self.g1(x).permute(0, 3, 2, 1).contiguous()  # n,t,v,c
         g2 = self.g2(x).permute(0, 3, 1, 2).contiguous()  # n,t,c,v
         g3 = g1.matmul(g2)  # n,t,v,v
         g4 = self.act(g3)
+        if g is not None:
+            g4 = (g * self.alpha + g4) / (self.alpha + 1)
         return g4
 
 
@@ -896,12 +902,14 @@ class GCNSpatialBlock(PyTorchModule):
                  g_kernel: int = 1,
                  g_proj_shared: bool = False,
                  g_activation: T1 = nn.Softmax,
+                 g_weighted: int = 0,
                  #  return_g: bool = True,
                  #  return_gcn_list: bool = False,
                  ):
         super(GCNSpatialBlock, self).__init__()
         # self.return_g = return_g
         # self.return_gcn_list = return_gcn_list
+
         self.num_blocks = len(gcn_dims) - 1
         self.g_shared = isinstance(g_proj_dim, int)
         if self.g_shared:
@@ -922,6 +930,10 @@ class GCNSpatialBlock(PyTorchModule):
                                     padding=g_kernel//2,
                                     activation=g_activation,
                                     g_proj_shared=g_proj_shared))
+
+        if g_weighted == 1:
+            assert not self.g_shared
+            self.g_weighted = g_weighted
 
         for i in range(self.num_blocks):
             setattr(self, f'gcn{i+1}',
@@ -974,12 +986,17 @@ class GCNSpatialBlock(PyTorchModule):
             if hasattr(self, f'gcn_prenorm{i+1}'):
                 x1 = getattr(self, f'gcn_prenorm{i+1}')(x1)
 
-            if (self.g_shared and len(g) == 0) or not self.g_shared:
-                g1 = getattr(self, f'gcn_g{i+1}')(x1)
-                g.append(g1)
+            if len(g) == 0:
+                g.append(getattr(self, f'gcn_g{i+1}')(x1))
+            else:
+                if not self.g_shared:
+                    if hasattr(self, 'g_weighted'):
+                        g.append(getattr(self, f'gcn_g{i+1}')(x1, g[-1]))
+                    else:
+                        g.append(getattr(self, f'gcn_g{i+1}')(x1))
 
             r = getattr(self, f'gcn_res{i+1}')(x)
-            x = getattr(self, f'gcn{i+1}')(x1, g1) + r
+            x = getattr(self, f'gcn{i+1}')(x1, g[-1]) + r
 
             if hasattr(self, f'gcn_ffn{i+1}'):
                 x = getattr(self, f'gcn_ffn{i+1}')(x)
@@ -1181,11 +1198,12 @@ if __name__ == '__main__':
         # int for global res, list for individual gcn
         sgcn_residual=[0, 0, 0],
         sgcn_prenorm=False,
-        sgcn_ffn=2,
-        sgcn_v_kernel=1,
+        sgcn_ffn=0,
+        sgcn_v_kernel=0,
         sgcn_g_kernel=1,
-        # sgcn_g_proj_dim=[512, 512, 512],  # c3
+        sgcn_g_proj_dim=[512, 512, 512],  # c3
         sgcn_g_proj_shared=False,
+        sgcn_g_weighted=1,
         # gcn_fpn=0,
         spatial_maxpool=1,
         temporal_maxpool=1,
