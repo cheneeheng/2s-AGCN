@@ -128,7 +128,7 @@ class SGN(PyTorchModule):
                  # int for global res, list for individual gcn
                  sgcn_residual: T3 = [0, 0, 0],
                  sgcn_prenorm: bool = False,
-                 sgcn_ffn: int = 0,
+                 sgcn_ffn: Optional[float] = None,
                  sgcn_v_kernel: int = 0,
                  sgcn_g_kernel: int = 1,
                  sgcn_g_proj_dim: Optional[T3] = None,  # c3
@@ -760,7 +760,7 @@ class GCNSpatialFFN(Module):
                  bias: int = 0,
                  activation: T1 = nn.ReLU,
                  normalization: T1 = nn.BatchNorm2d,
-                 multiplier: int = 4
+                 multiplier: float = 4.0
                  ):
         super(GCNSpatialFFN, self).__init__(in_channels,
                                             out_channels,
@@ -770,14 +770,14 @@ class GCNSpatialFFN(Module):
                                             activation=activation,
                                             normalization=normalization)
         self.ffn1 = Conv(self.in_channels,
-                         self.in_channels*multiplier,
+                         int(self.in_channels*multiplier),
                          bias=self.bias,
                          kernel_size=self.kernel_size,
                          padding=self.padding,
                          activation=self.activation,
                          normalization=lambda: self.normalization(
-                             self.in_channels*multiplier))
-        self.ffn2 = Conv(self.in_channels*multiplier,
+                             int(self.in_channels*multiplier)))
+        self.ffn2 = Conv(int(self.in_channels*multiplier),
                          self.out_channels,
                          bias=self.bias,
                          kernel_size=self.kernel_size,
@@ -897,7 +897,7 @@ class GCNSpatialBlock(PyTorchModule):
                  gcn_residual: T3 = [0, 0, 0],
                  gcn_prenorm: bool = False,
                  gcn_v_kernel: int = 0,
-                 gcn_ffn: int = 0,
+                 gcn_ffn: Optional[float] = None,
                  g_proj_dim: T3 = 256,
                  g_kernel: int = 1,
                  g_proj_shared: bool = False,
@@ -952,7 +952,7 @@ class GCNSpatialBlock(PyTorchModule):
             for i in range(self.num_blocks):
                 setattr(self, f'gcn_prenorm{i+1}', normalization(gcn_dims[i]))
 
-        if gcn_ffn > 0:
+        if gcn_ffn is not None:
             for i in range(self.num_blocks):
                 setattr(self, f'gcn_ffn{i+1}',
                         GCNSpatialFFN(gcn_dims[i+1],
