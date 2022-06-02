@@ -326,14 +326,18 @@ class SGN(PyTorchModule):
         # 4 proj and concat
         # 5 proj to lower and concat
         # 6 proj to 64 and sum
+        # 7 proj with 1x3 and sum, similar to 1
         self.gcn_fpn = gcn_fpn
         if self.gcn_fpn < 0:
             pass
         elif self.gcn_fpn == 0:
-            assert self.semantic_frame_location == 1
+            if len(set(sgcn_dims)) == 1:
+                pass
+            else:
+                assert self.semantic_frame_location == 1
         else:
             for i in range(len(sgcn_dims)):
-                if self.gcn_fpn in [1, 3, 4]:
+                if self.gcn_fpn in [1, 3, 4, 7]:
                     out_channels = sgcn_dims[-1]
                 elif self.gcn_fpn == 2:
                     out_channels = sgcn_dims[0]
@@ -343,10 +347,16 @@ class SGN(PyTorchModule):
                     out_channels = 64
                 else:
                     raise ValueError
+                if self.gcn_fpn == 7:
+                    kernel_size = 3
+                else:
+                    kernel_size = 1
                 setattr(self,
                         f'fpn_proj{i+1}',
                         Conv(sgcn_dims[i],
                              out_channels,
+                             kernel_size=kernel_size,
+                             padding=kernel_size//2,
                              bias=self.bias,
                              activation=self.activation_fn,
                              normalization=lambda: self.normalization_fn(
@@ -378,7 +388,7 @@ class SGN(PyTorchModule):
 
                 if self.gcn_fpn == 0:
                     in_ch = sgcn_dim
-                elif self.gcn_fpn in [1, 3]:
+                elif self.gcn_fpn in [1, 3, 7]:
                     in_ch = sgcn_dims[-1]
                 elif self.gcn_fpn == 2:
                     in_ch = sgcn_dims[0]
@@ -509,7 +519,7 @@ class SGN(PyTorchModule):
         # gcn fpn
         if self.gcn_fpn == 0:
             x_list = x_spa_list
-        elif self.gcn_fpn in [1, 2, 6]:
+        elif self.gcn_fpn in [1, 2, 6, 7]:
             assert hasattr(self, 'sgcn')
             x_list = [getattr(self, f'fpn_proj{i+1}')(x_spa_list[i])
                       for i in range(len(x_spa_list))]
@@ -1198,19 +1208,19 @@ if __name__ == '__main__':
         # int for global res, list for individual gcn
         sgcn_residual=[0, 0, 0],
         sgcn_prenorm=False,
-        sgcn_ffn=0,
+        # sgcn_ffn=0,
         sgcn_v_kernel=0,
         sgcn_g_kernel=1,
-        sgcn_g_proj_dim=[512, 512, 512],  # c3
+        sgcn_g_proj_dim=[128, 256, 256],  # c3
         sgcn_g_proj_shared=False,
-        sgcn_g_weighted=1,
-        # gcn_fpn=0,
+        # sgcn_g_weighted=1,
+        gcn_fpn=7,
         spatial_maxpool=1,
         temporal_maxpool=1,
         aspp_rates=None,
         t_mode=1,
         t_maxpool_kwargs=None,
-        multi_t=[[], [], [3, 5, 7]],
+        multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7]],
         multi_t_shared=0,
     )
     model(inputs)

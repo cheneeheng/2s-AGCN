@@ -2057,6 +2057,7 @@ sgn_v11:
                   - 95.14%
 
         - 220520150001_gcnfpn0_multit333_pregcntemsem:
+                  - no fpn
                   - 94.83%
         - 220520150001_gcnfpn0_multit555_pregcntemsem:
                   - 94.90%
@@ -2064,6 +2065,7 @@ sgn_v11:
                   - 94.94%
 
         - 220520150001_gcnfpn1_multit333:
+                  - proj and sum
                   - 95.12%
         - 220520150001_gcnfpn1_multit333shared:
                   - 95.12%
@@ -2090,6 +2092,7 @@ sgn_v11:
                   - 95.37% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
         - 220520150001_gcnfpn2_multit333:
+                  - proj to lower and sum
                   - 94.78%
         - 220520150001_gcnfpn2_multit333shared:
                   - 94.02%
@@ -2101,6 +2104,7 @@ sgn_v11:
                   - 95.05%
 
         - 220520150001_gcnfpn3_multit333:
+                  - proj
                   - 94.94%
         - 220520150001_gcnfpn3_multit333shared:
                   - 94.44%
@@ -2118,11 +2122,13 @@ sgn_v11:
                   - 95.23% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
         - 220525170001_gcnfpn4_multit357:
+                  - proj and concat
                   - 95.17%
         - 220525170001_gcnfpn4_multit3:
                   - 95.32% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
         - 220525170001_gcnfpn5_multit357_cmulti111025_notmp:
+                  - proj to lower and concat
                   - 94.59%
         - 220525170001_gcnfpn5_multit357_cmulti111025:
                   - 94.61%
@@ -2146,6 +2152,55 @@ sgn_v11:
                             - 93.95%
                   - 220525170001_gcnfpn6_multit357357357_cmulti1111:
                             - 93.37%
+
+        - 220527120001_gcnfpn6_multit357357357shared_cmulti111025:
+                  - proj to 64 and sum
+                  - 93.34%
+        - 220527120001_gcnfpn6_multit357357357shared_cmulti11105:
+                  - 93.89%
+        - 220527120001_gcnfpn6_multit357357357shared_cmulti1111:
+                  - 93.99%
+
+        - 220527120001_gcnweighted1:
+                  - added previous G to the current G
+                  - G not shared among the GCNs
+                  - 94.61%
+
+        - 220527120001_vkernel1:
+                  - 94.60%
+        - 220527120001_vkernel1_gcnffn1:
+                  - NO FFN
+                  - 94.60%
+        - 220527120001_vkernel1_gcnffn1_rerun:
+                  - 94.46%
+        - 220527120001_vkernel1_gcnffn2:
+                  - 93.67%
+        - 220527120001_gnonshared_vkernel1_gcnffn1:
+                  - 93.90%
+        - 220527120001_gnonshared_vkernel1_gcnffn2:
+                  - 93.80%
+        - 220530120001_gcnffnres025:
+                  - 94.67%
+        - 220530120001_gcnffnres05:
+                  - 94.55%
+        - 220527120001_gcnffn1:
+                  - ffn multiplier 1
+                  - 94.35%
+        - 220527120001_gcnffnres1:
+                  - ffn multiplier 1
+                  - residual addition in code
+                  - 94.74%
+        - 220527120001_gcnffn2:
+                  - ffn multiplier 2
+                  - 94.12%
+        - 220527120001_gcnffnres2:
+                  - ffn multiplier 2
+                  - residual addition in code
+                  - 94.62%
+
+        - 220527120001_nogcnres:
+                  - no residual in gcn (w2 = 0)
+                  - 92.78%
 
 sgn-code:
         - original sgn repo code
