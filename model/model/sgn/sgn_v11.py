@@ -136,6 +136,7 @@ class SGN(PyTorchModule):
                  sgcn_g_weighted: int = 0,
 
                  gcn_fpn: int = -1,
+                 gcn_fpn_kernel: int = -1,
 
                  spatial_maxpool: int = 1,
                  temporal_maxpool: int = 1,
@@ -328,13 +329,19 @@ class SGN(PyTorchModule):
         # 6 proj to 64 and sum
         # 7 proj with 1x3 and sum, similar to 1
         self.gcn_fpn = gcn_fpn
+        self.gcn_fpn_kernel = gcn_fpn_kernel
+        if self.gcn_fpn_kernel < 1:
+            self.gcn_fpn_kernel = 1
+
         if self.gcn_fpn < 0:
             pass
+
         elif self.gcn_fpn == 0:
             if len(set(sgcn_dims)) == 1:
                 pass
             else:
                 assert self.semantic_frame_location == 1
+
         else:
             for i in range(len(sgcn_dims)):
                 if self.gcn_fpn in [1, 3, 4, 7]:
@@ -347,16 +354,12 @@ class SGN(PyTorchModule):
                     out_channels = 64
                 else:
                     raise ValueError
-                if self.gcn_fpn == 7:
-                    kernel_size = 3
-                else:
-                    kernel_size = 1
                 setattr(self,
                         f'fpn_proj{i+1}',
                         Conv(sgcn_dims[i],
                              out_channels,
-                             kernel_size=kernel_size,
-                             padding=kernel_size//2,
+                             kernel_size=self.gcn_fpn_kernel,
+                             padding=self.gcn_fpn_kernel//2,
                              bias=self.bias,
                              activation=self.activation_fn,
                              normalization=lambda: self.normalization_fn(
