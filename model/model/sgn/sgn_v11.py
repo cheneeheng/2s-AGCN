@@ -26,6 +26,7 @@ from typing import Tuple, Optional, Union, Type, List, Any
 
 from model.module import *
 from model.module.layernorm import LayerNorm
+from model.module.bifpn import BiFPN
 from model.resource.common_ntu import *
 
 from utils.utils import *
@@ -243,7 +244,7 @@ class SGN(PyTorchModule):
                 out_channels = self.gcn_in_ch
             elif gcn_fpn == 5:
                 out_channels = self.c3//4
-            elif gcn_fpn == 6:
+            elif gcn_fpn in [6, 8]:
                 out_channels = 64
             else:
                 out_channels = self.c3
@@ -328,6 +329,7 @@ class SGN(PyTorchModule):
         # 5 proj to lower and concat
         # 6 proj to 64 and sum
         # 7 proj with 1x3 and sum, similar to 1
+        # 8 bifpn 1 layer 64 dim
         self.gcn_fpn = gcn_fpn
         self.gcn_fpn_kernel = gcn_fpn_kernel
         if self.gcn_fpn_kernel < 1:
@@ -341,6 +343,9 @@ class SGN(PyTorchModule):
                 pass
             else:
                 assert self.semantic_frame_location == 1
+
+        elif self.gcn_fpn == 8:
+            self.bifpn = BiFPN(sgcn_dims, 64, num_layers=1)
 
         else:
             for i in range(len(sgcn_dims)):
@@ -399,7 +404,7 @@ class SGN(PyTorchModule):
                     in_ch = sgcn_dims[-1]*3
                 elif self.gcn_fpn == 5:
                     in_ch = sgcn_dims[-1]//4 * 3
-                elif self.gcn_fpn == 6:
+                elif self.gcn_fpn in [6, 8]:
                     in_ch = 64
                 else:
                     in_ch = sgcn_dims[-1]
@@ -533,6 +538,10 @@ class SGN(PyTorchModule):
             assert hasattr(self, 'sgcn')
             x_list = [getattr(self, f'fpn_proj{i+1}')(x_spa_list[i])
                       for i in range(len(x_spa_list))]
+        elif self.gcn_fpn == 8:
+            assert hasattr(self, 'sgcn')
+            assert hasattr(self, 'bifpn')
+            x_list = self.bifpn(x_spa_list)
         else:
             x_list = [None, None, x_spa_list[-1]]
 
@@ -989,7 +998,7 @@ class GCNSpatialBlock(PyTorchModule):
         else:
             raise ValueError("Unknown residual modes...")
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor) -> Tuple[Tensor, list, list]:
         x0 = x
         g = []
         gcn_list = []
@@ -1217,7 +1226,7 @@ if __name__ == '__main__':
         sgcn_g_proj_dim=[128, 256, 256],  # c3
         sgcn_g_proj_shared=False,
         # sgcn_g_weighted=1,
-        gcn_fpn=7,
+        gcn_fpn=8,
         spatial_maxpool=1,
         temporal_maxpool=1,
         aspp_rates=None,
