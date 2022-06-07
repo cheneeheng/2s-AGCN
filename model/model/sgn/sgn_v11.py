@@ -129,6 +129,9 @@ class SGN(PyTorchModule):
                  gcn_fpn: int = -1,
                  gcn_fpn_kernel: int = -1,
 
+                 bifpn_dim: int = 64,
+                 bifpn_layers: int = 1,
+
                  spatial_maxpool: int = 1,
                  temporal_maxpool: int = 1,
 
@@ -217,7 +220,7 @@ class SGN(PyTorchModule):
             )
         )
 
-        # Joint and frame embeddings -------------------------------------------
+        # Spatial GCN ----------------------------------------------------------
 
         # Input dim to the GCN
         if self.semantic_joint == 0:
@@ -227,49 +230,6 @@ class SGN(PyTorchModule):
                 self.gcn_in_ch = self.c1 * 2
             elif self.semantic_joint_fusion == 1:
                 self.gcn_in_ch = self.c1
-
-        # post gcn
-        if self.semantic_frame_location == 0:
-            if gcn_fpn == 2:
-                out_channels = self.gcn_in_ch
-            elif gcn_fpn == 5:
-                out_channels = self.c3//4
-            elif gcn_fpn in [6, 8]:
-                out_channels = 64
-            else:
-                out_channels = self.c3
-        # pre gcn
-        elif self.semantic_frame_location == 1:
-            out_channels = self.gcn_in_ch
-
-        self.semantic_embedding = SemanticEmbedding(
-            num_point=self.num_point,
-            num_segment=self.num_segment,
-            sem_spa=self.semantic_joint,
-            sem_tem=self.semantic_frame,
-            sem_spa_emb_kwargs=dict(
-                in_channels=self.num_point,
-                out_channels=self.c1,
-                bias=self.bias,
-                dropout=self.dropout_fn,
-                activation=self.activation_fn,
-                normalization=self.normalization_fn,
-                num_point=self.num_point,
-                mode=self.semantic_joint
-            ),
-            sem_tem_emb_kwargs=dict(
-                in_channels=self.num_segment,
-                out_channels=out_channels,
-                bias=self.bias,
-                dropout=self.dropout_fn,
-                activation=self.activation_fn,
-                normalization=self.normalization_fn,
-                num_point=self.num_point,
-                mode=self.semantic_frame
-            )
-        )
-
-        # Spatial GCN ----------------------------------------------------------
 
         # projection layer pre GCN
         if self.xem_projection > 0:
@@ -321,6 +281,10 @@ class SGN(PyTorchModule):
         # 7 proj with 1x3 and sum, similar to 1
         # 8 bifpn 1 layer 64 dim
         self.gcn_fpn = gcn_fpn
+
+        if bifpn_dim > 0:
+            assert self.gcn_fpn == 8
+
         self.gcn_fpn_kernel = gcn_fpn_kernel
         if self.gcn_fpn_kernel < 1:
             self.gcn_fpn_kernel = 1
@@ -335,7 +299,7 @@ class SGN(PyTorchModule):
                 assert self.semantic_frame_location == 1
 
         elif self.gcn_fpn == 8:
-            self.bifpn = BiFPN(sgcn_dims, 64, num_layers=1)
+            self.bifpn = BiFPN(sgcn_dims, bifpn_dim, num_layers=bifpn_layers)
 
         else:
             for i in range(len(sgcn_dims)):
@@ -361,6 +325,50 @@ class SGN(PyTorchModule):
                                  out_channels),
                              #  dropout=self.dropout_fn,
                              ))
+
+        # Joint and frame embeddings -------------------------------------------
+        # post gcn
+        if self.semantic_frame_location == 0:
+            if self.gcn_fpn == 2:
+                out_channels = self.gcn_in_ch
+            elif self.gcn_fpn == 5:
+                out_channels = self.c3//4
+            elif self.gcn_fpn == 6:
+                out_channels = 64
+            elif self.gcn_fpn == 8:
+                out_channels = bifpn_dim
+            else:
+                out_channels = self.c3
+        # pre gcn
+        elif self.semantic_frame_location == 1:
+            out_channels = self.gcn_in_ch
+
+        self.semantic_embedding = SemanticEmbedding(
+            num_point=self.num_point,
+            num_segment=self.num_segment,
+            sem_spa=self.semantic_joint,
+            sem_tem=self.semantic_frame,
+            sem_spa_emb_kwargs=dict(
+                in_channels=self.num_point,
+                out_channels=self.c1,
+                bias=self.bias,
+                dropout=self.dropout_fn,
+                activation=self.activation_fn,
+                normalization=self.normalization_fn,
+                num_point=self.num_point,
+                mode=self.semantic_joint
+            ),
+            sem_tem_emb_kwargs=dict(
+                in_channels=self.num_segment,
+                out_channels=out_channels,
+                bias=self.bias,
+                dropout=self.dropout_fn,
+                activation=self.activation_fn,
+                normalization=self.normalization_fn,
+                num_point=self.num_point,
+                mode=self.semantic_frame
+            )
+        )
 
         # Frame level module ---------------------------------------------------
         self.t_mode = t_mode
@@ -394,8 +402,10 @@ class SGN(PyTorchModule):
                     in_ch = sgcn_dims[-1]*3
                 elif self.gcn_fpn == 5:
                     in_ch = sgcn_dims[-1]//4 * 3
-                elif self.gcn_fpn in [6, 8]:
+                elif self.gcn_fpn == 6:
                     in_ch = 64
+                elif self.gcn_fpn == 8:
+                    in_ch = bifpn_dim
                 else:
                     in_ch = sgcn_dims[-1]
 
@@ -1217,6 +1227,8 @@ if __name__ == '__main__':
         sgcn_g_proj_shared=False,
         # sgcn_g_weighted=1,
         gcn_fpn=8,
+        bifpn_dim=256,
+        bifpn_layers=1,
         spatial_maxpool=1,
         temporal_maxpool=1,
         aspp_rates=None,

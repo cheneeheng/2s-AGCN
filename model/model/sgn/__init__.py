@@ -1,11 +1,3 @@
-from . import sgn
-from . import sgn_v2
-from . import sgn_v3
-from . import sgn_v4
-from . import sgn_v5
-from . import sgn_v6
-from . import sgn_v7
-from . import sgn_v8
-from . import sgn_v9
-from . import sgn_v10
+# used for import_class function
+from .archiv import *
 from . import sgn_v11
