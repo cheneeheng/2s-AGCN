@@ -31,24 +31,13 @@ from typing import OrderedDict, Tuple, Optional, Union, Type, List, Any
 from model.module import *
 from model.module.layernorm import LayerNorm
 from model.resource.common_ntu import *
+from model.torch_utils import *
 
 from utils.utils import *
 
 
 T1 = Type[PyTorchModule]
 T2 = List[Optional[Type[PyTorchModule]]]
-
-
-def null_fn(x: Any) -> int:
-    return 0
-
-
-def init_0(x: Tensor):
-    return nn.init.constant_(x, 0)
-
-
-def pad_zeros(x: Tensor) -> Tensor:
-    return torch.cat([x.new(*x.shape[:-1], 1).zero_(), x], dim=-1)
 
 
 def get_inter_channels(mode: int, ch: int) -> Union[list, int]:
@@ -473,11 +462,11 @@ class SGN(PyTorchModule):
         if 'spa' in self.gcn_list:
             for p_name, param in self.gcn_spatial.named_parameters():
                 if f'w1.block.conv.conv.weight' in p_name:
-                    init_0(param)
+                    init_zeros(param)
         if 'tem' in self.gcn_list:
             for p_name, param in self.gcn_temporal.named_parameters():
                 if f'w1.block.conv.conv.weight' in p_name:
-                    init_0(param)
+                    init_zeros(param)
 
     def forward(self, x: Tensor) -> Tuple[Tensor, list]:
         """Model forward pass.

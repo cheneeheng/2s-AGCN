@@ -26,15 +26,13 @@ from typing import OrderedDict, Tuple, Optional, Union, Type, List, Any
 from model.module import *
 from model.module.layernorm import LayerNorm
 from model.resource.common_ntu import *
+from model.torch_utils import *
 
 from utils.utils import *
 
 
 T1 = Type[PyTorchModule]
 T2 = List[Optional[Type[PyTorchModule]]]
-
-
-def null_fn(x: Any) -> int: return 0
 
 
 class SGN(PyTorchModule):
@@ -398,15 +396,15 @@ class SGN(PyTorchModule):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
                 m.weight.data.normal_(0, math.sqrt(2. / n))
 
-        def _init_0(x: Tensor): return nn.init.constant_(x, 0)
+        def _init_zeros(x: Tensor): return nn.init.constant_(x, 0)
 
-        _init_0(self.gcn_spatial.gcn1.w1.block.conv.conv.weight)
-        _init_0(self.gcn_spatial.gcn2.w1.block.conv.conv.weight)
-        _init_0(self.gcn_spatial.gcn3.w1.block.conv.conv.weight)
+        _init_zeros(self.gcn_spatial.gcn1.w1.block.conv.conv.weight)
+        _init_zeros(self.gcn_spatial.gcn2.w1.block.conv.conv.weight)
+        _init_zeros(self.gcn_spatial.gcn3.w1.block.conv.conv.weight)
         if self.g_part == 0:
-            _init_0(self.gcn_spatial_part.gcn1.w1.block.conv.conv.weight)
-            _init_0(self.gcn_spatial_part.gcn2.w1.block.conv.conv.weight)
-            _init_0(self.gcn_spatial_part.gcn3.w1.block.conv.conv.weight)
+            _init_zeros(self.gcn_spatial_part.gcn1.w1.block.conv.conv.weight)
+            _init_zeros(self.gcn_spatial_part.gcn2.w1.block.conv.conv.weight)
+            _init_zeros(self.gcn_spatial_part.gcn3.w1.block.conv.conv.weight)
 
     def init_input_dr(self):
         if self.in_position > 0:

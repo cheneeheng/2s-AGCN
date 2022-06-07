@@ -28,6 +28,7 @@ from typing import OrderedDict, Tuple, Optional, Union, Type, List, Any
 from model.module import *
 from model.module.layernorm import LayerNorm
 from model.resource.common_ntu import *
+from model.torch_utils import *
 
 from utils.utils import *
 
@@ -35,26 +36,6 @@ from utils.utils import *
 T1 = Type[PyTorchModule]
 T2 = List[Optional[Type[PyTorchModule]]]
 T3 = Union[List[int], int]
-
-
-class Identity(PyTorchModule):
-    def __init__(self, *args, **kwargs):
-        super(Identity, self).__init__()
-
-    def forward(self, *args):
-        return args[0]
-
-
-def null_fn(x: Any) -> int:
-    return 0
-
-
-def init_0(x: Tensor):
-    return nn.init.constant_(x, 0)
-
-
-def pad_zeros(x: Tensor) -> Tensor:
-    return torch.cat([x.new(*x.shape[:-1], 1).zero_(), x], dim=-1)
 
 
 def get_inter_channels(mode: int, ch: int) -> Union[list, int]:
@@ -529,7 +510,7 @@ class SGN(PyTorchModule):
             elif self.gcn_fpn == 3:
                 in_ch = [gcn_spa_dims[0], gcn_spa_dims[0], gcn_spa_dims[0]]
             else:
-                in_ch = [_c3, _c3, _c3]
+                in_ch = [_c3 for _ in range(len(self.multi_t))]
             for i, _t in enumerate(self.multi_t):
                 setattr(self,
                         f'tem_mlp{i+1}',
@@ -605,11 +586,11 @@ class SGN(PyTorchModule):
         if 'spa' in self.gcn_list:
             for p_name, param in self.gcn_spatial.named_parameters():
                 if f'w1.block.conv.conv.weight' in p_name:
-                    init_0(param)
+                    init_zeros(param)
         if 'tem' in self.gcn_list:
             for p_name, param in self.gcn_temporal.named_parameters():
                 if f'w1.block.conv.conv.weight' in p_name:
-                    init_0(param)
+                    init_zeros(param)
 
     def forward(self, x: Tensor) -> Tuple[Tensor, list]:
         """Model forward pass.
@@ -732,6 +713,11 @@ class SGN(PyTorchModule):
                     _x_list.append(getattr(self, f'tem_mlp')(x))
                 else:
                     _x_list.append(getattr(self, f'tem_mlp{i+1}')(x))
+            # _x_list = []
+            # for i in range(len(x_list)):
+            #     x = x_list[i]
+            #     for j in range(len(self.multi_t)):
+            #         _x_list.append(getattr(self, f'tem_mlp{j+1}')(x))
             x = torch.mean(torch.stack(_x_list, dim=0), dim=0)
 
         # temporal pooling

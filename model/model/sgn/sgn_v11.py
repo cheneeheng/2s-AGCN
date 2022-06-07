@@ -28,6 +28,8 @@ from model.module import *
 from model.module.layernorm import LayerNorm
 from model.module.bifpn import BiFPN
 from model.resource.common_ntu import *
+from model.torch_utils import *
+
 
 from utils.utils import *
 
@@ -38,18 +40,6 @@ T3 = Union[List[int], int]
 
 EMB_MODES = [1, 2, 3, 4, 5, 6, 7, 8]
 T_MODES = [0, 1, 2]
-
-
-def null_fn(x: Any) -> int:
-    return 0
-
-
-def init_0(x: Tensor):
-    return nn.init.constant_(x, 0)
-
-
-def pad_zeros(x: Tensor) -> Tensor:
-    return torch.cat([x.new(*x.shape[:-1], 1).zero_(), x], dim=-1)
 
 
 def residual_layer(residual: int, in_ch: int, out_ch: int, bias: int = 0):
@@ -484,7 +474,7 @@ class SGN(PyTorchModule):
                 m.weight.data.normal_(0, math.sqrt(2. / n))
         for p_name, param in self.sgcn.named_parameters():
             if f'w1.block.conv.conv.weight' in p_name:
-                init_0(param)
+                init_zeros(param)
 
     def forward(self, x: Tensor) -> Tuple[Tensor, list]:
         """Model forward pass.

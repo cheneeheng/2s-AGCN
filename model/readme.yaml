@@ -2099,6 +2099,8 @@ sgn_v11:
                   - 95.66% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< BEST
         - 220601220001_gcnfpn7_multit357357357:
                   - 95.48% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        - 220601220001_gcnfpn7_multit357:
+                  - 95.61% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
         - 220520150001_gcnfpn2_multit333:
                   - proj to lower and sum
@@ -2111,6 +2113,10 @@ sgn_v11:
                   - 95.11%
         - 220520150001_gcnfpn2_multit357357357shared:
                   - 95.05%
+        - 220603153001_gcnfpn2kernel3_multit357357357:
+                  - 95.30%
+        - 220603153001_gcnfpn2kernel3_multit357357357shared:
+                  - 95.35%
 
         - 220520150001_gcnfpn3_multit333:
                   - proj
@@ -2169,6 +2175,16 @@ sgn_v11:
                   - 93.89%
         - 220527120001_gcnfpn6_multit357357357shared_cmulti1111:
                   - 93.99%
+
+        - 220603153001_gcnfpn83layer_multit357357357shared:
+                  - bifpn, 64dim, 3 layers
+                  - 93.75%
+        - 220603153001_gcnfpn8_multit357357357shared:
+                  - bifpn, 64dim, 1 layers
+                  - 94.04%
+        - 220603153001_gcnfpn8_multit357357357:
+                  - bifpn, 64dim, 1 layers
+                  - 94.13%
 
         - 220527120001_gcnweighted1:
                   - added previous G to the current G

@@ -29,16 +29,13 @@ from typing import OrderedDict, Tuple, Optional, Union, Type, List, Any
 from model.module import *
 from model.module.layernorm import LayerNorm
 from model.resource.common_ntu import *
+from model.torch_utils import *
 
 from utils.utils import *
 
 
 T1 = Type[PyTorchModule]
 T2 = List[Optional[Type[PyTorchModule]]]
-
-
-def null_fn(x: Any) -> int: return 0
-def init_0(x: Tensor): return nn.init.constant_(x, 0)
 
 
 class SGN(PyTorchModule):
@@ -416,9 +413,9 @@ class SGN(PyTorchModule):
             if isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
                 m.weight.data.normal_(0, math.sqrt(2. / n))
-        init_0(self.gcn_spatial.gcn1.w1.block.conv.conv.weight)
-        init_0(self.gcn_spatial.gcn2.w1.block.conv.conv.weight)
-        init_0(self.gcn_spatial.gcn3.w1.block.conv.conv.weight)
+        init_zeros(self.gcn_spatial.gcn1.w1.block.conv.conv.weight)
+        init_zeros(self.gcn_spatial.gcn2.w1.block.conv.conv.weight)
+        init_zeros(self.gcn_spatial.gcn3.w1.block.conv.conv.weight)
 
     def init_temporal_mlp(self):
         _c3 = self.c3
