@@ -2045,6 +2045,47 @@ sgn_v11:
         - 220525170001_midvel1_multit357:
                   - 94.82%
 
+        - 220527120001_gcnweighted1:
+                  - added previous G to the current G
+                  - G not shared among the GCNs
+                  - 94.61%
+
+        - 220527120001_vkernel1:
+                  - 94.60%
+        - 220527120001_vkernel1_gcnffn1:
+                  - NO FFN
+                  - 94.60%
+        - 220527120001_vkernel1_gcnffn1_rerun:
+                  - 94.46%
+        - 220527120001_vkernel1_gcnffn2:
+                  - 93.67%
+        - 220527120001_gnonshared_vkernel1_gcnffn1:
+                  - 93.90%
+        - 220527120001_gnonshared_vkernel1_gcnffn2:
+                  - 93.80%
+        - 220530120001_gcnffnres025:
+                  - 94.67%
+        - 220530120001_gcnffnres05:
+                  - 94.55%
+        - 220527120001_gcnffn1:
+                  - ffn multiplier 1
+                  - 94.35%
+        - 220527120001_gcnffnres1:
+                  - ffn multiplier 1
+                  - residual addition in code
+                  - 94.74%
+        - 220527120001_gcnffn2:
+                  - ffn multiplier 2
+                  - 94.12%
+        - 220527120001_gcnffnres2:
+                  - ffn multiplier 2
+                  - residual addition in code
+                  - 94.62%
+
+        - 220527120001_nogcnres:
+                  - no residual in gcn (w2 = 0)
+                  - 92.78%
+
         - 220520150001_rerun_orisgn:
                   - 94.56%
         - 220520150001_multit333:
@@ -2101,6 +2142,10 @@ sgn_v11:
                   - 95.48% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
         - 220601220001_gcnfpn7_multit357:
                   - 95.61% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        - 220607103001_gcnfpn1_multit357357357shared_fcmerge2:
+                  - 95.22%
+        - 220607103001_gcnfpn7_multit357357357shared_fcmerge2:
+                  - 95.42%
 
         - 220520150001_gcnfpn2_multit333:
                   - proj to lower and sum
@@ -2185,47 +2230,16 @@ sgn_v11:
         - 220603153001_gcnfpn8_multit357357357:
                   - bifpn, 64dim, 1 layers
                   - 94.13%
-
-        - 220527120001_gcnweighted1:
-                  - added previous G to the current G
-                  - G not shared among the GCNs
-                  - 94.61%
-
-        - 220527120001_vkernel1:
-                  - 94.60%
-        - 220527120001_vkernel1_gcnffn1:
-                  - NO FFN
-                  - 94.60%
-        - 220527120001_vkernel1_gcnffn1_rerun:
-                  - 94.46%
-        - 220527120001_vkernel1_gcnffn2:
-                  - 93.67%
-        - 220527120001_gnonshared_vkernel1_gcnffn1:
-                  - 93.90%
-        - 220527120001_gnonshared_vkernel1_gcnffn2:
-                  - 93.80%
-        - 220530120001_gcnffnres025:
-                  - 94.67%
-        - 220530120001_gcnffnres05:
+        - 220607103001_gcnfpn8dim128_multit357357357shared:
+                  - 95.05% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        - 220607103001_gcnfpn8dim128layer3_multit357357357shared:
                   - 94.55%
-        - 220527120001_gcnffn1:
-                  - ffn multiplier 1
-                  - 94.35%
-        - 220527120001_gcnffnres1:
-                  - ffn multiplier 1
-                  - residual addition in code
-                  - 94.74%
-        - 220527120001_gcnffn2:
-                  - ffn multiplier 2
-                  - 94.12%
-        - 220527120001_gcnffnres2:
-                  - ffn multiplier 2
-                  - residual addition in code
-                  - 94.62%
-
-        - 220527120001_nogcnres:
-                  - no residual in gcn (w2 = 0)
-                  - 92.78%
+        - 220607103001_gcnfpn8dim256_multit357357357shared:
+                  - 91.83%
+        - 220607103001_gcnfpn8dim256layer3_multit357357357shared:
+                  - 91.83%
+        - 220607103001_gcnfpn8dim256layer3_multit357357357shared_fcmerge2:
+                  - 82.26%
 
 sgn-code:
         - original sgn repo code
