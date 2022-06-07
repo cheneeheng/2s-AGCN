@@ -22,7 +22,7 @@ except ImportError:
     print("Warning: fvcore is not found")
 
 import math
-from typing import Tuple, Optional, Union, Type, List, Any
+from typing import Tuple, Optional, Union, Type, List
 
 from model.module import *
 from model.module.layernorm import LayerNorm
@@ -38,7 +38,31 @@ T1 = Type[PyTorchModule]
 T2 = List[Optional[Type[PyTorchModule]]]
 T3 = Union[List[int], int]
 
+
 EMB_MODES = [1, 2, 3, 4, 5, 6, 7, 8]
+
+# GCN-FPN ---
+# -1 no fpn
+# 0 no fpn but has parallel projections
+# 1 proj and sum
+# 2 proj to lower and sum
+# 3 proj
+# 4 proj and concat
+# 5 proj to lower and concat
+# 6 proj to 64 and sum
+# 7 proj with 1x3 and sum, similar to 1
+# 8 bifpn 1 layer 64 dim
+GCN_FPN = [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8]
+
+# 0: no merge + no fpn
+# 1: avraged and sent to 1 fc only.
+# 2: no merge and used by multiple fc and averaged.
+GCN_FPN_MERGE = [0, 1, 2]
+
+# Temporal branch ---
+# 0 skip -> no temporal branch
+# 1 original sgn -> 1x3conv + 1x1conv
+# 2 original sgn with residual -> 1x3conv + res + 1x1conv + res
 T_MODES = [0, 1, 2]
 
 
@@ -128,6 +152,7 @@ class SGN(PyTorchModule):
 
                  gcn_fpn: int = -1,
                  gcn_fpn_kernel: int = -1,
+                 gcn_fpn_output_merge: int = 1,
 
                  bifpn_dim: int = 64,
                  bifpn_layers: int = 1,
@@ -271,16 +296,11 @@ class SGN(PyTorchModule):
         )
 
         # GCN FPN --------------------------------------------------------------
-        # 0 no fpn
-        # 1 proj and sum
-        # 2 proj to lower and sum
-        # 3 proj
-        # 4 proj and concat
-        # 5 proj to lower and concat
-        # 6 proj to 64 and sum
-        # 7 proj with 1x3 and sum, similar to 1
-        # 8 bifpn 1 layer 64 dim
         self.gcn_fpn = gcn_fpn
+        assert self.gcn_fpn in GCN_FPN
+
+        self.gcn_fpn_output_merge = gcn_fpn_output_merge
+        assert self.gcn_fpn_output_merge in GCN_FPN_MERGE
 
         if bifpn_dim > 0:
             assert self.gcn_fpn == 8
@@ -471,7 +491,15 @@ class SGN(PyTorchModule):
             fc_in_ch = self.c4 * self.num_segment
         else:
             fc_in_ch = self.c4
-        self.fc = nn.Linear(fc_in_ch, num_class)
+
+        if self.gcn_fpn_output_merge == 2:
+            i = 0
+            for _ in self.multi_t:
+                for _ in t_kernels:
+                    i += 1
+                    setattr(self, f'fc{i}', nn.Linear(fc_in_ch, num_class))
+        else:
+            self.fc = nn.Linear(fc_in_ch, num_class)
 
         # Init weight ----------------------------------------------------------
         self.init_weight()
@@ -578,15 +606,33 @@ class SGN(PyTorchModule):
 
                 _x_list.append(getattr(self, name)(x_list[i]))
 
-        x = torch.mean(torch.stack(_x_list, dim=0), dim=0)
+        if self.gcn_fpn_output_merge in [0, 1]:
+            x = torch.mean(torch.stack(_x_list, dim=0), dim=0)
+        elif self.gcn_fpn_output_merge == 2:
+            x = _x_list
+        else:
+            raise ValueError("Unknown 'gcn_fpn_output_merge' arg value...")
 
         # temporal pooling
-        y = self.tmp(x)
+        if isinstance(x, list):
+            y = [self.tmp(i) for i in x]
+        else:
+            y = self.tmp(x)
 
         # Classification -------------------------------------------------------
-        y = torch.flatten(y, 1)
-        y = self.fc_dropout(y)
-        y = self.fc(y)
+        if isinstance(x, list):
+            if self.gcn_fpn_output_merge == 2:
+                _y_list = []
+                for i, y_i in enumerate(y):
+                    y_i = torch.flatten(y_i, 1)
+                    y_i = self.fc_dropout(y_i)
+                    y_i = getattr(self, f'fc{i+1}')(y_i)
+                    _y_list.append(y_i)
+                y = torch.mean(torch.stack(_y_list, dim=0), dim=0)
+        else:
+            y = torch.flatten(y, 1)
+            y = self.fc_dropout(y)
+            y = self.fc(y)
 
         return y, g_spa
 
@@ -1139,13 +1185,12 @@ class MLPTemporalBranch(Module):
                              activation=self.activation,
                              normalization=self.normalization)
 
+        # Temporal branch ------------------------------------------------------
         self.t_mode = t_mode
         assert t_mode in T_MODES
 
-        # skip
         if t_mode == 0:
             self.cnn = nn.Identity()
-        # original sgn
         elif t_mode == 1:
             idx = 2
             self.cnn = MLPTemporal(
@@ -1161,7 +1206,6 @@ class MLPTemporalBranch(Module):
                 maxpool_kwargs=maxpool_kwargs,
                 prenorm=self.prenorm
             )
-        # original sgn with residual
         elif t_mode == 2:
             idx = 2
             self.cnn = MLPTemporal(
@@ -1227,6 +1271,7 @@ if __name__ == '__main__':
         sgcn_g_proj_shared=False,
         # sgcn_g_weighted=1,
         gcn_fpn=8,
+        gcn_fpn_output_merge=1,
         bifpn_dim=256,
         bifpn_layers=1,
         spatial_maxpool=1,
