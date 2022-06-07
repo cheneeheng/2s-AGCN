@@ -154,8 +154,8 @@ class SGN(PyTorchModule):
                  gcn_fpn_kernel: int = -1,
                  gcn_fpn_output_merge: int = 1,
 
-                 bifpn_dim: int = 64,
-                 bifpn_layers: int = 1,
+                 bifpn_dim: int = 0,  # 64
+                 bifpn_layers: int = 0,  # 1
 
                  spatial_maxpool: int = 1,
                  temporal_maxpool: int = 1,
@@ -308,6 +308,8 @@ class SGN(PyTorchModule):
         self.gcn_fpn_kernel = gcn_fpn_kernel
         if self.gcn_fpn_kernel < 1:
             self.gcn_fpn_kernel = 1
+        if self.gcn_fpn == 7:  # backward compat
+            self.gcn_fpn_kernel = 3
 
         if self.gcn_fpn < 0:
             pass
