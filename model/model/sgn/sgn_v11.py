@@ -63,7 +63,8 @@ GCN_FPN_MERGE = [0, 1, 2]
 # 0 skip -> no temporal branch
 # 1 original sgn -> 1x3conv + 1x1conv
 # 2 original sgn with residual -> 1x3conv + res + 1x1conv + res
-T_MODES = [0, 1, 2]
+# 3 trasnformers
+T_MODES = [0, 1, 2, 3]
 
 
 def residual_layer(residual: int, in_ch: int, out_ch: int, bias: int = 0):
@@ -166,6 +167,7 @@ class SGN(PyTorchModule):
 
                  t_mode: int = 1,
                  t_maxpool_kwargs: Optional[dict] = None,
+                 t_mha_kwargs: Optional[dict] = None,
                  aspp_rates: Optional[list] = None,
 
                  ):
@@ -395,6 +397,7 @@ class SGN(PyTorchModule):
         # Frame level module ---------------------------------------------------
         self.t_mode = t_mode
         self.t_maxpool_kwargs = t_maxpool_kwargs
+        self.t_mha_kwargs = t_mha_kwargs
         self.aspp_rates = aspp_rates  # dilation rates
         self.multi_t = multi_t  # list of list : gcn layers -> kernel sizes
         assert len(self.multi_t) == len(sgcn_dims)
@@ -445,7 +448,7 @@ class SGN(PyTorchModule):
 
                 setattr(self,
                         name,
-                        MLPTemporalBranch(
+                        TemporalBranch(
                             in_channels=in_ch,
                             out_channels=self.c4,
                             kernel_size=t_kernel,
@@ -457,6 +460,7 @@ class SGN(PyTorchModule):
                             t_mode=self.t_mode,
                             aspp_rates=self.aspp_rates,
                             maxpool_kwargs=self.t_maxpool_kwargs,
+                            mha_kwargs=self.t_mha_kwargs,
                         ))
 
                 # if self.multi_t_shared == 1:
@@ -487,6 +491,8 @@ class SGN(PyTorchModule):
         # Classifier ---------------------------------------------------------
         if self.t_mode == 0:
             fc_in_ch = self.c3
+        elif self.t_mode == 3:
+            fc_in_ch = self.t_mha_kwargs['d_model']
         elif self.spatial_maxpool == 0 and self.temporal_maxpool == 0:
             fc_in_ch = self.c4 * self.num_segment * self.num_point
         elif self.temporal_maxpool == 0:
@@ -1152,7 +1158,7 @@ class MLPTemporal(PyTorchModule):
         return x
 
 
-class MLPTemporalBranch(Module):
+class TemporalBranch(Module):
     def __init__(self,
                  in_channels: int,
                  out_channels: int,
@@ -1165,15 +1171,16 @@ class MLPTemporalBranch(Module):
                  t_mode: int = 0,
                  aspp_rates: Optional[List[int]] = None,
                  maxpool_kwargs: Optional[dict] = None,
+                 mha_kwargs: Optional[dict] = None,
                  ):
-        super(MLPTemporalBranch, self).__init__(in_channels,
-                                                out_channels,
-                                                kernel_size=kernel_size,
-                                                bias=bias,
-                                                dropout=dropout,
-                                                activation=activation,
-                                                normalization=normalization,
-                                                prenorm=prenorm)
+        super(TemporalBranch, self).__init__(in_channels,
+                                             out_channels,
+                                             kernel_size=kernel_size,
+                                             bias=bias,
+                                             dropout=dropout,
+                                             activation=activation,
+                                             normalization=normalization,
+                                             prenorm=prenorm)
 
         # aspp
         if aspp_rates is None or len(aspp_rates) == 0:
@@ -1223,13 +1230,30 @@ class MLPTemporalBranch(Module):
                 maxpool_kwargs=maxpool_kwargs,
                 prenorm=self.prenorm
             )
+        elif t_mode == 3:
+            encoder_layer = nn.TransformerEncoderLayer(
+                d_model=mha_kwargs['d_model'],
+                nhead=mha_kwargs['nhead'],
+                dim_feedforward=mha_kwargs['dim_feedforward'],
+                dropout=mha_kwargs['dropout'],
+                activation=mha_kwargs['activation'],
+                layer_norm_eps=1e-5,
+                batch_first=True,
+            )
+            self.cnn = nn.TransformerEncoder(encoder_layer, 2)
         else:
             raise ValueError('Unknown t_mode')
 
     def forward(self, x: Tensor) -> Tensor:
-        # x: n,c,v,t ; v=1 due to SMP
+        N, C, _, T = x.shape
         x = self.aspp(x)
+        if self.t_mode == 3:
+            x = x.permute(0, 3, 2, 1).contiguous()  # n,t,v,c
+            x = x.reshape(N, T, C)
         x = self.cnn(x)
+        if self.t_mode == 3:
+            x = x.reshape(N, T, 1, C)
+            x = x.permute(0, 3, 2, 1).contiguous()  # n,c,v,t
         return x
 
 
@@ -1279,8 +1303,15 @@ if __name__ == '__main__':
         spatial_maxpool=1,
         temporal_maxpool=1,
         aspp_rates=None,
-        t_mode=1,
+        t_mode=3,
         t_maxpool_kwargs=None,
+        t_mha_kwargs={
+            'd_model': 256,
+            'nhead': 4,
+            'dim_feedforward': 256*4,
+            'dropout': 0.1,
+            'activation': "relu"
+        },
         multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7]],
         multi_t_shared=0,
     )

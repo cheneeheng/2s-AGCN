@@ -2146,6 +2146,14 @@ sgn_v11:
                   - 95.22%
         - 220607103001_gcnfpn7_multit357357357shared_fcmerge2:
                   - 95.42%
+        - 220607103001_gcnfpn7_multit357357357shared_tmode2:
+                  - 95.42%
+        - 220607103001_gcnfpn1k9_multit357357357shared:
+                  - 95.50%
+        - 220607103001_gcnfpn1k7_multit357357357shared:
+                  - 95.62%
+        - 220607103001_gcnfpn1k5_multit357357357shared:
+                  - 95.62%
 
         - 220520150001_gcnfpn2_multit333:
                   - proj to lower and sum
