@@ -434,7 +434,10 @@ class SGN(PyTorchModule):
                 else:
                     in_ch = sgcn_dims[-1]
 
-                name = f'tem_mlp_{i+1}_{j+1}_k{t_kernel}'
+                if self.t_mode == 3:
+                    name = f'tem_mha_{i+1}_{j+1}'
+                else:
+                    name = f'tem_mlp_{i+1}_{j+1}_k{t_kernel}'
 
                 if self.multi_t_shared == 2:
                     cont = False
@@ -600,7 +603,10 @@ class SGN(PyTorchModule):
                 if x_list[i] is None:
                     continue
 
-                name = f'tem_mlp_{i+1}_{j+1}_k{t_kernel}'
+                if self.t_mode == 3:
+                    name = f'tem_mha_{i+1}_{j+1}'
+                else:
+                    name = f'tem_mlp_{i+1}_{j+1}_k{t_kernel}'
 
                 # if self.multi_t_shared == 1:
                 #     name = f'tem_mlp_{i+1}_{1}_k{t_kernel}'
@@ -1296,10 +1302,10 @@ if __name__ == '__main__':
         sgcn_g_proj_dim=[128, 256, 256],  # c3
         sgcn_g_proj_shared=False,
         # sgcn_g_weighted=1,
-        gcn_fpn=8,
-        gcn_fpn_output_merge=1,
-        bifpn_dim=256,
-        bifpn_layers=1,
+        gcn_fpn=1,
+        # gcn_fpn_output_merge=1,
+        # bifpn_dim=256,
+        # bifpn_layers=1,
         spatial_maxpool=1,
         temporal_maxpool=1,
         aspp_rates=None,
@@ -1313,7 +1319,7 @@ if __name__ == '__main__':
             'activation': "relu"
         },
         multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7]],
-        multi_t_shared=0,
+        multi_t_shared=2,
     )
     model(inputs)
     print(model)
