@@ -21,7 +21,7 @@ except ImportError:
     print("Warning: fvcore is not found")
 
 import math
-from typing import Tuple, Optional, Union, Type, List
+from typing import OrderedDict, Tuple, Optional, Union, Type, List
 
 # from model.module import *
 # from model.module.bifpn import BiFPN
@@ -29,6 +29,7 @@ from model.resource.common_ntu import *
 from model.module import Module
 from model.module import BiFPN
 from model.module import Conv
+from model.module import ASPP
 from model.module import null_fn
 from model.module import init_zeros
 from model.module import pad_zeros
@@ -424,9 +425,11 @@ class SGN(PyTorchModule):
                 if self.multi_t_shared == 2:
                     cont = False
                     for k in range(i+1):
-                        if getattr(self,
-                                   f'tem_mlp_{k+1}_{j+1}_k{t_kernel}',
-                                   None) is not None:
+                        if self.t_mode == 3:
+                            name_k = f'tem_mha_{k+1}_{j+1}'
+                        else:
+                            name_k = f'tem_mlp_{k+1}_{j+1}_k{t_kernel}'
+                        if getattr(self, name_k, None) is not None:
                             cont = True
                     if cont:
                         continue
@@ -594,10 +597,12 @@ class SGN(PyTorchModule):
                 #     name = f'tem_mlp_{i+1}_{1}_k{t_kernel}'
                 if self.multi_t_shared == 2:
                     for k in range(i):
-                        if getattr(self,
-                                   f'tem_mlp_{k+1}_{j+1}_k{t_kernel}',
-                                   None) is not None:
-                            name = f'tem_mlp_{k+1}_{j+1}_k{t_kernel}'
+                        if self.t_mode == 3:
+                            name_k = f'tem_mha_{k+1}_{j+1}'
+                        else:
+                            name_k = f'tem_mlp_{k+1}_{j+1}_k{t_kernel}'
+                        if getattr(self, name_k, None) is not None:
+                            name = name_k
                             break
 
                 _x_list.append(getattr(self, name)(x_list[i]))
@@ -1080,6 +1085,29 @@ class GCNSpatialBlock(PyTorchModule):
         #     return x
 
 
+class MHATemporal(PyTorchModule):
+    def __init__(self, kwargs: dict, num_layers: int = 2):
+        super(MHATemporal, self).__init__()
+        self.num_layers = num_layers
+        for i in range(self.num_layers):
+            setattr(self,
+                    f'layer{i+1}',
+                    nn.TransformerEncoderLayer(
+                        d_model=kwargs['d_model'],
+                        nhead=kwargs['nhead'],
+                        dim_feedforward=kwargs['dim_feedforward'],
+                        dropout=kwargs['dropout'],
+                        activation=kwargs['activation'],
+                        layer_norm_eps=1e-5,
+                        batch_first=True,
+                    ))
+
+    def forward(self, x: Tensor) -> Tensor:
+        for i in range(self.num_layers):
+            x = getattr(self, f'layer{i+1}')(x)
+        return x
+
+
 class MLPTemporal(PyTorchModule):
     def __init__(self,
                  channels: List[int],
@@ -1219,16 +1247,8 @@ class TemporalBranch(Module):
                 prenorm=self.prenorm
             )
         elif t_mode == 3:
-            encoder_layer = nn.TransformerEncoderLayer(
-                d_model=mha_kwargs['d_model'],
-                nhead=mha_kwargs['nhead'],
-                dim_feedforward=mha_kwargs['dim_feedforward'],
-                dropout=mha_kwargs['dropout'],
-                activation=mha_kwargs['activation'],
-                layer_norm_eps=1e-5,
-                batch_first=True,
-            )
-            self.cnn = nn.TransformerEncoder(encoder_layer, 2)
+            num_layers = 2
+            self.cnn = MHATemporal(mha_kwargs, num_layers)
         else:
             raise ValueError('Unknown t_mode')
 
@@ -1300,11 +1320,13 @@ if __name__ == '__main__':
             'dropout': 0.1,
             'activation': "relu"
         },
-        multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7]],
+        multi_t=[[3], [3], [3]],
         multi_t_shared=2,
     )
     model(inputs)
     print(model)
+
+# tem_mha_1_1.cnn.layer1.self_attn.out_proj, tem_mha_1_1.cnn.layer2.self_attn.out_proj, tem_mha_2_1, tem_mha_2_1.cnn, tem_mha_2_1.cnn.layer1, tem_mha_2_1.cnn.layer1.dropout, tem_mha_2_1.cnn.layer1.dropout1, tem_mha_2_1.cnn.layer1.dropout2, tem_mha_2_1.cnn.layer1.linear1, tem_mha_2_1.cnn.layer1.linear2, tem_mha_2_1.cnn.layer1.norm1, tem_mha_2_1.cnn.layer1.norm2, tem_mha_2_1.cnn.layer1.self_attn, tem_mha_2_1.cnn.layer1.self_attn.out_proj, tem_mha_2_1.cnn.layer2, tem_mha_2_1.cnn.layer2.dropout, tem_mha_2_1.cnn.layer2.dropout1, tem_mha_2_1.cnn.layer2.dropout2, tem_mha_2_1.cnn.layer2.linear1, tem_mha_2_1.cnn.layer2.linear2, tem_mha_2_1.cnn.layer2.norm1, tem_mha_2_1.cnn.layer2.norm2, tem_mha_2_1.cnn.layer2.self_attn, tem_mha_2_1.cnn.layer2.self_attn.out_proj, tem_mha_3_1, tem_mha_3_1.cnn, tem_mha_3_1.cnn.layer1, tem_mha_3_1.cnn.layer1.dropout, tem_mha_3_1.cnn.layer1.dropout1, tem_mha_3_1.cnn.layer1.dropout2, tem_mha_3_1.cnn.layer1.linear1, tem_mha_3_1.cnn.layer1.linear2, tem_mha_3_1.cnn.layer1.norm1, tem_mha_3_1.cnn.layer1.norm2, tem_mha_3_1.cnn.layer1.self_attn, tem_mha_3_1.cnn.layer1.self_attn.out_proj, tem_mha_3_1.cnn.layer2, tem_mha_3_1.cnn.layer2.dropout, tem_mha_3_1.cnn.layer2.dropout1, tem_mha_3_1.cnn.layer2.dropout2, tem_mha_3_1.cnn.layer2.linear1, tem_mha_3_1.cnn.layer2.linear2, tem_mha_3_1.cnn.layer2.norm1, tem_mha_3_1.cnn.layer2.norm2, tem_mha_3_1.cnn.layer2.self_attn, tem_mha_3_1.cnn.layer2.self_attn.out_proj
 
     try:
         flops = FlopCountAnalysis(model, inputs)

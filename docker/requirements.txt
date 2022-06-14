@@ -36,3 +36,5 @@ torchinfo
 deberta
 
 einops
+
+fvcore
