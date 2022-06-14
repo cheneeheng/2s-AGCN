@@ -1086,9 +1086,9 @@ class GCNSpatialBlock(PyTorchModule):
 
 
 class MHATemporal(PyTorchModule):
-    def __init__(self, kwargs: dict, num_layers: int = 2):
+    def __init__(self, kwargs: dict):
         super(MHATemporal, self).__init__()
-        self.num_layers = num_layers
+        self.num_layers = kwargs['num_layers']
         for i in range(self.num_layers):
             setattr(self,
                     f'layer{i+1}',
@@ -1247,8 +1247,7 @@ class TemporalBranch(Module):
                 prenorm=self.prenorm
             )
         elif t_mode == 3:
-            num_layers = 2
-            self.cnn = MHATemporal(mha_kwargs, num_layers)
+            self.cnn = MHATemporal(mha_kwargs)
         else:
             raise ValueError('Unknown t_mode')
 
@@ -1318,15 +1317,14 @@ if __name__ == '__main__':
             'nhead': 4,
             'dim_feedforward': 256*4,
             'dropout': 0.1,
-            'activation': "relu"
+            'activation': "relu",
+            'num_layers': 2
         },
         multi_t=[[3], [3], [3]],
         multi_t_shared=2,
     )
     model(inputs)
     print(model)
-
-# tem_mha_1_1.cnn.layer1.self_attn.out_proj, tem_mha_1_1.cnn.layer2.self_attn.out_proj, tem_mha_2_1, tem_mha_2_1.cnn, tem_mha_2_1.cnn.layer1, tem_mha_2_1.cnn.layer1.dropout, tem_mha_2_1.cnn.layer1.dropout1, tem_mha_2_1.cnn.layer1.dropout2, tem_mha_2_1.cnn.layer1.linear1, tem_mha_2_1.cnn.layer1.linear2, tem_mha_2_1.cnn.layer1.norm1, tem_mha_2_1.cnn.layer1.norm2, tem_mha_2_1.cnn.layer1.self_attn, tem_mha_2_1.cnn.layer1.self_attn.out_proj, tem_mha_2_1.cnn.layer2, tem_mha_2_1.cnn.layer2.dropout, tem_mha_2_1.cnn.layer2.dropout1, tem_mha_2_1.cnn.layer2.dropout2, tem_mha_2_1.cnn.layer2.linear1, tem_mha_2_1.cnn.layer2.linear2, tem_mha_2_1.cnn.layer2.norm1, tem_mha_2_1.cnn.layer2.norm2, tem_mha_2_1.cnn.layer2.self_attn, tem_mha_2_1.cnn.layer2.self_attn.out_proj, tem_mha_3_1, tem_mha_3_1.cnn, tem_mha_3_1.cnn.layer1, tem_mha_3_1.cnn.layer1.dropout, tem_mha_3_1.cnn.layer1.dropout1, tem_mha_3_1.cnn.layer1.dropout2, tem_mha_3_1.cnn.layer1.linear1, tem_mha_3_1.cnn.layer1.linear2, tem_mha_3_1.cnn.layer1.norm1, tem_mha_3_1.cnn.layer1.norm2, tem_mha_3_1.cnn.layer1.self_attn, tem_mha_3_1.cnn.layer1.self_attn.out_proj, tem_mha_3_1.cnn.layer2, tem_mha_3_1.cnn.layer2.dropout, tem_mha_3_1.cnn.layer2.dropout1, tem_mha_3_1.cnn.layer2.dropout2, tem_mha_3_1.cnn.layer2.linear1, tem_mha_3_1.cnn.layer2.linear2, tem_mha_3_1.cnn.layer2.norm1, tem_mha_3_1.cnn.layer2.norm2, tem_mha_3_1.cnn.layer2.self_attn, tem_mha_3_1.cnn.layer2.self_attn.out_proj
 
     try:
         flops = FlopCountAnalysis(model, inputs)
