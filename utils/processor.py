@@ -23,7 +23,7 @@ from torch.profiler import profile, schedule, tensorboard_trace_handler
 from torch.utils.tensorboard import SummaryWriter
 
 from feeders.loader import FeederDataLoader
-from model.module.loss import LabelSmoothingLoss
+from model.module import LabelSmoothingLoss
 
 from sam.sam.sam import SAM
 from sam.sam.example.utility.bypass_bn import enable_running_stats

@@ -1,9 +1,6 @@
 from collections import OrderedDict
 from typing import Optional, Union, Type
 
-import inspect
-
-
 try:
     from fvcore.nn import FlopCountAnalysis
     from fvcore.nn import flop_count_table
@@ -16,10 +13,12 @@ from torch.nn import functional as F
 from torch.nn import Module as PyTorchModule
 from torch.nn import Sequential
 
+from model.module.torch_utils import null_fn
 
-__all__ = ['Module', 'Conv1xN', 'Conv', 'Pool', 'ASPP']
+__all__ = ['Module', 'Residual', 'Conv1xN', 'Conv', 'Pool', 'ASPP']
 
 OTPM = Optional[Type[PyTorchModule]]
+OUTPMPM = Optional[Union[Type[PyTorchModule], PyTorchModule]]
 
 
 class Module(PyTorchModule):
@@ -65,6 +64,40 @@ class Module(PyTorchModule):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.block(x)
+
+
+class Residual(Module):
+    def __init__(self,
+                 mode: int,
+                 in_channels: int,
+                 out_channels: int,
+                 kernel_size: int = 1,
+                 padding: int = 0,
+                 dilation: int = 1,
+                 bias: int = 0):
+        super(Residual, self).__init__(in_channels,
+                                       out_channels,
+                                       kernel_size=kernel_size,
+                                       padding=padding,
+                                       dilation=dilation,
+                                       bias=bias)
+        if mode == 0:
+            self.skip = null_fn
+        elif mode == 1:
+            if self.in_channels == self.out_channels:
+                self.skip = torch.nn.Identity()
+            else:
+                self.skip = Conv(self.in_channels,
+                                 self.out_channels,
+                                 self.kernel_size,
+                                 self.padding,
+                                 self.dilation,
+                                 bias=self.bias)
+        else:
+            raise ValueError("Unknown residual modes...")
+
+    def forward(self, x: torch.Tensor, s: torch.Tensor) -> torch.Tensor:
+        return x + self.skip(s)
 
 
 class Conv1xN(Module):
@@ -187,22 +220,34 @@ class ASPP(PyTorchModule):
                  #  padding: Optional[list] = None,
                  dilation: list = [1, 3, 5, 7],
                  bias: int = 0,
-                 dropout: Type[PyTorchModule] = None,  # nn.Dropout2d,
-                 activation: Type[PyTorchModule] = None,  # nn.ReLU,
-                 normalization: Type[PyTorchModule] = None,  # nn.BatchNorm2d,
+                 dropout: OUTPMPM = None,  # nn.Dropout2d,
+                 activation: OUTPMPM = None,  # nn.ReLU,
+                 normalization: OUTPMPM = None,  # nn.BatchNorm2d,
                  residual: int = 0):
         super(ASPP, self).__init__()
 
-        _dropout = dropout
-        if len(inspect.getfullargspec(dropout).args) != 0:
+        if isinstance(dropout, Type[PyTorchModule]):
             def _dropout(): return dropout(0.2)
+        elif isinstance(dropout, callable):
+            _dropout = dropout
+        else:
+            raise ValueError("Unknown dropout arg in ASPP")
 
-        _normalization = normalization
-        if len(inspect.getfullargspec(normalization).args) != 0:
+        if isinstance(activation, Type[PyTorchModule]):
+            def _activation(): return activation(0.1)
+        elif isinstance(activation, callable):
+            _activation = activation
+        else:
+            raise ValueError("Unknown activation arg in ASPP")
+
+        if isinstance(normalization, Type[PyTorchModule]):
             def _normalization(): return normalization(out_channels)
+        elif isinstance(normalization, callable):
+            _normalization = normalization
+        else:
+            raise ValueError("Unknown normalization arg in ASPP")
 
-        self.block = torch.nn.ModuleDict()
-
+        self.block = nn.ModuleDict()
         for i in range(len(dilation)):
             if dilation[i] == 0:
                 self.block.update({
@@ -210,7 +255,7 @@ class ASPP(PyTorchModule):
                                       out_channels,
                                       bias=bias,
                                       pooling=nn.AdaptiveAvgPool2d(1),
-                                      activation=activation)
+                                      activation=_activation)
                 })
             else:
                 self.block.update({
@@ -221,37 +266,36 @@ class ASPP(PyTorchModule):
                          padding=dilation[i],
                          dilation=dilation[i],
                          bias=bias,
-                         activation=activation,
+                         activation=_activation,
                          normalization=_normalization,
                          deterministic=False)
                 })
 
-        self.proj = Conv(out_channels * len(dilation),
-                         out_channels,
-                         bias=bias,
-                         normalization=_normalization,
-                         dropout=_dropout)
+        self.projection = Conv(out_channels * len(dilation),
+                               out_channels,
+                               bias=bias,
+                               normalization=_normalization,
+                               dropout=_dropout)
 
-        if residual == 0:
-            self.res = lambda x: 0
-        elif in_channels == out_channels:
-            self.res = nn.Identity()
-        else:
-            self.res = Conv(in_channels, out_channels, bias=bias)
+        self.residual = Residual(mode=residual,
+                                 in_channels=in_channels,
+                                 out_channels=out_channels,
+                                 bias=bias)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: n,c,v,t
-        res = []
+        output = []
         for name, block in self.block.items():
-            x1 = block(x)
+            z = block(x)
             if name == 'aspp_pool':
-                x1 = F.interpolate(x1,
-                                   size=x.shape[-2:],
-                                   mode="bilinear",
-                                   align_corners=False)
-            res.append(x1)
-        res = torch.cat(res, dim=1)
-        x = self.proj(res) + self.res(x)
+                z = F.interpolate(z,
+                                  size=x.shape[-2:],
+                                  mode="bilinear",
+                                  align_corners=False)
+            output.append(z)
+        output = torch.cat(output, dim=1)
+        output = self.projection(output)
+        x = self.residual(output, x)
         return x
 
 

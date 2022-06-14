@@ -10,6 +10,9 @@ from typing import Optional, Tuple
 from model.module.embedding.rel_embedding import RelPosEmb1D
 
 
+__all__ = ['MultiheadAttention']
+
+
 # ------------------------------------------------------------------------------
 # From torch.nn.MultiheadAttention
 # ------------------------------------------------------------------------------

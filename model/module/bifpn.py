@@ -10,17 +10,6 @@ from typing import Union
 from model.module.pytorch_module_wrapper import Conv
 
 
-# Conv(sgcn_dims[i],
-#      out_channels,
-#      kernel_size=self.gcn_fpn_kernel,
-#      padding=self.gcn_fpn_kernel//2,
-#      bias=self.bias,
-#      activation=self.activation_fn,
-#      normalization=lambda: self.normalization_fn(
-#          out_channels),
-#      #  dropout=self.dropout_fn,
-#      ))
-
 class BiFPNBlock(nn.Module):
     """Bi-directional Feature Pyramid Network """
 
@@ -29,7 +18,7 @@ class BiFPNBlock(nn.Module):
                  out_channels: int,
                  td_kernel_size: int = 1,
                  out_kernel_size: int = 1,
-                 epsilon=0.0001):
+                 epsilon: float = 0.0001):
         super(BiFPNBlock, self).__init__()
         assert in_channels == out_channels
 
@@ -91,12 +80,12 @@ class BiFPNBlock(nn.Module):
 class BiFPN(nn.Module):
     def __init__(self,
                  in_channels: Union[list, tuple],
-                 out_channels=64,
+                 out_channels: int = 64,
                  proj_kernel_size: int = 1,
                  td_kernel_size: int = 1,
                  out_kernel_size: int = 1,
-                 num_layers=2,
-                 epsilon=0.0001):
+                 num_layers: int = 2,
+                 epsilon: float = 0.0001):
         super(BiFPN, self).__init__()
 
         self.num_layers = num_layers

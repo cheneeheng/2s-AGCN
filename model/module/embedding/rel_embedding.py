@@ -9,6 +9,9 @@ import torch.nn as nn
 from einops import rearrange
 
 
+__all__ = ['RelPosEmb1D']
+
+
 # borrowed from
 # https://github.com/lucidrains/bottleneck-transformer-pytorch/blob/main/bottleneck_transformer_pytorch/bottleneck_transformer_pytorch.py#L21  # noqa
 # i will try to reimplement the function
