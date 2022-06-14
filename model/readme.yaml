@@ -2249,6 +2249,15 @@ sgn_v11:
         - 220607103001_gcnfpn8dim256layer3_multit357357357shared_fcmerge2:
                   - 82.26%
 
+        - 220613180001_tmode3_d256h4ffn64relu:
+                  - using gcn_fpn1 + kernel 3
+                  - 94.32%
+        - 220613180001_tmode3_d256h4ffn1024relu:
+                  - using gcn_fpn1 + kernel 3
+                  - 94.42%
+
+
+
 sgn-code:
         - original sgn repo code
         - 220324170001:

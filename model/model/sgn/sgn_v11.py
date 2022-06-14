@@ -9,7 +9,6 @@
 # Continue from on sgn_v10
 # NO PARTS
 
-
 import torch
 from torch import nn
 from torch import Tensor
@@ -25,19 +24,15 @@ import math
 from typing import Tuple, Optional, Union, Type, List
 
 from model.module import *
-from model.module.layernorm import LayerNorm
 from model.module.bifpn import BiFPN
 from model.resource.common_ntu import *
 from model.torch_utils import *
 
-
 from utils.utils import *
-
 
 T1 = Type[PyTorchModule]
 T2 = List[Optional[Type[PyTorchModule]]]
 T3 = Union[List[int], int]
-
 
 EMB_MODES = [1, 2, 3, 4, 5, 6, 7, 8]
 
@@ -86,25 +81,6 @@ def fuse_features(x1: Tensor, x2: Tensor, mode: int) -> Tensor:
         return x1 + x2
     else:
         raise ValueError('Unknown feature fusion arg')
-
-
-def activation_fn(act_type: str) -> Type[Type[PyTorchModule]]:
-    if act_type == 'relu':
-        return nn.ReLU
-    elif act_type == 'gelu':
-        return nn.GELU
-    else:
-        raise ValueError("Unknown act_type ...")
-
-
-def normalization_fn(norm_type: str) -> Tuple[Type[PyTorchModule],
-                                              Type[PyTorchModule]]:
-    if 'bn' in norm_type:
-        return nn.BatchNorm2d, nn.BatchNorm1d
-    elif 'ln' in norm_type:
-        return LayerNorm, LayerNorm
-    else:
-        raise ValueError("Unknown norm_type ...")
 
 
 class SGN(PyTorchModule):
@@ -193,11 +169,11 @@ class SGN(PyTorchModule):
         self.c3 = to_int(self.c3 * c_multiplier[2])  # gcn
         self.c4 = to_int(self.c4 * c_multiplier[3])  # gcn
 
-        (self.normalization_fn,
-         self.normalization_fn_1d) = normalization_fn(norm_type)
+        (self.normalization_fn_1d,
+         self.normalization_fn) = get_normalization_fn(norm_type)
         self.prenorm = True if 'pre' in norm_type else False
 
-        self.activation_fn = activation_fn(act_type)
+        self.activation_fn = get_activation_fn(act_type)
 
         # Input + Semantics ----------------------------------------------------
         self.input_position = input_position

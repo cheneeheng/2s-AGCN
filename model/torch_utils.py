@@ -1,9 +1,15 @@
-from typing import Any
+# Utility functions for torch library.
+# ##############################################################################
 
 import torch
 
+from typing import Any, Tuple, Type
 
-__all__ = ['null_fn', 'init_zeros', 'pad_zeros']
+from model.module.layernorm import LayerNorm
+
+
+__all__ = ['null_fn', 'init_zeros', 'pad_zeros',
+           'get_activation_fn', 'get_normalization_fn']
 
 
 def null_fn(x: Any) -> int:
@@ -16,3 +22,22 @@ def init_zeros(x: torch.Tensor):
 
 def pad_zeros(x: torch.Tensor) -> torch.Tensor:
     return torch.cat([x.new(*x.shape[:-1], 1).zero_(), x], dim=-1)
+
+
+def get_activation_fn(act_type: str) -> Type[Type[torch.nn.Module]]:
+    if act_type == 'relu':
+        return torch.nn.ReLU
+    elif act_type == 'gelu':
+        return torch.nn.GELU
+    else:
+        raise ValueError("Unknown act_type ...")
+
+
+def get_normalization_fn(norm_type: str) -> Tuple[Type[torch.nn.Module],
+                                                  Type[torch.nn.Module]]:
+    if 'bn' in norm_type:
+        return torch.nn.BatchNorm1d, torch.nn.BatchNorm2d
+    elif 'ln' in norm_type:
+        return LayerNorm, LayerNorm
+    else:
+        raise ValueError("Unknown norm_type ...")

@@ -4,9 +4,7 @@
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
-from collections import OrderedDict
 from typing import Union
 
 from model.module.pytorch_module_wrapper import Conv
