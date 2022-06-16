@@ -339,13 +339,13 @@ class SGN(PyTorchModule):
             if self.gcn_fpn == 2:
                 out_channels = self.gcn_in_ch
             elif self.gcn_fpn == 5:
-                out_channels = self.c3//4
+                out_channels = sgcn_dims[-1]//4
             elif self.gcn_fpn == 6:
                 out_channels = 64
             elif self.gcn_fpn == 8:
                 out_channels = bifpn_dim
             else:
-                out_channels = self.c3
+                out_channels = sgcn_dims[-1]
         # pre gcn
         elif self.semantic_frame_location == 1:
             out_channels = self.gcn_in_ch
@@ -477,16 +477,15 @@ class SGN(PyTorchModule):
             raise ValueError("Unknown temporal_maxpool")
 
         # Classifier ---------------------------------------------------------
+        fc_in_ch = self.c4  # default
         if self.t_mode == 0:
             fc_in_ch = self.c3
-        elif self.t_mode == 3:
+        if self.t_mode == 3:
             fc_in_ch = self.t_mha_kwargs['d_model']
-        elif self.spatial_maxpool == 0 and self.temporal_maxpool == 0:
-            fc_in_ch = self.c4 * self.num_segment * self.num_point
-        elif self.temporal_maxpool == 0:
-            fc_in_ch = self.c4 * self.num_segment
-        else:
-            fc_in_ch = self.c4
+        if self.spatial_maxpool == 0 and self.temporal_maxpool == 0:
+            fc_in_ch = fc_in_ch * self.num_segment * self.num_point
+        if self.temporal_maxpool == 0:
+            fc_in_ch = fc_in_ch * self.num_segment
 
         if self.gcn_fpn_output_merge == 2:
             i = 0
@@ -1290,7 +1289,7 @@ if __name__ == '__main__':
         semantic_joint_fusion=0,
         semantic_frame_fusion=1,
         semantic_frame_location=0,
-        sgcn_dims=None,  # [c2, c3, c3],
+        sgcn_dims=[128, 128, 128],  # [c2, c3, c3],
         sgcn_kernel=1,  # residual connection in GCN
         sgcn_padding=0,  # residual connection in GCN
         sgcn_dropout=0.0,  # residual connection in GCN
@@ -1300,7 +1299,7 @@ if __name__ == '__main__':
         # sgcn_ffn=0,
         sgcn_v_kernel=0,
         sgcn_g_kernel=1,
-        sgcn_g_proj_dim=[128, 256, 256],  # c3
+        sgcn_g_proj_dim=256,  # c3
         sgcn_g_proj_shared=False,
         # sgcn_g_weighted=1,
         gcn_fpn=1,
@@ -1308,19 +1307,19 @@ if __name__ == '__main__':
         # bifpn_dim=256,
         # bifpn_layers=1,
         spatial_maxpool=1,
-        temporal_maxpool=1,
+        temporal_maxpool=0,
         aspp_rates=None,
         t_mode=3,
         t_maxpool_kwargs=None,
         t_mha_kwargs={
-            'd_model': 256,
-            'nhead': 4,
-            'dim_feedforward': 256*4,
+            'd_model': 128,
+            'nhead': 1,
+            'dim_feedforward': 128*4,
             'dropout': 0.1,
             'activation': "relu",
             'num_layers': 2
         },
-        multi_t=[[3], [3], [3]],
+        multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7]],
         multi_t_shared=2,
     )
     model(inputs)

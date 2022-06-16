@@ -2149,11 +2149,11 @@ sgn_v11:
         - 220607103001_gcnfpn7_multit357357357shared_tmode2:
                   - 95.42%
         - 220607103001_gcnfpn1k9_multit357357357shared:
-                  - 95.50%
+                  - 95.50% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
         - 220607103001_gcnfpn1k7_multit357357357shared:
-                  - 95.62%
+                  - 95.62% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
         - 220607103001_gcnfpn1k5_multit357357357shared:
-                  - 95.62%
+                  - 95.62% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
         - 220520150001_gcnfpn2_multit333:
                   - proj to lower and sum
@@ -2250,11 +2250,15 @@ sgn_v11:
                   - 82.26%
 
         - 220613180001_tmode3_d256h4ffn64relu:
-                  - using gcn_fpn1 + kernel 3
+                  - gcnfpn1k3_multit357357357shared
                   - 94.32%
         - 220613180001_tmode3_d256h4ffn1024relu:
-                  - using gcn_fpn1 + kernel 3
+                  - gcnfpn1k3_multit357357357shared
                   - 94.42%
+        - 220614140001_gcnfpn1k3_multit357357357shared_tmode3_d512h4ffn128relu2l:
+                  - 94.06%
+        - 220614140001_gcnfpn1k3_multit357357357shared_tmode3_d512h4ffn2048relu2l:
+                  - 91.84%
 
 
 
