@@ -2260,6 +2260,19 @@ sgn_v11:
         - 220614140001_gcnfpn1k3_multit357357357shared_tmode3_d512h4ffn2048relu2l:
                   - 91.84%
 
+        - 220616130001_gcnfpn1k3_multit357357357shared_tmode3_d256h1ffn256relu2l:
+                  - 94.46%
+        - 220616130001_gcnfpn1k3_multit357357357shared_tmode3_d256h1ffn1024relu2l:
+                  - 94.50%
+        - 220616130001_gcnfpn1k3_multit357357357shared_tmp0_tmode3_d128h1ffn128relu2l:
+                  - 94.21%
+        - 220616130001_gcnfpn1k3_multit357357357shared_tmp0_tmode3_d128h1ffn512relu2l:
+                  - 94.03%
+        - 220616130001_gcnfpn1k3_multit357357357shared_tmp0_tmode3_d256h1ffn256relu2l:
+                  - 94.52%
+        - 220616130001_gcnfpn1k3_multit357357357shared_tmp2:
+                  - 95.37% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
 
 
 sgn-code:

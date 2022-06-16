@@ -572,9 +572,8 @@ class SGN(PyTorchModule):
             assert hasattr(self, 'sgcn')
             x_list = [getattr(self, f'fpn_proj{i+1}')(x_spa_list[i])
                       for i in range(len(x_spa_list))]
-            x_list = [x_list[2] + x_list[1] + x_list[0],
-                      x_list[2] + x_list[1],
-                      x_list[2]]
+            x_list = [torch.sum(torch.stack(x_list[i:], dim=0), dim=0)
+                      for i in range(len(x_list))]
         elif self.gcn_fpn in [3, 4, 5]:
             assert hasattr(self, 'sgcn')
             x_list = [getattr(self, f'fpn_proj{i+1}')(x_spa_list[i])
@@ -584,7 +583,8 @@ class SGN(PyTorchModule):
             assert hasattr(self, 'bifpn')
             x_list = self.bifpn(x_spa_list)
         else:
-            x_list = [None, None, x_spa_list[-1]]
+            x_list = [None for _ in range(len(x_spa_list)-1)] + \
+                     [x_spa_list[-1]]
 
         # Frame-level Module ---------------------------------------------------
         # temporal fusion post gcn
@@ -595,7 +595,8 @@ class SGN(PyTorchModule):
         x_list = [self.smp(i) if i is not None else None for i in x_list]
 
         if self.gcn_fpn in [4, 5]:
-            x_list = [None, None, torch.cat(x_list, dim=1)]
+            x_list = [None for _ in range(len(x_spa_list)-1)] + \
+                     [torch.cat(x_list, dim=1)]
 
         # temporal MLP
         _x_list = []
@@ -1317,12 +1318,12 @@ if __name__ == '__main__':
         semantic_joint_fusion=0,
         semantic_frame_fusion=1,
         semantic_frame_location=0,
-        sgcn_dims=[128, 256, 256],  # [c2, c3, c3],
+        sgcn_dims=[128, 256, 256, 256],  # [c2, c3, c3],
         sgcn_kernel=1,  # residual connection in GCN
         sgcn_padding=0,  # residual connection in GCN
         sgcn_dropout=0.0,  # residual connection in GCN
         # int for global res, list for individual gcn
-        sgcn_residual=[0, 0, 0],
+        sgcn_residual=[0, 0, 0, 0],
         sgcn_prenorm=False,
         # sgcn_ffn=0,
         sgcn_v_kernel=0,
@@ -1335,19 +1336,19 @@ if __name__ == '__main__':
         # bifpn_dim=256,
         # bifpn_layers=1,
         spatial_maxpool=1,
-        temporal_maxpool=2,
+        temporal_maxpool=1,
         aspp_rates=None,
         t_mode=1,
-        t_maxpool_kwargs=None,
-        t_mha_kwargs={
-            'd_model': 128,
-            'nhead': 1,
-            'dim_feedforward': 128*4,
-            'dropout': 0.1,
-            'activation': "relu",
-            'num_layers': 2
-        },
-        multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7]],
+        # t_maxpool_kwargs=None,
+        # t_mha_kwargs={
+        #     'd_model': 128,
+        #     'nhead': 1,
+        #     'dim_feedforward': 128*4,
+        #     'dropout': 0.1,
+        #     'activation': "relu",
+        #     'num_layers': 2
+        # },
+        multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7], [3, 5, 7]],
         multi_t_shared=2,
     )
     model(inputs)
