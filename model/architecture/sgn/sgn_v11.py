@@ -54,12 +54,13 @@ EMB_MODES = [1, 2, 3, 4, 5, 6, 7, 8]
 # 6 proj to 64 and sum
 # 7 proj with 1x3 and sum, similar to 1
 # 8 bifpn 1 layer 64 dim
-GCN_FPN = [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8]
+GCN_FPN_MODES = [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8]
 
+# how the gcn fpns are merged for fc.
 # 0: no merge + no fpn
 # 1: avraged and sent to 1 fc only.
 # 2: no merge and used by multiple fc and averaged.
-GCN_FPN_MERGE = [0, 1, 2]
+GCN_FPN_MERGE_MODES = [0, 1, 2]
 
 # Temporal branch ---
 # 0 skip -> no temporal branch
@@ -67,6 +68,12 @@ GCN_FPN_MERGE = [0, 1, 2]
 # 2 original sgn with residual -> 1x3conv + res + 1x1conv + res
 # 3 trasnformers
 T_MODES = [0, 1, 2, 3]
+
+# Maxpooling ---
+# 0 no pool
+# 1 pool
+# 2 pool with indices
+POOLING_MODES = [0, 1, 2]
 
 
 def residual_layer(residual: int, in_ch: int, out_ch: int, bias: int = 0):
@@ -250,7 +257,6 @@ class SGN(PyTorchModule):
                 # dropout=self.dropout_fn,
                 activation=self.activation_fn,
                 normalization=self.normalization_fn,
-                num_point=self.num_point,
                 mode=self.x_emb_proj
             )
 
@@ -282,10 +288,10 @@ class SGN(PyTorchModule):
 
         # GCN FPN --------------------------------------------------------------
         self.gcn_fpn = gcn_fpn
-        assert self.gcn_fpn in GCN_FPN
+        assert self.gcn_fpn in GCN_FPN_MODES
 
         self.gcn_fpn_output_merge = gcn_fpn_output_merge
-        assert self.gcn_fpn_output_merge in GCN_FPN_MERGE
+        assert self.gcn_fpn_output_merge in GCN_FPN_MERGE_MODES
 
         if bifpn_dim > 0:
             assert self.gcn_fpn == 8
@@ -455,17 +461,18 @@ class SGN(PyTorchModule):
                 #     break
 
         # Maxpool --------------------------------------------------------------
-        # 0 no pool, 1 pool, 2 projection, 3 no pool but merge channels
+        # 0 no pool, 1 pool, 2 pool with indices
         self.spatial_maxpool = spatial_maxpool
         self.temporal_maxpool = temporal_maxpool
-        assert self.spatial_maxpool in [0, 1]
-        assert self.temporal_maxpool in [0, 1]
+        assert self.spatial_maxpool in POOLING_MODES
+        assert self.temporal_maxpool in POOLING_MODES
 
-        # 0=nn.Identity, 1=pool, 2=lerge kernel, 3= n,cv,1,t
         if self.spatial_maxpool == 0:
             self.smp = nn.Identity()
         elif self.spatial_maxpool == 1:
             self.smp = nn.AdaptiveMaxPool2d((1, self.num_segment))
+        elif self.spatial_maxpool == 2:
+            raise ValueError("spatial_maxpool=2 not implemented")
         else:
             raise ValueError("Unknown spatial_maxpool")
 
@@ -473,6 +480,8 @@ class SGN(PyTorchModule):
             self.tmp = nn.Identity()
         elif self.temporal_maxpool == 1:
             self.tmp = nn.AdaptiveMaxPool2d((1, 1))
+        elif self.temporal_maxpool == 2:
+            self.tmp = nn.AdaptiveMaxPool2d((1, 1), return_indices=True)
         else:
             raise ValueError("Unknown temporal_maxpool")
 
@@ -495,6 +504,15 @@ class SGN(PyTorchModule):
                     setattr(self, f'fc{i}', nn.Linear(fc_in_ch, num_class))
         else:
             self.fc = nn.Linear(fc_in_ch, num_class)
+
+        if self.temporal_maxpool == 2:
+            self.tmp_ind_projection = Embedding(
+                in_channels=fc_in_ch,
+                out_channels=fc_in_ch,
+                bias=self.bias,
+                activation=self.activation_fn,
+                mode=1
+            )
 
         # Init weight ----------------------------------------------------------
         self.init_weight()
@@ -618,6 +636,16 @@ class SGN(PyTorchModule):
             y = [self.tmp(i) for i in x]
         else:
             y = self.tmp(x)
+
+        if self.temporal_maxpool == 2:
+            if isinstance(y, list):
+                y_ind = [i[1] for i in y]
+                y = [i[0] for i in y]
+                y = [i + self.tmp_ind_projection(j.float())
+                     for i, j in zip(y, y_ind)]
+            else:
+                y, y_ind = y
+                y = y + self.tmp_ind_projection(y_ind.float())
 
         # Classification -------------------------------------------------------
         if isinstance(x, list):
@@ -1289,7 +1317,7 @@ if __name__ == '__main__':
         semantic_joint_fusion=0,
         semantic_frame_fusion=1,
         semantic_frame_location=0,
-        sgcn_dims=[128, 128, 128],  # [c2, c3, c3],
+        sgcn_dims=[128, 256, 256],  # [c2, c3, c3],
         sgcn_kernel=1,  # residual connection in GCN
         sgcn_padding=0,  # residual connection in GCN
         sgcn_dropout=0.0,  # residual connection in GCN
@@ -1307,9 +1335,9 @@ if __name__ == '__main__':
         # bifpn_dim=256,
         # bifpn_layers=1,
         spatial_maxpool=1,
-        temporal_maxpool=0,
+        temporal_maxpool=2,
         aspp_rates=None,
-        t_mode=3,
+        t_mode=1,
         t_maxpool_kwargs=None,
         t_mha_kwargs={
             'd_model': 128,
