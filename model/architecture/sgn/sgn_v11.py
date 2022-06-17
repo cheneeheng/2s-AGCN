@@ -21,7 +21,7 @@ except ImportError:
     print("Warning: fvcore is not found")
 
 import math
-from typing import OrderedDict, Tuple, Optional, Union, Type, List
+from typing import Tuple, Optional, Union, Type, List
 
 # from model.module import *
 # from model.module.bifpn import BiFPN
@@ -35,6 +35,7 @@ from model.module import init_zeros
 from model.module import pad_zeros
 from model.module import get_activation_fn
 from model.module import get_normalization_fn
+from model.module import Transformer
 from utils.utils import *
 
 T1 = Type[PyTorchModule]
@@ -490,7 +491,11 @@ class SGN(PyTorchModule):
         if self.t_mode == 0:
             fc_in_ch = self.c3
         if self.t_mode == 3:
-            fc_in_ch = self.t_mha_kwargs['d_model']
+            fc_in_ch = self.t_mha_kwargs.get('dim_feedforward_output', None)
+            if fc_in_ch is None:
+                fc_in_ch = self.t_mha_kwargs.get('d_model', None)
+            if fc_in_ch is None:
+                raise ValueError("dim_feedforward_output/d_model missing...")
         if self.spatial_maxpool == 0 and self.temporal_maxpool == 0:
             fc_in_ch = fc_in_ch * self.num_segment * self.num_point
         if self.temporal_maxpool == 0:
@@ -1116,23 +1121,40 @@ class GCNSpatialBlock(PyTorchModule):
 class MHATemporal(PyTorchModule):
     def __init__(self, kwargs: dict):
         super(MHATemporal, self).__init__()
-        self.num_layers = kwargs['num_layers']
-        for i in range(self.num_layers):
-            setattr(self,
-                    f'layer{i+1}',
-                    nn.TransformerEncoderLayer(
-                        d_model=kwargs['d_model'],
-                        nhead=kwargs['nhead'],
-                        dim_feedforward=kwargs['dim_feedforward'],
-                        dropout=kwargs['dropout'],
-                        activation=kwargs['activation'],
-                        layer_norm_eps=1e-5,
-                        batch_first=True,
-                    ))
+        if 'norm' in kwargs:
+            self.transformer = Transformer(
+                dim=kwargs['d_model'],
+                depth=kwargs['num_layers'],
+                heads=kwargs['nhead'],
+                dim_head=kwargs['d_head'],
+                dropout=kwargs['dropout'],
+                mlp_dim=kwargs['dim_feedforward'],
+                mlp_out_dim=kwargs['dim_feedforward_output'],
+                activation=kwargs['activation'],
+                norm=kwargs['norm'],
+                global_norm=kwargs['global_norm']
+            )
+        else:
+            self.num_layers = kwargs['num_layers']
+            for i in range(self.num_layers):
+                setattr(self,
+                        f'layer{i+1}',
+                        nn.TransformerEncoderLayer(
+                            d_model=kwargs['d_model'],
+                            nhead=kwargs['nhead'],
+                            dim_feedforward=kwargs['dim_feedforward'],
+                            dropout=kwargs['dropout'],
+                            activation=kwargs['activation'],
+                            layer_norm_eps=1e-5,
+                            batch_first=True,
+                        ))
 
     def forward(self, x: Tensor) -> Tensor:
-        for i in range(self.num_layers):
-            x = getattr(self, f'layer{i+1}')(x)
+        if hasattr(self, 'transformer'):
+            x, _ = self.transformer(x)
+        else:
+            for i in range(self.num_layers):
+                x = getattr(self, f'layer{i+1}')(x)
         return x
 
 
@@ -1280,14 +1302,14 @@ class TemporalBranch(Module):
             raise ValueError('Unknown t_mode')
 
     def forward(self, x: Tensor) -> Tensor:
-        N, C, _, T = x.shape
+        N, _, _, T = x.shape
         x = self.aspp(x)
         if self.t_mode == 3:
             x = x.permute(0, 3, 2, 1).contiguous()  # n,t,v,c
-            x = x.reshape(N, T, C)
+            x = x.reshape(N, T, -1)
         x = self.cnn(x)
         if self.t_mode == 3:
-            x = x.reshape(N, T, 1, C)
+            x = x.reshape(N, T, 1, -1)
             x = x.permute(0, 3, 2, 1).contiguous()  # n,c,v,t
         return x
 
@@ -1318,12 +1340,12 @@ if __name__ == '__main__':
         semantic_joint_fusion=0,
         semantic_frame_fusion=1,
         semantic_frame_location=0,
-        sgcn_dims=[128, 256, 256, 256],  # [c2, c3, c3],
+        sgcn_dims=[128, 256, 256],  # [c2, c3, c3],
         sgcn_kernel=1,  # residual connection in GCN
         sgcn_padding=0,  # residual connection in GCN
         sgcn_dropout=0.0,  # residual connection in GCN
         # int for global res, list for individual gcn
-        sgcn_residual=[0, 0, 0, 0],
+        sgcn_residual=[0, 0, 0],
         sgcn_prenorm=False,
         # sgcn_ffn=0,
         sgcn_v_kernel=0,
@@ -1331,7 +1353,7 @@ if __name__ == '__main__':
         sgcn_g_proj_dim=256,  # c3
         sgcn_g_proj_shared=False,
         # sgcn_g_weighted=1,
-        gcn_fpn=1,
+        gcn_fpn=-1,
         # gcn_fpn_output_merge=1,
         # bifpn_dim=256,
         # bifpn_layers=1,
@@ -1340,16 +1362,20 @@ if __name__ == '__main__':
         aspp_rates=None,
         t_mode=1,
         # t_maxpool_kwargs=None,
-        # t_mha_kwargs={
-        #     'd_model': 128,
-        #     'nhead': 1,
-        #     'dim_feedforward': 128*4,
-        #     'dropout': 0.1,
-        #     'activation': "relu",
-        #     'num_layers': 2
-        # },
-        multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7], [3, 5, 7]],
-        multi_t_shared=2,
+        t_mha_kwargs={
+            'd_model': 256,
+            'nhead': 1,
+            'd_head': 512,
+            'dim_feedforward': 256*4,
+            'dim_feedforward_output': 512,
+            'dropout': 0.1,
+            'activation': "relu",
+            'num_layers': 2,
+            'norm': 'ln',
+            'global_norm': False
+        },
+        # multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7], [3, 5, 7]],
+        # multi_t_shared=2,
     )
     model(inputs)
     print(model)
