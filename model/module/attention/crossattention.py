@@ -9,12 +9,20 @@ from torch import nn, einsum
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 
+from typing import Callable
+
+from model.module.torch_utils import get_activation_fn
+from model.module.torch_utils import get_normalization_fn
+
 
 __all__ = ['CrossViT',
            'ImageEmbedder',
            'MultiScaleEncoder',
            'CrossTransformer',
-           'Transformer']
+           'Transformer',
+           'PreNorm',
+           'Attention',
+           'FeedForward']
 
 
 # helpers
@@ -26,36 +34,64 @@ def default(val, d):
     return val if exists(val) else d
 
 
-# pre-layernorm
-class PreNorm(nn.Module):
-    def __init__(self, dim, fn):
+class Normalize(nn.Module):
+    def __init__(self, fn: Callable):
         super().__init__()
-        self.norm = nn.LayerNorm(dim)
         self.fn = fn
 
-    def forward(self, x, **kwargs):
+    def forward(self, x: torch.Tensor):
+        return self.fn(x.transpose(1, 2)).transpose(1, 2)
+
+
+# pre-layer norm
+class PreNorm(nn.Module):
+    def __init__(self, dim: int, fn: Callable, norm: str = 'ln'):
+        super().__init__()
+        self.norm = Normalize(get_normalization_fn(norm)[0](dim))
+        self.fn = fn
+
+    def forward(self, x: torch.Tensor, **kwargs):
+
         return self.fn(self.norm(x), **kwargs)
 
 
 # feedforward
 class FeedForward(nn.Module):
-    def __init__(self, dim, hidden_dim, dropout=0.):
+    def __init__(self,
+                 dim: int,
+                 hidden_dim: int,
+                 dropout: float = 0.,
+                 output_dim: int = 0,
+                 activation: str = 'gelu'):
         super().__init__()
+        if output_dim == 0:
+            output_dim = dim
         self.net = nn.Sequential(OrderedDict([
             ('linear1', nn.Linear(dim, hidden_dim)),
-            ('gelu', nn.GELU()),
+            (activation, get_activation_fn(activation)()),
             ('dropout1', nn.Dropout(dropout)),
-            ('linear2', nn.Linear(hidden_dim, dim)),
+            ('linear2', nn.Linear(hidden_dim, output_dim)),
             ('dropout2', nn.Dropout(dropout))])
         )
+        if dim == output_dim:
+            self.residual = nn.Identity()
+        else:
+            self.residual = nn.Linear(dim, output_dim)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         return self.net(x)
+
+    def res(self, x: torch.Tensor):
+        return self.residual(x)
 
 
 # attention
 class Attention(nn.Module):
-    def __init__(self, dim, heads=8, dim_head=64, dropout=0.):
+    def __init__(self,
+                 dim: int,
+                 heads: int = 8,
+                 dim_head: int = 64,
+                 dropout: float = 0.):
         super().__init__()
         inner_dim = dim_head * heads
         self.heads = heads
@@ -70,7 +106,10 @@ class Attention(nn.Module):
             ('dropout', nn.Dropout(dropout))])
         )
 
-    def forward(self, x, context=None, kv_include_self=False):
+    def forward(self,
+                x: torch.Tensor,
+                context: torch.Tensor = None,
+                kv_include_self: bool = False):
         b, n, _, h = *x.shape, self.heads
         context = default(context, x)
 
@@ -92,8 +131,18 @@ class Attention(nn.Module):
 
 # transformer encoder, for small and large patches
 class Transformer(nn.Module):
-    def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout=0.,
-                 **kwargs):
+    def __init__(self,
+                 dim: int,
+                 depth: int,
+                 heads: int,
+                 dim_head: int,
+                 mlp_dim: int,
+                 dropout: float = 0.,
+                 mlp_out_dim: int = 0,
+                 activation: str = 'gelu',
+                 norm: str = 'ln',
+                 global_norm: bool = True,
+                 ** kwargs):
         super().__init__()
         attn_kwargs = dict(dim=dim,
                            heads=heads,
@@ -101,30 +150,39 @@ class Transformer(nn.Module):
                            dropout=dropout)
         ffnn_kwargs = dict(dim=dim,
                            hidden_dim=mlp_dim,
-                           dropout=dropout)
+                           dropout=dropout,
+                           activation=activation)
         self.layers = nn.ModuleDict({})
-        self.norm = nn.LayerNorm(dim)
         for i in range(depth):
+            if i == depth-1:
+                ffnn_kwargs['output_dim'] = mlp_out_dim
             self.layers.update(
                 {
                     f'l{i+1}':
                     nn.ModuleDict(
                         OrderedDict({
                             'attn': PreNorm(dim=dim,
-                                            fn=Attention(**attn_kwargs)),
+                                            fn=Attention(**attn_kwargs),
+                                            norm=norm),
                             'ffn': PreNorm(dim=dim,
-                                           fn=FeedForward(**ffnn_kwargs))
+                                           fn=FeedForward(**ffnn_kwargs),
+                                           norm=norm)
                         })
                     )
                 }
             )
+        if global_norm:
+            _dim = dim if mlp_out_dim == 0 else mlp_out_dim
+            self.norm = Normalize(get_normalization_fn(norm)[0](_dim))
+        else:
+            self.norm = nn.Identity()
 
     def forward(self, x):
         attn_list = []
         for _, layer in self.layers.items():
             x1, attn = layer['attn'](x)
             x = x1 + x
-            x = layer['ffn'](x) + x
+            x = layer['ffn'](x) + layer['ffn'].fn.res(x)
             attn_list.append(attn)
         return self.norm(x), attn_list
 
@@ -316,7 +374,11 @@ class CrossViT(nn.Module):
         cross_attn_dim_head=64,
         depth=3,
         dropout=0.1,
-        emb_dropout=0.1
+        emb_dropout=0.1,
+        sm_enc_mlp_out_dim=0,
+        lg_enc_mlp_out_dim=0,
+        activation='gelu',
+        norm='ln'
     ):
         super().__init__()
         self.sm_image_embedder = ImageEmbedder(dim=sm_dim,
@@ -339,21 +401,31 @@ class CrossViT(nn.Module):
                 depth=sm_enc_depth,
                 heads=sm_enc_heads,
                 mlp_dim=sm_enc_mlp_dim,
-                dim_head=sm_enc_dim_head
+                dim_head=sm_enc_dim_head,
+                activation=activation,
+                norm=norm,
+                mlp_out_dim=sm_enc_mlp_out_dim
             ),
             lg_enc_params=dict(
                 depth=lg_enc_depth,
                 heads=lg_enc_heads,
                 mlp_dim=lg_enc_mlp_dim,
-                dim_head=lg_enc_dim_head
+                dim_head=lg_enc_dim_head,
+                activation=activation,
+                norm=norm,
+                mlp_out_dim=lg_enc_mlp_out_dim
             ),
             dropout=dropout
         )
 
-        self.sm_mlp_head = nn.Sequential(nn.LayerNorm(
-            sm_dim), nn.Linear(sm_dim, num_classes))
-        self.lg_mlp_head = nn.Sequential(nn.LayerNorm(
-            lg_dim), nn.Linear(lg_dim, num_classes))
+        self.sm_mlp_head = nn.Sequential(
+            Normalize(get_normalization_fn(norm)[0](sm_dim)),
+            nn.Linear(sm_dim, num_classes)
+        )
+        self.lg_mlp_head = nn.Sequential(
+            Normalize(get_normalization_fn(norm)[0](lg_dim)),
+            nn.Linear(lg_dim, num_classes)
+        )
 
     def forward(self, img):
         sm_tokens = self.sm_image_embedder(img)
@@ -367,3 +439,8 @@ class CrossViT(nn.Module):
         lg_logits = self.lg_mlp_head(lg_cls)
 
         return sm_logits + lg_logits
+
+
+if __name__ == '__main__':
+    m = Transformer(8, 2, 4, 4, 16, 0, 32)
+    m(torch.rand(2, 5, 8))

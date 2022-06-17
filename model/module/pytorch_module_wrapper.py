@@ -85,19 +85,19 @@ class Residual(Module):
             self.skip = null_fn
         elif mode == 1:
             if self.in_channels == self.out_channels:
-                self.skip = torch.nn.Identity()
+                self.residual = torch.nn.Identity()
             else:
-                self.skip = Conv(self.in_channels,
-                                 self.out_channels,
-                                 self.kernel_size,
-                                 self.padding,
-                                 self.dilation,
-                                 bias=self.bias)
+                self.residual = Conv(self.in_channels,
+                                     self.out_channels,
+                                     self.kernel_size,
+                                     self.padding,
+                                     self.dilation,
+                                     bias=self.bias)
         else:
             raise ValueError("Unknown residual modes...")
 
-    def forward(self, x: torch.Tensor, s: torch.Tensor) -> torch.Tensor:
-        return x + self.skip(s)
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.residual(x)
 
 
 class Conv1xN(Module):
@@ -293,9 +293,7 @@ class ASPP(PyTorchModule):
                                   mode="bilinear",
                                   align_corners=False)
             output.append(z)
-        output = torch.cat(output, dim=1)
-        output = self.projection(output)
-        x = self.residual(output, x)
+        x = self.projection(torch.cat(output, dim=1)) + self.residual(x)
         return x
 
 

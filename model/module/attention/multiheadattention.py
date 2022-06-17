@@ -22,10 +22,10 @@ def scaled_dot_product_attention(
     v: torch.Tensor,
     attn_mask: Optional[torch.Tensor] = None,
     dropout_p: float = 0.0,
-    num_heads: int = 1,
-    pos_emb: Optional[nn.Module] = None,
-    alpha: Optional[torch.Tensor] = None,
-    global_attn: Optional[torch.Tensor] = None,
+    num_heads: int = 1,  # new
+    pos_emb: Optional[nn.Module] = None,  # new
+    alpha: Optional[torch.Tensor] = None,  # new
+    global_attn: Optional[torch.Tensor] = None,  # new
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     B, Nt, E = q.shape
     q = q / math.sqrt(E)
@@ -33,6 +33,8 @@ def scaled_dot_product_attention(
     attn = torch.bmm(q, k.transpose(-2, -1))
     if attn_mask is not None:
         attn += attn_mask
+
+    # [Modification] ===========================================================
     if pos_emb is not None:
         _, t, d = q.shape
         pe = pos_emb(q.reshape(-1, num_heads, t, d)).reshape(-1, t, t)
@@ -40,11 +42,17 @@ def scaled_dot_product_attention(
     else:
         pe = None
     attn_i = softmax(attn, dim=-1)
+    # =========================================================== [Modification]
+
     attn = softmax(attn, dim=-1)
+
+    # [Modification] ===========================================================
     if alpha is not None:
         attn = attn * alpha
     if global_attn is not None:
         attn = attn + global_attn
+    # =========================================================== [Modification]
+
     if dropout_p > 0.0:
         attn = dropout(attn, p=dropout_p)
     # (B, Nt, Ns) x (B, Ns, E) -> (B, Nt, E)
@@ -76,9 +84,9 @@ def multi_head_attention_forward(
     v_proj_weight: Optional[torch.Tensor] = None,
     static_k: Optional[torch.Tensor] = None,
     static_v: Optional[torch.Tensor] = None,
-    pos_emb: Optional[nn.Module] = None,
-    alpha: Optional[torch.Tensor] = None,
-    global_attn: Optional[torch.Tensor] = None,
+    pos_emb: Optional[nn.Module] = None,  # new
+    alpha: Optional[torch.Tensor] = None,  # new
+    global_attn: Optional[torch.Tensor] = None,  # new
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
     tens_ops = (query, key, value, in_proj_weight, in_proj_bias,
                 bias_k, bias_v, out_proj_weight, out_proj_bias)
@@ -341,9 +349,9 @@ class MultiheadAttention(nn.MultiheadAttention):
                 q_proj_weight=self.q_proj_weight,
                 k_proj_weight=self.k_proj_weight,
                 v_proj_weight=self.v_proj_weight,
-                pos_emb=self.pos_emb,
-                alpha=alpha,
-                global_attn=global_attn)
+                pos_emb=self.pos_emb,  # new
+                alpha=alpha,  # new
+                global_attn=global_attn)  # new
         else:
             attn_output, attn_output_weights, pe = multi_head_attention_forward(
                 query, key, value, self.embed_dim, self.num_heads,
@@ -354,9 +362,9 @@ class MultiheadAttention(nn.MultiheadAttention):
                 key_padding_mask=key_padding_mask,
                 need_weights=need_weights,
                 attn_mask=attn_mask,
-                pos_emb=self.pos_emb,
-                alpha=alpha,
-                global_attn=global_attn)
+                pos_emb=self.pos_emb,  # new
+                alpha=alpha,  # new
+                global_attn=global_attn)  # new
         if self.batch_first:
             return attn_output.transpose(1, 0), attn_output_weights, pe
         else:
