@@ -2249,6 +2249,7 @@ sgn_v11:
         - 220607103001_gcnfpn8dim256layer3_multit357357357shared_fcmerge2:
                   - 82.26%
 
+        # TMODE = 3
         - 220613180001_tmode3_d256h4ffn64relu:
                   - gcnfpn1k3_multit357357357shared
                   - 94.32%
@@ -2265,19 +2266,30 @@ sgn_v11:
         - 220616130001_gcnfpn1k3_multit357357357shared_tmode3_d256h1ffn1024relu2l:
                   - 94.50%
         - 220616130001_gcnfpn1k3_multit357357357shared_tmp0_tmode3_d128h1ffn128relu2l:
+                  - no temporal maxpool
                   - 94.21%
         - 220616130001_gcnfpn1k3_multit357357357shared_tmp0_tmode3_d128h1ffn512relu2l:
+                  - no temporal maxpool
                   - 94.03%
         - 220616130001_gcnfpn1k3_multit357357357shared_tmp0_tmode3_d256h1ffn256relu2l:
+                  - no temporal maxpool
                   - 94.52%
         - 220616130001_gcnfpn1k3_multit357357357shared_tmp2:
+                  - temporal max pool with indices
                   - 95.37% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
+        - 220617113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out512layer2bn:
+                  - 95.08%
+        - 220617113001_gcnfpn1k3_multit357357357shared_tmode3ffn256layer2bn:
+                  - 94.56%
+        - 220617113001_gcnfpn1k3_multit357357357shared_tmode3ffn1024layer2bn:
+                  - 94.59%
+
+        # MORE GCNS + higher proj dim                  
         - 220616130001_gcndim128128256256_gcnfpn1k3_multit357357357shared:
                   - 95.63% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
         - 220616130001_gproj512_gcnfpn1k3_multit357357357shared:
                   - 95.66% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
 
 
 sgn-code:

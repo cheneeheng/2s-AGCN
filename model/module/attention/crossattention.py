@@ -9,7 +9,7 @@ from torch import nn, einsum
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 
-from typing import Callable
+from typing import Callable, Union
 
 from model.module.torch_utils import get_activation_fn
 from model.module.torch_utils import get_normalization_fn
@@ -132,47 +132,70 @@ class Attention(nn.Module):
 # transformer encoder, for small and large patches
 class Transformer(nn.Module):
     def __init__(self,
-                 dim: int,
+                 dim: Union[int, list],
                  depth: int,
-                 heads: int,
-                 dim_head: int,
-                 mlp_dim: int,
-                 dropout: float = 0.,
-                 mlp_out_dim: int = 0,
+                 heads: Union[int, list],
+                 dim_head: Union[int, list],
+                 mlp_dim: Union[int, list],
+                 dropout: Union[float, list] = 0.,
+                 mlp_out_dim: Union[int, list] = 0,
                  activation: str = 'gelu',
                  norm: str = 'ln',
                  global_norm: bool = True,
-                 ** kwargs):
+                 **kwargs):
         super().__init__()
-        attn_kwargs = dict(dim=dim,
-                           heads=heads,
-                           dim_head=dim_head,
-                           dropout=dropout)
-        ffnn_kwargs = dict(dim=dim,
-                           hidden_dim=mlp_dim,
-                           dropout=dropout,
-                           activation=activation)
+
+        if isinstance(dim, int):
+            dim = [dim] * depth
+        if isinstance(heads, int):
+            heads = [heads] * depth
+        if isinstance(dim_head, int):
+            dim_head = [dim_head] * depth
+        if isinstance(mlp_dim, int):
+            mlp_dim = [mlp_dim] * depth
+        if isinstance(mlp_out_dim, int):
+            mlp_out_dim = [mlp_out_dim] * depth
+        if isinstance(dropout, float):
+            dropout = [dropout] * depth
+
+        assert isinstance(dim, list)
+        assert isinstance(heads, list)
+        assert isinstance(dim_head, list)
+        assert isinstance(mlp_dim, list)
+        assert isinstance(mlp_out_dim, list)
+        assert isinstance(dropout, list)
+
         self.layers = nn.ModuleDict({})
         for i in range(depth):
-            if i == depth-1:
-                ffnn_kwargs['output_dim'] = mlp_out_dim
+
+            attn_kwargs = dict(dim=dim[i],
+                               heads=heads[i],
+                               dim_head=dim_head[i],
+                               dropout=dropout[i])
+            ffnn_kwargs = dict(dim=dim[i],
+                               hidden_dim=mlp_dim[i],
+                               dropout=dropout[i],
+                               activation=activation,
+                               output_dim=mlp_out_dim[i])
+
             self.layers.update(
                 {
                     f'l{i+1}':
                     nn.ModuleDict(
                         OrderedDict({
-                            'attn': PreNorm(dim=dim,
+                            'attn': PreNorm(dim=dim[i],
                                             fn=Attention(**attn_kwargs),
                                             norm=norm),
-                            'ffn': PreNorm(dim=dim,
+                            'ffn': PreNorm(dim=dim[i],
                                            fn=FeedForward(**ffnn_kwargs),
                                            norm=norm)
                         })
                     )
                 }
             )
+
         if global_norm:
-            _dim = dim if mlp_out_dim == 0 else mlp_out_dim
+            _dim = dim[-1] if mlp_out_dim[-1] == 0 else mlp_out_dim[-1]
             self.norm = Normalize(get_normalization_fn(norm)[0](_dim))
         else:
             self.norm = nn.Identity()

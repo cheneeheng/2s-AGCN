@@ -496,6 +496,8 @@ class SGN(PyTorchModule):
                 fc_in_ch = self.t_mha_kwargs.get('d_model', None)
             if fc_in_ch is None:
                 raise ValueError("dim_feedforward_output/d_model missing...")
+            if isinstance(fc_in_ch, list):
+                fc_in_ch = fc_in_ch[-1]
         if self.spatial_maxpool == 0 and self.temporal_maxpool == 0:
             fc_in_ch = fc_in_ch * self.num_segment * self.num_point
         if self.temporal_maxpool == 0:
@@ -1360,14 +1362,14 @@ if __name__ == '__main__':
         spatial_maxpool=1,
         temporal_maxpool=1,
         aspp_rates=None,
-        t_mode=1,
+        t_mode=3,
         # t_maxpool_kwargs=None,
         t_mha_kwargs={
-            'd_model': 256,
-            'nhead': 1,
-            'd_head': 512,
-            'dim_feedforward': 256*4,
-            'dim_feedforward_output': 512,
+            'd_model': [256, 512],
+            'nhead': [1, 1],
+            'd_head': [256, 512],
+            'dim_feedforward': [256*4, 2048],
+            'dim_feedforward_output': [512, 1024],
             'dropout': 0.1,
             'activation': "relu",
             'num_layers': 2,
