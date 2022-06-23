@@ -3,6 +3,8 @@ from .torch_utils import init_zeros
 from .torch_utils import pad_zeros
 from .torch_utils import get_activation_fn
 from .torch_utils import get_normalization_fn
+from .torch_utils import tensor_list_sum
+from .torch_utils import tensor_list_mean
 
 from .pytorch_module_wrapper import Module
 from .pytorch_module_wrapper import Residual

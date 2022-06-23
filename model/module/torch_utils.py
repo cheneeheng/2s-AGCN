@@ -9,7 +9,8 @@ from model.module.layernorm import LayerNorm
 
 
 __all__ = ['null_fn', 'init_zeros', 'pad_zeros',
-           'get_activation_fn', 'get_normalization_fn']
+           'get_activation_fn', 'get_normalization_fn',
+           'tensor_list_sum', 'tensor_list_mean']
 
 
 def null_fn(x: Any) -> int:
@@ -41,3 +42,11 @@ def get_normalization_fn(norm_type: str) -> Tuple[Type[torch.nn.Module],
         return LayerNorm, LayerNorm
     else:
         raise ValueError("Unknown norm_type ...")
+
+
+def tensor_list_sum(x: list):
+    return torch.sum(torch.stack(x, dim=0), dim=0)
+
+
+def tensor_list_mean(x: list):
+    return torch.mean(torch.stack(x, dim=0), dim=0)
