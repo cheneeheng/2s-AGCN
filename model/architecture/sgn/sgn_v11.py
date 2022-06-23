@@ -35,6 +35,8 @@ from model.module import init_zeros
 from model.module import pad_zeros
 from model.module import get_activation_fn
 from model.module import get_normalization_fn
+from model.module import tensor_list_mean
+from model.module import tensor_list_sum
 from model.module import Transformer
 from utils.utils import *
 
@@ -55,7 +57,8 @@ EMB_MODES = [1, 2, 3, 4, 5, 6, 7, 8]
 # 6 proj to 64 and sum
 # 7 proj with 1x3 and sum, similar to 1
 # 8 bifpn 1 layer 64 dim
-GCN_FPN_MODES = [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8]
+# 9 proj with 1x3 and sum, similar to 1, but witk K kernels and summed
+GCN_FPN_MODES = [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 
 # how the gcn fpns are merged for fc.
 # 0: no merge + no fpn
@@ -104,7 +107,7 @@ class SGN(PyTorchModule):
     ffn_mode = [0, 1, 2, 3, 101, 102, 103, 104, 201, 202]
     emb_modes = [0, 1, 2, 3, 4, 5, 6, 7, 8]
     c1, c2, c3, c4 = c1, c2, c3, c4
-    g_activation_fn = nn.Softmax
+    g_activation_fn = nn.Identity  # nn.Softmax
 
     def __init__(self,
                  num_class: int = 60,
@@ -143,7 +146,7 @@ class SGN(PyTorchModule):
                  sgcn_g_weighted: int = 0,
 
                  gcn_fpn: int = -1,
-                 gcn_fpn_kernel: int = -1,
+                 gcn_fpn_kernel: Union[int, list] = -1,
                  gcn_fpn_output_merge: int = 1,
 
                  bifpn_dim: int = 0,  # 64
@@ -298,10 +301,11 @@ class SGN(PyTorchModule):
             assert self.gcn_fpn == 8
 
         self.gcn_fpn_kernel = gcn_fpn_kernel
-        if self.gcn_fpn_kernel < 1:
-            self.gcn_fpn_kernel = 1
-        if self.gcn_fpn == 7:  # backward compat
-            self.gcn_fpn_kernel = 3
+        if isinstance(self.gcn_fpn_kernel, int):
+            if self.gcn_fpn_kernel < 1:
+                self.gcn_fpn_kernel = 1
+            if self.gcn_fpn == 7:  # backward compat
+                self.gcn_fpn_kernel = 3
 
         if self.gcn_fpn < 0:
             pass
@@ -315,7 +319,25 @@ class SGN(PyTorchModule):
         elif self.gcn_fpn == 8:
             self.bifpn = BiFPN(sgcn_dims, bifpn_dim, num_layers=bifpn_layers)
 
+        elif self.gcn_fpn == 9:
+            assert isinstance(self.gcn_fpn_kernel, list)
+            for i in range(len(sgcn_dims)):
+                for k in self.gcn_fpn_kernel:
+                    setattr(self,
+                            f'fpn_proj{i+1}_k{k}',
+                            Conv(sgcn_dims[i],
+                                 sgcn_dims[-1],
+                                 kernel_size=k,
+                                 padding=k//2,
+                                 bias=self.bias,
+                                 activation=self.activation_fn,
+                                 normalization=lambda: self.normalization_fn(
+                                sgcn_dims[-1]),
+                                #  dropout=self.dropout_fn,
+                            ))
+
         else:
+            assert isinstance(self.gcn_fpn_kernel, int)
             for i in range(len(sgcn_dims)):
                 if self.gcn_fpn in [1, 3, 4, 7]:
                     out_channels = sgcn_dims[-1]
@@ -409,7 +431,7 @@ class SGN(PyTorchModule):
 
                 if self.gcn_fpn == 0:
                     in_ch = sgcn_dim
-                elif self.gcn_fpn in [1, 3, 7]:
+                elif self.gcn_fpn in [1, 3, 7, 9]:
                     in_ch = sgcn_dims[-1]
                 elif self.gcn_fpn == 2:
                     in_ch = sgcn_dims[0]
@@ -575,12 +597,20 @@ class SGN(PyTorchModule):
         # gcn fpn
         if self.gcn_fpn == 0:
             x_list = x_spa_list
+        elif self.gcn_fpn == 9:
+            assert hasattr(self, 'sgcn')
+            x_list = [
+                tensor_list_sum(
+                    [getattr(self, f'fpn_proj{i+1}_k{k}')(x_spa_list[i])
+                     for k in self.gcn_fpn_kernel])
+                for i in range(len(x_spa_list))
+            ]
+            x_list = [tensor_list_sum(x_list[i:]) for i in range(len(x_list))]
         elif self.gcn_fpn in [1, 2, 6, 7]:
             assert hasattr(self, 'sgcn')
             x_list = [getattr(self, f'fpn_proj{i+1}')(x_spa_list[i])
                       for i in range(len(x_spa_list))]
-            x_list = [torch.sum(torch.stack(x_list[i:], dim=0), dim=0)
-                      for i in range(len(x_list))]
+            x_list = [tensor_list_sum(x_list[i:]) for i in range(len(x_list))]
         elif self.gcn_fpn in [3, 4, 5]:
             assert hasattr(self, 'sgcn')
             x_list = [getattr(self, f'fpn_proj{i+1}')(x_spa_list[i])
@@ -633,7 +663,7 @@ class SGN(PyTorchModule):
                 _x_list.append(getattr(self, name)(x_list[i]))
 
         if self.gcn_fpn_output_merge in [0, 1]:
-            x = torch.mean(torch.stack(_x_list, dim=0), dim=0)
+            x = tensor_list_mean(_x_list)
         elif self.gcn_fpn_output_merge == 2:
             x = _x_list
         else:
@@ -664,7 +694,7 @@ class SGN(PyTorchModule):
                     y_i = self.fc_dropout(y_i)
                     y_i = getattr(self, f'fc{i+1}')(y_i)
                     _y_list.append(y_i)
-                y = torch.mean(torch.stack(_y_list, dim=0), dim=0)
+                y = tensor_list_mean(_y_list)
         else:
             y = torch.flatten(y, 1)
             y = self.fc_dropout(y)
@@ -1318,7 +1348,7 @@ class TemporalBranch(Module):
 
 if __name__ == '__main__':
 
-    batch_size = 64
+    batch_size = 1
 
     inputs = torch.ones(batch_size, 20, 75)
     # subjects = torch.ones(batch_size, 40, 1)
@@ -1355,20 +1385,21 @@ if __name__ == '__main__':
         sgcn_g_proj_dim=256,  # c3
         sgcn_g_proj_shared=False,
         # sgcn_g_weighted=1,
-        gcn_fpn=-1,
+        gcn_fpn=1,
+        gcn_fpn_kernel=3,
         # gcn_fpn_output_merge=1,
         # bifpn_dim=256,
         # bifpn_layers=1,
         spatial_maxpool=1,
         temporal_maxpool=1,
         aspp_rates=None,
-        t_mode=3,
+        t_mode=1,
         # t_maxpool_kwargs=None,
         t_mha_kwargs={
             'd_model': [256, 512],
             'nhead': [1, 1],
             'd_head': [256, 512],
-            'dim_feedforward': [256*4, 2048],
+            'dim_feedforward': [256, 512],
             'dim_feedforward_output': [512, 1024],
             'dropout': 0.1,
             'activation': "relu",
@@ -1376,8 +1407,8 @@ if __name__ == '__main__':
             'norm': 'ln',
             'global_norm': False
         },
-        # multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7], [3, 5, 7]],
-        # multi_t_shared=2,
+        multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7]],
+        multi_t_shared=2,
     )
     model(inputs)
     print(model)

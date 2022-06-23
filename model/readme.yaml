@@ -2284,12 +2284,27 @@ sgn_v11:
                   - 94.56%
         - 220617113001_gcnfpn1k3_multit357357357shared_tmode3ffn1024layer2bn:
                   - 94.59%
+        - 220620113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out1024layer2bn:
+                  - 95.31%
+        - 220620113001_gcnfpn1k3_multit357357357shared_tmode3ffn512out1024layer2bn:
+                  - 95.05%
+        - 220620113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out2048layer2bn:
+                  - 95.19%
+        - 220620113001_gcnfpn1k3_multit357357357shared_tmode3dim256512ffnx1out1024layer2bn:
+                  - 94.45%
+        - 220620113001_gcnfpn1k3_multit357357357shared_tmode3dim256512ffnX2out1024layer2bn:
+                  - 94.51%
+        - 220620113001_gcnfpn1k3_multit357357357shared_tmode3dim256512ffnX4out1024layer2bn:
+                  - 94.46%
+        - 220620113001_gcndim128256512_gproj512_gcnfpn1k3_multit357357357shared_tmode3ffn512out1024layer2bn:
+                  - 94.64%
 
         # MORE GCNS + higher proj dim                  
         - 220616130001_gcndim128128256256_gcnfpn1k3_multit357357357shared:
                   - 95.63% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
         - 220616130001_gproj512_gcnfpn1k3_multit357357357shared:
                   - 95.66% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
 
 
 sgn-code:
