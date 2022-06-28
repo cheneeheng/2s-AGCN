@@ -148,6 +148,7 @@ class SGN(PyTorchModule):
                  gcn_fpn: int = -1,
                  gcn_fpn_kernel: Union[int, list] = -1,
                  gcn_fpn_output_merge: int = 1,
+                 gcn_fpn_shared: int = 0,
 
                  bifpn_dim: int = 0,  # 64
                  bifpn_layers: int = 0,  # 1
@@ -297,6 +298,10 @@ class SGN(PyTorchModule):
         self.gcn_fpn_output_merge = gcn_fpn_output_merge
         assert self.gcn_fpn_output_merge in GCN_FPN_MERGE_MODES
 
+        # not for mode 8
+        # if used for the rest, the gcn dim must all be 256
+        self.gcn_fpn_shared = gcn_fpn_shared
+
         if bifpn_dim > 0:
             assert self.gcn_fpn == 8
 
@@ -323,6 +328,14 @@ class SGN(PyTorchModule):
             assert isinstance(self.gcn_fpn_kernel, list)
             for i in range(len(sgcn_dims)):
                 for k in self.gcn_fpn_kernel:
+                    if self.gcn_fpn_shared == 1:
+                        cont = False
+                        for j in range(i+1):
+                            name_k = f'fpn_proj{j+1}_k{k}'
+                            if getattr(self, name_k, None) is not None:
+                                cont = True
+                        if cont:
+                            continue
                     setattr(self,
                             f'fpn_proj{i+1}_k{k}',
                             Conv(sgcn_dims[i],
@@ -349,6 +362,14 @@ class SGN(PyTorchModule):
                     out_channels = 64
                 else:
                     raise ValueError
+                if self.gcn_fpn_shared == 1:
+                    cont = False
+                    for j in range(i+1):
+                        name_k = f'fpn_proj{j+1}'
+                        if getattr(self, name_k, None) is not None:
+                            cont = True
+                    if cont:
+                        continue
                 setattr(self,
                         f'fpn_proj{i+1}',
                         Conv(sgcn_dims[i],
@@ -600,21 +621,29 @@ class SGN(PyTorchModule):
         elif self.gcn_fpn == 9:
             assert hasattr(self, 'sgcn')
             x_list = [
-                tensor_list_sum(
-                    [getattr(self, f'fpn_proj{i+1}_k{k}')(x_spa_list[i])
-                     for k in self.gcn_fpn_kernel])
+                tensor_list_sum([
+                    getattr(self, f'fpn_proj{i+1}_k{k}',
+                            getattr(self, f'fpn_proj1_k{k}'))(x_spa_list[i])
+                    for k in self.gcn_fpn_kernel
+                ])
                 for i in range(len(x_spa_list))
             ]
             x_list = [tensor_list_sum(x_list[i:]) for i in range(len(x_list))]
         elif self.gcn_fpn in [1, 2, 6, 7]:
             assert hasattr(self, 'sgcn')
-            x_list = [getattr(self, f'fpn_proj{i+1}')(x_spa_list[i])
-                      for i in range(len(x_spa_list))]
+            x_list = [
+                getattr(self, f'fpn_proj{i+1}',
+                        getattr(self, 'fpn_proj1'))(x_spa_list[i])
+                for i in range(len(x_spa_list))
+            ]
             x_list = [tensor_list_sum(x_list[i:]) for i in range(len(x_list))]
         elif self.gcn_fpn in [3, 4, 5]:
             assert hasattr(self, 'sgcn')
-            x_list = [getattr(self, f'fpn_proj{i+1}')(x_spa_list[i])
-                      for i in range(len(x_spa_list))]
+            x_list = [
+                getattr(self, f'fpn_proj{i+1}',
+                        getattr(self, 'fpn_proj1'))(x_spa_list[i])
+                for i in range(len(x_spa_list))
+            ]
         elif self.gcn_fpn == 8:
             assert hasattr(self, 'sgcn')
             assert hasattr(self, 'bifpn')
@@ -1372,7 +1401,7 @@ if __name__ == '__main__':
         semantic_joint_fusion=0,
         semantic_frame_fusion=1,
         semantic_frame_location=0,
-        sgcn_dims=[128, 256, 256],  # [c2, c3, c3],
+        sgcn_dims=[256, 256, 256],  # [c2, c3, c3],
         sgcn_kernel=1,  # residual connection in GCN
         sgcn_padding=0,  # residual connection in GCN
         sgcn_dropout=0.0,  # residual connection in GCN
@@ -1385,8 +1414,9 @@ if __name__ == '__main__':
         sgcn_g_proj_dim=256,  # c3
         sgcn_g_proj_shared=False,
         # sgcn_g_weighted=1,
-        gcn_fpn=1,
-        gcn_fpn_kernel=3,
+        gcn_fpn=9,
+        gcn_fpn_kernel=[3, 5, 7],
+        gcn_fpn_shared=0,
         # gcn_fpn_output_merge=1,
         # bifpn_dim=256,
         # bifpn_layers=1,
@@ -1398,7 +1428,7 @@ if __name__ == '__main__':
         t_mha_kwargs={
             'd_model': [256, 512],
             'nhead': [1, 1],
-            'd_head': [256, 512],
+            'd_head': [256*2, 512*2],
             'dim_feedforward': [256, 512],
             'dim_feedforward_output': [512, 1024],
             'dropout': 0.1,

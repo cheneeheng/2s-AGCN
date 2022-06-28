@@ -2285,11 +2285,15 @@ sgn_v11:
         - 220617113001_gcnfpn1k3_multit357357357shared_tmode3ffn1024layer2bn:
                   - 94.59%
         - 220620113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out1024layer2bn:
-                  - 95.31%
+                  - 95.31% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
         - 220620113001_gcnfpn1k3_multit357357357shared_tmode3ffn512out1024layer2bn:
                   - 95.05%
         - 220620113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out2048layer2bn:
                   - 95.19%
+        - 220620113001_gcnfpn1k3_multit357357357shared_tmode3ffn128out1024layer2bn:
+                  - 95.21% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        - 220620113001_gcnfpn1k3_multit357357357shared_tmode3ffn64out1024layer2bn:
+                  - 94.64%
         - 220620113001_gcnfpn1k3_multit357357357shared_tmode3dim256512ffnx1out1024layer2bn:
                   - 94.45%
         - 220620113001_gcnfpn1k3_multit357357357shared_tmode3dim256512ffnX2out1024layer2bn:
@@ -2299,13 +2303,28 @@ sgn_v11:
         - 220620113001_gcndim128256512_gproj512_gcnfpn1k3_multit357357357shared_tmode3ffn512out1024layer2bn:
                   - 94.64%
 
+        # 1 layer of MHA
+        - 220623113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out512layer1bn:
+                  - 94.69%
+        - 220623113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out1024layer1bn:
+                  - 95.27% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        - 220623113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out2048layer1bn:
+                  - 94.92%
+        - 220623113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out1024layer1bnh1d512:
+                  - 95.09%
+        - 220623113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out1024layer1bnh2d512:
+                  - 95.25% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        - 220623113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out1024layer1bnh2d256:
+                  - 95.30% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+        - 220623113001_gcnfpn1k3_multit111111111shared:
+                  - 95.28% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
         # MORE GCNS + higher proj dim                  
         - 220616130001_gcndim128128256256_gcnfpn1k3_multit357357357shared:
                   - 95.63% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
         - 220616130001_gproj512_gcnfpn1k3_multit357357357shared:
                   - 95.66% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-
 
 sgn-code:
         - original sgn repo code
