@@ -126,10 +126,12 @@ class SGN(PyTorchModule):
                  input_velocity: int = 1,
                  semantic_joint: int = 1,
                  semantic_frame: int = 1,
+                 semantic_class: int = 0,
 
                  semantic_joint_fusion: int = 0,
                  semantic_frame_fusion: int = 1,
                  semantic_frame_location: int = 0,
+                 semantic_class_fusion: int = 0,
 
                  sgcn_dims: Optional[list] = None,  # [c2, c3, c3],
                  sgcn_kernel: int = 1,  # res connection in GCN, 0 = no res
@@ -199,11 +201,13 @@ class SGN(PyTorchModule):
         self.input_velocity = input_velocity
         self.semantic_joint = semantic_joint
         self.semantic_frame = semantic_frame
+        self.semantic_class = semantic_class
         self.xem_projection = xem_projection  # projection layer pre GCN
         assert self.input_position in self.emb_modes
         assert self.input_velocity in self.emb_modes
         assert self.semantic_joint in self.emb_modes
         assert self.semantic_frame in self.emb_modes
+        assert self.semantic_class in self.emb_modes
         assert self.xem_projection in self.emb_modes
         if self.input_position == 0 and self.semantic_joint > 0:
             raise ValueError("input_position is 0 but semantic_joint is not")
@@ -211,10 +215,12 @@ class SGN(PyTorchModule):
         # 0: concat, 1: sum
         self.semantic_joint_fusion = semantic_joint_fusion
         # 0: concat, 1: sum
-        self.semantic_frame_fusion = semantic_frame_fusion
+        self.semantic_frame_fusion = semantic_frame_fusion  # UNUSED
         # 0 = add after GCN, 1 = add before GCN
         self.semantic_frame_location = semantic_frame_location
         assert self.semantic_frame_location in [0, 1]
+        # 0: concat, 1: sum
+        self.semantic_class_fusion = semantic_class_fusion  # UNUSED
 
         # Dynamic Representation -----------------------------------------------
         self.feature_extractor = FeatureExtractor(
@@ -405,6 +411,7 @@ class SGN(PyTorchModule):
             num_segment=self.num_segment,
             sem_spa=self.semantic_joint,
             sem_tem=self.semantic_frame,
+            sem_cls=self.semantic_class,
             sem_spa_emb_kwargs=dict(
                 in_channels=self.num_point,
                 out_channels=self.c1,
@@ -424,6 +431,16 @@ class SGN(PyTorchModule):
                 normalization=self.normalization_fn,
                 num_point=self.num_point,
                 mode=self.semantic_frame
+            ),
+            sem_cls_emb_kwargs=dict(
+                in_channels=1,
+                out_channels=self.c4,
+                bias=self.bias,
+                dropout=self.dropout_fn,
+                activation=self.activation_fn,
+                normalization=self.normalization_fn,
+                num_point=self.num_point,
+                mode=self.semantic_class
             )
         )
 
@@ -594,7 +611,7 @@ class SGN(PyTorchModule):
         assert x is not None
 
         # Joint and frame embeddings -------------------------------------------
-        spa_emb, tem_emb = self.semantic_embedding(x)
+        spa_emb, tem_emb, cls_emb = self.semantic_embedding(x)
 
         # Joint-level Module ---------------------------------------------------
         # xyz embeddings
@@ -703,6 +720,12 @@ class SGN(PyTorchModule):
             y = [self.tmp(i) for i in x]
         else:
             y = self.tmp(x)
+
+        if cls_emb is not None:
+            if isinstance(x, list):
+                y = [i + cls_emb for i in y]
+            else:
+                y += cls_emb
 
         if self.temporal_maxpool == 2:
             if isinstance(y, list):
@@ -871,6 +894,8 @@ class OneHotTensor(PyTorchModule):
             onehot = onehot.permute(0, 3, 2, 1)
         elif mode == 1:
             onehot = onehot.permute(0, 3, 1, 2)
+        elif mode == 2:
+            pass
         else:
             raise ValueError("Unknown mode")
         self.register_buffer("onehot", onehot)
@@ -886,14 +911,17 @@ class SemanticEmbedding(PyTorchModule):
                  num_segment: int,
                  sem_spa: int,
                  sem_tem: int,
+                 sem_cls: int,
                  sem_spa_emb_kwargs: dict,
                  sem_tem_emb_kwargs: dict,
+                 sem_cls_emb_kwargs: dict,
                  ):
         super(SemanticEmbedding, self).__init__()
         self.num_point = num_point
         self.num_segment = num_segment
         self.sem_spa = sem_spa
         self.sem_tem = sem_tem
+        self.sem_cls = sem_cls
         # Joint Embedding
         if self.sem_spa > 0:
             self.spa_onehot = OneHotTensor(
@@ -904,14 +932,21 @@ class SemanticEmbedding(PyTorchModule):
             self.tem_onehot = OneHotTensor(
                 sem_tem_emb_kwargs['in_channels'], self.num_point, mode=1)
             self.tem_embedding = Embedding(**sem_tem_emb_kwargs)
+        # Class Embedding
+        if self.sem_cls > 0:
+            self.cls_onehot = OneHotTensor(
+                sem_cls_emb_kwargs['in_channels'], 1, mode=2)
+            self.cls_embedding = Embedding(**sem_cls_emb_kwargs)
 
     def forward(self, x: Tensor) -> Tuple[Optional[Tensor], Optional[Tensor]]:
-        spa_emb, tem_emb = None, None
+        spa_emb, tem_emb, cls_emb = None, None, None
         if self.sem_spa > 0:
             spa_emb = self.spa_embedding(self.spa_onehot(x.shape[0]))
         if self.sem_tem > 0:
             tem_emb = self.tem_embedding(self.tem_onehot(x.shape[0]))
-        return spa_emb, tem_emb
+        if self.sem_cls > 0:
+            cls_emb = self.cls_embedding(self.cls_onehot(x.shape[0]))
+        return spa_emb, tem_emb, cls_emb
 
 
 class GCNSpatialFFN(Module):
@@ -1398,6 +1433,7 @@ if __name__ == '__main__':
         input_velocity=1,
         semantic_joint=1,
         semantic_frame=1,
+        semantic_class=1,
         semantic_joint_fusion=0,
         semantic_frame_fusion=1,
         semantic_frame_location=0,

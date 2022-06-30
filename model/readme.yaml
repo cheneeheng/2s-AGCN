@@ -2155,6 +2155,9 @@ sgn_v11:
         - 220607103001_gcnfpn1k5_multit357357357shared:
                   - 95.62% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
+        - 220628140001_gcndim256256256_gcnfpn1k3_multit357357357shared:
+                  - 95.34% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
         - 220520150001_gcnfpn2_multit333:
                   - proj to lower and sum
                   - 94.78%
@@ -2248,6 +2251,12 @@ sgn_v11:
                   - 91.83%
         - 220607103001_gcnfpn8dim256layer3_multit357357357shared_fcmerge2:
                   - 82.26%
+        # multiple kernels for fpn
+        - 220628140001_gcndim256256256_gcnfpn9k357_multit357357357shared:
+                  - multiple kernels for fpn
+                  - 91.54%
+        - 220628140001_gcndim256256256_gcnfpn9k357shared_multit357357357shared:
+                  - 90.48%
 
         # TMODE = 3
         - 220613180001_tmode3_d256h4ffn64relu:
