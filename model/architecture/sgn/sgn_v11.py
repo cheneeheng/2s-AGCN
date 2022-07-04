@@ -8,6 +8,7 @@
 
 # Continue from on sgn_v10
 # NO PARTS
+# FREEZE 220704
 
 import torch
 from torch import nn
