@@ -1,4 +1,4 @@
-work_dir: ./data/data/ntu_result/xview/sgn/sgn_v10/220518100001_gcnfpn2
+work_dir: ./data/data/ntu_result/xview/sgn/sgn_v11/220630190001_gcnfpn1k3_multit357357357shared_semcls1
 
 phase: train
 save_score: True
@@ -25,6 +25,7 @@ train_dataloader_args:
   # motion_sampler: 1
   # motion_norm: 1
   # center_sampler: 0.001
+  # midvel_sampler: 1
 
 test_feeder_args:
   debug: False
@@ -39,11 +40,12 @@ test_dataloader_args:
   # motion_sampler: 1
   # motion_norm: 1
   # center_sampler: 0.001
+  # midvel_sampler: 1
 
 use_sgn_dataloader: True
 
 ## model
-model: model.sgn_v10.SGN
+model: model.sgn_v11.SGN
 model_args:
   # main args ------------------------------------------------------------------
   num_class: 60
@@ -53,7 +55,7 @@ model_args:
   bias: 1
   dropout: 0.0
   dropout2d: 0.2
-  # c_multiplier: [1.0, 1.0, 1.0, 1.0]
+  c_multiplier: [1.0, 1.0, 1.0, 1.0]
   norm_type: bn
   act_type: relu
   # input args -----------------------------------------------------------------
@@ -62,6 +64,7 @@ model_args:
   input_velocity: 1
   semantic_joint: 1
   semantic_frame: 1
+  semantic_class: 1
   semantic_joint_fusion: 0
   semantic_frame_fusion: 1
   semantic_frame_location: 0
@@ -72,20 +75,39 @@ model_args:
   sgcn_dropout: 0.0
   sgcn_residual: [0, 0, 0]
   sgcn_prenorm: False
+  # sgcn_ffn: 0
+  # sgcn_v_kernel: 0
   sgcn_g_kernel: 1
   sgcn_g_proj_dim: 256
   sgcn_g_proj_shared: False
-  gcn_fpn: -1
+  gcn_fpn: 1
+  gcn_fpn_kernel: 3
+  gcn_fpn_shared: 0
+  # gcn_fpn_output_merge: 2
+  # bifpn_dim: 256
+  # bifpn_layers: 3
   # Temporal MLP args ----------------------------------------------------------
   spatial_maxpool: 1
   temporal_maxpool: 1
-  multi_t: [[], [], [3]]
-  multi_t_shared: 0
+  multi_t: [[3, 5, 7], [3, 5, 7], [3, 5, 7]]
+  multi_t_shared: 2
   t_mode: 1
-  # t_maxpool_kwargs:
-  #   kernel_size: [1, 3]
-  #   stride: [1, 1]
-  aspp_rates: None
+  # t_mha_kwargs:
+  #   d_model: [256]
+  #   nhead: [1]
+  #   dim_feedforward: [256]
+  #   dropout: 0.1
+  #   activation: relu
+  #   num_layers: 1
+  #   # local trans args
+  #   d_head: [512]
+  #   dim_feedforward_output: [1024]
+  #   norm: bn
+  #   global_norm: False
+  # # t_maxpool_kwargs:
+  # #   kernel_size: [1, 3]
+  # #   stride: [1, 1]
+  # # aspp_rates: [1,3,5,7]
 
 label_smoothing: 0.1
 

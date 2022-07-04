@@ -1,5 +1,4 @@
-work_dir: ./data/data/ntu_result/xview/sgn/sgn_v10/220518100001_gcnfpn2
-
+work_dir: ./data/data/ntu_result/xview/sgn/sgn_v10/220519140001_multit357911
 phase: train
 save_score: True
 
@@ -59,7 +58,7 @@ model_args:
   bias: 1
   dropout: 0.0
   dropout2d: 0.2
-  # c_multiplier: [1.0, 1.0, 1.0, 1.0]
+  # c_multiplier: [0.5, 0.5, 0.5, 0.5]
   norm_type: bn
   act_type: relu
   ### input args
@@ -73,13 +72,13 @@ model_args:
   # sem_fra_fusion: 1
   # sem_fra_location: 1
   ### GCN args
-  gcn_fpn: 2
   gcn_list: ["spa"]
-  gcn_tem: 0
-  gcn_fusion: 0
+  # gcn_fpn: 3
+  # gcn_tem: 0
+  # gcn_fusion: 0
   gcn_spa_g_kernel: 1
   gcn_spa_g_proj_shared: False
-  gcn_spa_g_proj_dim: 256
+  gcn_spa_g_proj_dim: 128
   gcn_spa_t_kernel: 1
   gcn_spa_dropout: 0.0
   gcn_spa_gcn_residual: [0, 0, 0]
@@ -108,7 +107,9 @@ model_args:
   # t_gcn_ffn: 0
   ### Temporal MLP args
   t_mode: 1
-  # multi_t: 3
+  multi_t: [3, 5, 7, 9, 11]
+  multi_t_shared: False
+  multi_t_parallel: False
   # t_kernel: 3
   # t_maxpool_kwargs:
   #   kernel_size: [1, 3]
