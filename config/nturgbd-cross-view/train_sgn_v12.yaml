@@ -45,7 +45,7 @@ test_dataloader_args:
 use_sgn_dataloader: True
 
 ## model
-model: model.sgn_v11.SGN
+model: model.sgn_v12.SGN
 model_args:
   # main args ------------------------------------------------------------------
   num_class: 60
