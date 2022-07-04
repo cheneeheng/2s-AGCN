@@ -504,21 +504,29 @@ class Processor(object):
             freq = self.arg.test_dataloader_args['multi_test']
             if self.arg.use_sgn_dataloader and freq > 1:
                 output = output.view((-1, freq, output.size(1))).mean(1)
+
         if isinstance(output, tuple):
             output, l1 = output
             l1 = l1.mean()
         else:
             l1 = 0
+
         if label is None or self.loss is None:
             loss = None
         else:
             loss = self.loss(output, label) + l1
+
         if self.mmd_loss is not None:
+            if not self.model.training:
+                freq = self.arg.test_dataloader_args['multi_test']
+                if self.arg.use_sgn_dataloader and freq > 1:
+                    z = z.view((-1, freq, z.size(1))).mean(1)
             mmd_loss, l2_z_mean, _ = self.mmd_loss(
                 z, self.model.z_prior, label)
             lambda1 = 1e-1
             lambda2 = 1e-4
             loss = lambda2 * mmd_loss + lambda1 * l2_z_mean + loss
+
         return output, loss
 
     def train(self, epoch: int, save_model: bool = False):
