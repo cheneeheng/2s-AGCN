@@ -24,6 +24,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from feeders.loader import FeederDataLoader
 from model.module import LabelSmoothingLoss
+from model.module import MaximumMeanDiscrepancyLoss
 
 from sam.sam.sam import SAM
 from sam.sam.example.utility.bypass_bn import enable_running_stats
@@ -274,9 +275,16 @@ class Processor(object):
         if self.arg.label_smoothing > 0.0:
             self.loss = LabelSmoothingLoss(
                 classes=self.arg.model_args.get('num_class', None),
-                smoothing=self.arg.label_smoothing).cuda(self.output_device)
+                smoothing=self.arg.label_smoothing
+            ).cuda(self.output_device)
         else:
             self.loss = nn.CrossEntropyLoss().cuda(self.output_device)
+        if self.arg.model_args.get('infogcn_noise_ratio', None) is not None:
+            self.mmd_loss = MaximumMeanDiscrepancyLoss(
+                classes=self.arg.model_args.get('num_class', None)
+            ).cuda(self.output_device)
+        else:
+            self.mmd_loss = None
 
     def load_model(self):
         self.get_output_device()
@@ -490,7 +498,8 @@ class Processor(object):
                      data: tuple,
                      label: Optional[torch.Tensor]
                      ) -> Tuple[tuple, Optional[torch.Tensor]]:
-        output, _ = self.model(*data)
+        # output, G, Z
+        output, _, z = self.model(*data)
         if not self.model.training:
             freq = self.arg.test_dataloader_args['multi_test']
             if self.arg.use_sgn_dataloader and freq > 1:
@@ -504,6 +513,12 @@ class Processor(object):
             loss = None
         else:
             loss = self.loss(output, label) + l1
+        if self.mmd_loss is not None:
+            mmd_loss, l2_z_mean, _ = self.mmd_loss(
+                z, self.model.z_prior, label)
+            lambda1 = 1e-1
+            lambda2 = 1e-4
+            loss = lambda2 * mmd_loss + lambda1 * l2_z_mean + loss
         return output, loss
 
     def train(self, epoch: int, save_model: bool = False):

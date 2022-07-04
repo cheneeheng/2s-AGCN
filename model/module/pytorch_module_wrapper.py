@@ -81,8 +81,9 @@ class Residual(Module):
                                        padding=padding,
                                        dilation=dilation,
                                        bias=bias)
+        self.mode = mode
         if mode == 0:
-            self.skip = null_fn
+            self.residual = null_fn
         elif mode == 1:
             if self.in_channels == self.out_channels:
                 self.residual = torch.nn.Identity()
@@ -98,6 +99,14 @@ class Residual(Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.residual(x)
+
+    def extra_repr(self):
+        s = ('{mode}, {in_channels}, {out_channels}'
+             ', kernel_size={kernel_size}'
+             ', padding={padding}'
+             ', dilation={dilation}'
+             ', bias={bias}')
+        return s.format(**self.__dict__)
 
 
 class Conv1xN(Module):

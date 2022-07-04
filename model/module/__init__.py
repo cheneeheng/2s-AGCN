@@ -16,6 +16,8 @@ from .pytorch_module_wrapper import ASPP
 from .bifpn import BiFPN
 from .layernorm import LayerNorm
 from .loss import LabelSmoothingLoss
+from .loss import MaximumMeanDiscrepancyLoss
+
 
 from .attention.multiheadattention import MultiheadAttention
 from .attention.crossattention import CrossViT
