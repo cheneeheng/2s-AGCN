@@ -523,9 +523,9 @@ class Processor(object):
                     z = z.view((-1, freq, z.size(1))).mean(1)
             mmd_loss, l2_z_mean, _ = self.mmd_loss(
                 z, self.model.z_prior, label)
-            lambda1 = 1e-1
-            lambda2 = 1e-4
-            loss = lambda2 * mmd_loss + lambda1 * l2_z_mean + loss
+            loss = (self.arg.mmd_lambda2 * mmd_loss +
+                    self.arg.mmd_lambda1 * l2_z_mean +
+                    loss)
 
         return output, loss
 

@@ -122,18 +122,28 @@ def get_parser() -> argparse.ArgumentParser:
                    type=float,
                    default=1e-8,
                    help='for adamw')
-    p.add_argument('--only_train_part',
+    p.add_argument('--only-train-part',
                    type=str2bool,
                    default=False,
                    help='if true skips the training of PA')
-    p.add_argument('--only_train_epoch',
+    p.add_argument('--only-train-epoch',
                    type=int,
                    default=0,
                    help='number of epochs for only_train_part')
-    p.add_argument('--warm_up_epoch',
+    p.add_argument('--warm-up-epoch',
                    type=int,
                    default=0,
                    help='number of warmup epochs')
+
+    # MMD loss
+    p.add_argument('--mmd-lambda1',
+                   type=float,
+                   default=1e-4,
+                   help='lambda1 factor in the mMMD loss calculation')
+    p.add_argument('--mmd-lambda2',
+                   type=float,
+                   default=1e-1,
+                   help='lambda1 factor in the cmMMD loss calculation')
 
     # scheduler
     p.add_argument('--scheduler',
