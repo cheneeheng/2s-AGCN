@@ -14,7 +14,7 @@ __all__ = ['null_fn', 'init_zeros', 'pad_zeros',
 
 
 def null_fn(x: Any) -> torch.Tensor:
-    return torch.zeros(1)
+    return 0
 
 
 def init_zeros(x: torch.Tensor):
