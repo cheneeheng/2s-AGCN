@@ -49,7 +49,7 @@ from typing import Tuple, Optional, Union, Type, List
 # from model.module.bifpn import BiFPN
 from model.resource.common_ntu import *
 from model.module import Module
-from model.module import Residual
+# from model.module import Residual
 from model.module import BiFPN
 from model.module import Conv
 from model.module import ASPP
@@ -108,6 +108,18 @@ T_MODES = [0, 1, 2, 3]
 # 1 pool
 # 2 pool with indices
 POOLING_MODES = [0, 1, 2]
+
+
+def residual_layer(residual: int, in_ch: int, out_ch: int, bias: int = 0):
+    if residual == 0:
+        return null_fn
+    elif residual == 1:
+        if in_ch == out_ch:
+            return nn.Identity()
+        else:
+            return Conv(in_ch, out_ch, bias=bias)
+    else:
+        raise ValueError("Unknown residual modes...")
 
 
 def fuse_features(x1: Tensor, x2: Tensor, mode: int) -> Tensor:
@@ -876,10 +888,14 @@ class Embedding(Module):
                                                 bias=self.bias,
                                                 activation=self.activation))
             for i in range(self.num_layers):
-                setattr(self, f'res{i+1}', Residual(mode=residual,
-                                                    in_channels=ch_list[i],
-                                                    out_channels=ch_list[i+1],
-                                                    bias=self.bias))
+                setattr(self, f'res{i+1}', residual_layer(residual,
+                                                          ch_list[i],
+                                                          ch_list[i+1],
+                                                          self.bias))
+                # setattr(self, f'res{i+1}', Residual(mode=residual,
+                #                                     in_channels=ch_list[i],
+                #                                     out_channels=ch_list[i+1],
+                #                                     bias=self.bias))
 
         elif self.mode >= 100 and self.mode < 200:
             if self.mode == 101:
@@ -1227,17 +1243,21 @@ class GCNSpatialBlock(PyTorchModule):
             assert len(gcn_residual) == self.num_blocks
             for i, r in enumerate(gcn_residual):
                 setattr(self, f'gcn_res{i+1}',
-                        Residual(mode=r,
-                                 in_channels=gcn_dims[i],
-                                 out_channels=gcn_dims[i+1],
-                                 bias=bias))
+                        residual_layer(r, gcn_dims[i], gcn_dims[i+1], bias))
+                # setattr(self, f'gcn_res{i+1}',
+                #         Residual(mode=r,
+                #                  in_channels=gcn_dims[i],
+                #                  out_channels=gcn_dims[i+1],
+                #                  bias=bias))
             self.res = null_fn
 
         elif isinstance(gcn_residual, int):
-            self.res = Residual(mode=gcn_residual,
-                                in_channels=gcn_dims[0],
-                                out_channels=gcn_dims[-1],
-                                bias=bias)
+            self.res = residual_layer(
+                gcn_residual, gcn_dims[0], gcn_dims[-1], bias)
+            # self.res = Residual(mode=gcn_residual,
+            #                     in_channels=gcn_dims[0],
+            #                     out_channels=gcn_dims[-1],
+            #                     bias=bias)
 
         else:
             raise ValueError("Unknown residual modes...")
@@ -1336,10 +1356,12 @@ class MLPTemporal(PyTorchModule):
         else:
             self.pool = nn.Identity()
 
-        self.res = Residual(mode=residual,
-                            in_channels=channels[0],
-                            out_channels=channels[-1],
-                            bias=biases[0])
+        self.res = residual_layer(residual,
+                                  channels[0], channels[-1], biases[0])
+        # self.res = Residual(mode=residual,
+        #                     in_channels=channels[0],
+        #                     out_channels=channels[-1],
+        #                     bias=biases[0])
 
         self.num_layers = len(channels) - 1
         for i in range(self.num_layers):
@@ -1367,12 +1389,14 @@ class MLPTemporal(PyTorchModule):
                          deterministic=False if dilations[i] > 1 else True)
                     )
 
-            setattr(self,
-                    f'res{i+1}',
-                    Residual(mode=residuals[i],
-                             in_channels=channels[i],
-                             out_channels=channels[i+1],
-                             bias=biases[i]))
+            setattr(self, f'res{i+1}',
+                    residual_layer(residuals[i],
+                                   channels[i], channels[i+1], biases[i]))
+            # setattr(self, f'res{i+1}',
+            #         Residual(mode=residuals[i],
+            #                  in_channels=channels[i],
+            #                  out_channels=channels[i+1],
+            #                  bias=biases[i]))
 
     def forward(self, x: Tensor, x_n: Optional[Tensor] = None) -> Tensor:
         # x: n,c,v,t ; v=1 due to SMP
