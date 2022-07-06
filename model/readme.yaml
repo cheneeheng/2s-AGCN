@@ -293,6 +293,25 @@ sgn_v11:
         - 220616130001_gproj512_gcnfpn1k3_multit357357357shared:
                   - 95.66% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
+
+sgn_v12:
+        - this has the infogcn MMD-based loss
+        - ./data/data/ntu_result/xview/sgn/sgn_v12/220705113001_gcnfpn1k3_multit357357357shared:
+                  - bs 64, adam, 1e4lr
+                  - 90.30%
+        - ./data/data/ntu_result/xview/sgn/sgn_v12/220705113001_gcnfpn1k3_multit357357357shared_128bs:
+                  - bs 128, adam, 1e4lr
+                  - 91.79%
+        - ./data/data/ntu_result/xview/sgn/sgn_v12/220705113001_gcnfpn1k3_multit357357357shared_128bs_001lr:
+                  - bs 128, adam, 1e3lr
+                  - 78.55%
+        - ./data/data/ntu_result/xview/sgn/sgn_v12/220705113001_gcnfpn1k3_multit357357357shared_128bs_01lr:
+                  - bs 128, adam, 1e2lr
+                  - 71.17%
+        - ./data/data/ntu_result/xview/sgn/sgn_v12/220705113001_gcnfpn1k3_multit357357357shared_128bs_01lr_sgd:
+                  - bs 128, sgd, 1e2lr
+                  - 92.50%
+
 sgn-code:
         - original sgn repo code
         - 220324170001:

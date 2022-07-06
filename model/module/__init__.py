@@ -18,7 +18,6 @@ from .layernorm import LayerNorm
 from .loss import LabelSmoothingLoss
 from .loss import MaximumMeanDiscrepancyLoss
 
-
 from .attention.multiheadattention import MultiheadAttention
 from .attention.crossattention import CrossViT
 from .attention.crossattention import ImageEmbedder

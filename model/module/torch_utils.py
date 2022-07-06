@@ -13,8 +13,8 @@ __all__ = ['null_fn', 'init_zeros', 'pad_zeros',
            'tensor_list_sum', 'tensor_list_mean']
 
 
-def null_fn(x: Any) -> int:
-    return 0
+def null_fn(x: Any) -> torch.Tensor:
+    return torch.zeros(1)
 
 
 def init_zeros(x: torch.Tensor):

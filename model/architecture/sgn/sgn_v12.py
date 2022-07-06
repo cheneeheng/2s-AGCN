@@ -165,8 +165,8 @@ class SGN(PyTorchModule):
 
                  gcn_fpn: int = -1,
                  gcn_fpn_kernel: Union[int, list] = -1,
-                 gcn_fpn_output_merge: int = 1,
                  gcn_fpn_shared: int = 0,
+                 gcn_fpn_output_merge: int = 1,
 
                  bifpn_dim: int = 0,  # 64
                  bifpn_layers: int = 0,  # 1
@@ -1492,16 +1492,16 @@ if __name__ == '__main__':
         c_multiplier=[1.0, 1.0, 1.0, 1.0],
         norm_type='bn-pre',
         act_type='relu',
-        xem_projection=0,
+        # xem_projection=0,
         input_position=1,
         input_velocity=1,
         semantic_joint=1,
         semantic_frame=1,
-        semantic_class=0,
+        # semantic_class=0,
         semantic_joint_fusion=0,
         semantic_frame_fusion=1,
         semantic_frame_location=0,
-        sgcn_dims=[256, 256, 256],  # [c2, c3, c3],
+        sgcn_dims=[128, 256, 256],  # [c2, c3, c3],
         sgcn_kernel=1,  # residual connection in GCN
         sgcn_padding=0,  # residual connection in GCN
         sgcn_dropout=0.0,  # residual connection in GCN
@@ -1509,14 +1509,14 @@ if __name__ == '__main__':
         sgcn_residual=[0, 0, 0],
         sgcn_prenorm=False,
         # sgcn_ffn=0,
-        sgcn_v_kernel=0,
-        sgcn_g_kernel=1,
+        # sgcn_v_kernel=0,
+        # sgcn_g_kernel=1,
         sgcn_g_proj_dim=256,  # c3
         sgcn_g_proj_shared=False,
         # sgcn_g_weighted=1,
-        gcn_fpn=1,
-        gcn_fpn_kernel=3,
-        gcn_fpn_shared=2,
+        # gcn_fpn=1,
+        # gcn_fpn_kernel=3,
+        # gcn_fpn_shared=2,
         # gcn_fpn_output_merge=1,
         # bifpn_dim=256,
         # bifpn_layers=1,
@@ -1525,20 +1525,21 @@ if __name__ == '__main__':
         aspp_rates=None,
         t_mode=1,
         # t_maxpool_kwargs=None,
-        t_mha_kwargs={
-            'd_model': [256, 512],
-            'nhead': [1, 1],
-            'd_head': [256*2, 512*2],
-            'dim_feedforward': [256, 512],
-            'dim_feedforward_output': [512, 1024],
-            'dropout': 0.1,
-            'activation': "relu",
-            'num_layers': 2,
-            'norm': 'ln',
-            'global_norm': False
-        },
-        multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7]],
-        multi_t_shared=2,
+        # t_mha_kwargs={
+        #     'd_model': [256, 512],
+        #     'nhead': [1, 1],
+        #     'd_head': [256*2, 512*2],
+        #     'dim_feedforward': [256, 512],
+        #     'dim_feedforward_output': [512, 1024],
+        #     'dropout': 0.1,
+        #     'activation': "relu",
+        #     'num_layers': 2,
+        #     'norm': 'ln',
+        #     'global_norm': False
+        # },
+        multi_t=[[], [], [3]],
+        # multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7]],
+        # multi_t_shared=2,
     )
     model(inputs)
     print(model)

@@ -114,6 +114,7 @@ venv.bak/
 data/
 *.png
 sandbox*
+output/
 
 sam
 run.sh
