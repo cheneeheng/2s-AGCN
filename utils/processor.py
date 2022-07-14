@@ -16,6 +16,8 @@ from typing import Tuple, Optional
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+from torch import linalg as LA
 import torch.optim as optim
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -34,6 +36,19 @@ from utils.utils import *
 
 
 __all__ = ['Processor']
+
+
+def get_vector_property(x):
+    N, C = x.size()
+    x1 = x.unsqueeze(0).expand(N, N, C)
+    x2 = x.unsqueeze(1).expand(N, N, C)
+    x1 = x1.reshape(N*N, C)
+    x2 = x2.reshape(N*N, C)
+    cos_sim = F.cosine_similarity(x1, x2, dim=1, eps=1e-6).view(N, N)
+    cos_sim = torch.triu(cos_sim, diagonal=1).sum() * 2 / (N*(N-1))
+    pdist = (LA.norm(x1-x2, ord=2, dim=1)).view(N, N)
+    pdist = torch.triu(pdist, diagonal=1).sum() * 2 / (N*(N-1))
+    return cos_sim, pdist
 
 
 class Processor(object):
@@ -511,23 +526,31 @@ class Processor(object):
         else:
             l1 = 0
 
+        loss_dict = {'loss': None}
+
         if label is None or self.loss is None:
-            loss = None
+            loss_dict['loss'] = None
         else:
-            loss = self.loss(output, label) + l1
+            loss_dict['loss'] = self.loss(output, label) + l1
 
         if self.mmd_loss is not None:
             if not self.model.training:
                 freq = self.arg.test_dataloader_args['multi_test']
                 if self.arg.use_sgn_dataloader and freq > 1:
                     z = z.view((-1, freq, z.size(1))).mean(1)
-            mmd_loss, l2_z_mean, _ = self.mmd_loss(
+            mmd_loss, l2_z_mean, z_mean = self.mmd_loss(
                 z, self.model.z_prior, label)
-            loss = (self.arg.mmd_lambda2 * mmd_loss +
-                    self.arg.mmd_lambda1 * l2_z_mean +
-                    loss)
+            loss_dict['loss'] = (self.arg.mmd_lambda2 * mmd_loss +
+                                 self.arg.mmd_lambda1 * l2_z_mean +
+                                 loss_dict['loss'])
+            cos_z, dis_z = get_vector_property(z_mean)
+            cos_z_prior, dis_z_prior = get_vector_property(self.model.z_prior)
+            loss_dict['cos_z'] = cos_z
+            loss_dict['dis_z'] = dis_z
+            loss_dict['cos_z_prior'] = cos_z_prior
+            loss_dict['dis_z_prior'] = dis_z_prior
 
-        return output, loss
+        return output, loss_dict
 
     def train(self, epoch: int, save_model: bool = False):
 
@@ -563,7 +586,15 @@ class Processor(object):
         #     self.train_writer.add_histogram(name, param.clone().cpu().data.numpy(), epoch)  # noqa
         if self.rank == 0:
             self.train_writer.add_scalar('epoch', epoch, self.global_step)
+
         loss_values = []
+        mmd_loss_values = []
+        l2_z_mean_values = []
+        acc_values = []
+        cos_z_values = []
+        dis_z_values = []
+        cos_z_prior_values = []
+        dis_z_prior_values = []
 
         # 4. Loader
         process = self.get_data_iterator(epoch, 'train')
@@ -591,20 +622,23 @@ class Processor(object):
             if self.arg.optimizer == 'SAM_SGD':
                 # 1. first forward-backward pass
                 enable_running_stats(self.model)
-                output, loss = self.forward_pass(data, label)
+                output, loss_dict = self.forward_pass(data, label)
+                loss = loss_dict['loss']
                 with self.model.no_sync():
                     loss.backward()
                 self.optimizer.first_step(zero_grad=True)
                 # 2. second forward-backward pass
                 # make sure to do a full forward pass
                 disable_running_stats(self.model)
-                output, loss = self.forward_pass(data, label)
+                output, loss_dict = self.forward_pass(data, label)
+                loss = loss_dict['loss']
                 loss.backward()
                 self.optimizer.second_step(zero_grad=True)
 
             else:
                 # forward
-                output, loss = self.forward_pass(data, label)
+                output, loss_dict = self.forward_pass(data, label)
+                loss = loss_dict['loss']
                 # if batch_idx == 0 and epoch == 0:
                 #     self.train_writer.add_graph(self.model, output)
                 # backward
@@ -616,6 +650,12 @@ class Processor(object):
                         if 'PA' in name:
                             param.grad *= 0
                 self.optimizer.step()
+
+            if self.mmd_loss is not None:
+                cos_z_values.append(self.tensor_to_value(loss_dict['cos_z']))
+                dis_z_values.append(self.tensor_to_value(loss_dict['dis_z']))
+                cos_z_prior_values.append(self.tensor_to_value(loss_dict['cos_z_prior']))  # noqa
+                dis_z_prior_values.append(self.tensor_to_value(loss_dict['dis_z_prior']))  # noqa
 
             # 5.3. scheduler if applicable.
             if self.scheduler[0] == 'BATCH':
@@ -647,6 +687,18 @@ class Processor(object):
         }
         self.print_log(
             f'\tMean training loss: {np.mean(loss_values):.4f}.'.format()
+        )
+        self.print_log(
+            f'\tMean cos_z loss: {np.mean(cos_z_values):.4f}.'.format()
+        )
+        self.print_log(
+            f'\tMean dis_z loss: {np.mean(dis_z_values):.4f}.'.format()
+        )
+        self.print_log(
+            f'\tMean cos_z_prior loss: {np.mean(cos_z_prior_values):.4f}.'.format()  # noqa
+        )
+        self.print_log(
+            f'\tMean dis_z_prior loss: {np.mean(dis_z_prior_values):.4f}.'.format()  # noqa
         )
         self.print_log(
             f'\tTime consumption: '
@@ -690,7 +742,8 @@ class Processor(object):
                 # 3. forward pass
                 with torch.no_grad():
                     data, label = self.to_cuda(data, label)
-                    output, loss = self.forward_pass(data, label)
+                    output, loss_dict = self.forward_pass(data, label)
+                    loss = loss_dict['loss']
                     score_frag.append(output.data.cpu().numpy())
                     loss_values.append(self.tensor_to_value(loss))
                     _, predict_label = torch.max(output.data, 1)
