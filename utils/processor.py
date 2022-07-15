@@ -199,17 +199,14 @@ class Processor(object):
         with open(score_path, 'wb') as f:
             pickle.dump(score_dict, f)
 
-    def writer(self, mode: str, acc: float, loss: float):
+    def writer(self, mode: str, **kwargs):
+        for k, v in kwargs.items():
+            self.train_writer.add_scalar(k, v, self.global_step)
         if mode == 'train':
-            self.train_writer.add_scalar('acc', acc, self.global_step)
-            self.train_writer.add_scalar('loss', loss, self.global_step)
-            # self.train_writer.add_scalar('loss_l1', l1, self.global_step)
-            # self.train_writer.add_scalar('batch_time', process.iterable.last_duration, self.global_step)  # noqa
             _lr = self.optimizer.param_groups[0]['lr']
             self.train_writer.add_scalar('lr', _lr, self.global_step)
-        elif mode == 'val':
-            self.val_writer.add_scalar('loss', loss, self.global_step)
-            self.val_writer.add_scalar('acc', acc, self.global_step)
+            # self.train_writer.add_scalar('loss_l1', l1, self.global_step)
+            # self.train_writer.add_scalar('batch_time', process.iterable.last_duration, self.global_step)  # noqa
 
     # --------------------------------------------------------------------------
     # WEIGHTS
@@ -545,6 +542,8 @@ class Processor(object):
                                  loss_dict['loss'])
             cos_z, dis_z = get_vector_property(z_mean)
             cos_z_prior, dis_z_prior = get_vector_property(self.model.z_prior)
+            loss_dict['l2_z_mean'] = l2_z_mean
+            loss_dict['mmd_loss'] = mmd_loss
             loss_dict['cos_z'] = cos_z
             loss_dict['dis_z'] = dis_z
             loss_dict['cos_z_prior'] = cos_z_prior
@@ -588,9 +587,9 @@ class Processor(object):
             self.train_writer.add_scalar('epoch', epoch, self.global_step)
 
         loss_values = []
+        acc_values = []
         mmd_loss_values = []
         l2_z_mean_values = []
-        acc_values = []
         cos_z_values = []
         dis_z_values = []
         cos_z_prior_values = []
@@ -651,12 +650,6 @@ class Processor(object):
                             param.grad *= 0
                 self.optimizer.step()
 
-            if self.mmd_loss is not None:
-                cos_z_values.append(self.tensor_to_value(loss_dict['cos_z']))
-                dis_z_values.append(self.tensor_to_value(loss_dict['dis_z']))
-                cos_z_prior_values.append(self.tensor_to_value(loss_dict['cos_z_prior']))  # noqa
-                dis_z_prior_values.append(self.tensor_to_value(loss_dict['dis_z_prior']))  # noqa
-
             # 5.3. scheduler if applicable.
             if self.scheduler[0] == 'BATCH':
                 self.scheduler[1].step()
@@ -667,12 +660,38 @@ class Processor(object):
             loss_value = self.tensor_to_value(loss)
             loss_values.append(loss_value)
 
+            if self.mmd_loss is not None:
+                l2_z_mean_value = self.tensor_to_value(loss_dict['l2_z_mean'])
+                mmd_loss_value = self.tensor_to_value(loss_dict['mmd_loss'])
+                cos_z_value = self.tensor_to_value(loss_dict['cos_z'])
+                dis_z_value = self.tensor_to_value(loss_dict['dis_z'])
+                cos_z_prior_value = self.tensor_to_value(loss_dict['cos_z_prior'])  # noqa
+                dis_z_prior_value = self.tensor_to_value(loss_dict['dis_z_prior'])  # noqa
+                l2_z_mean_values.append(l2_z_mean_value)
+                mmd_loss_values.append(mmd_loss_value)
+                cos_z_values.append(cos_z_value)
+                dis_z_values.append(dis_z_value)
+                cos_z_prior_values.append(cos_z_prior_value)
+                dis_z_prior_values.append(dis_z_prior_value)
+
             value, predict_label = torch.max(output.data, 1)
             acc = torch.mean((predict_label == label.data).float())
             acc = self.tensor_to_value(acc)
+            acc_values.append(acc)
 
             if self.rank == 0:
-                self.writer(mode='train', acc=acc, loss=loss_value)
+                kwargs = {
+                    'acc': acc,
+                    'loss': loss_value
+                }
+                if self.mmd_loss is not None:
+                    kwargs['l2_z_mean'] = l2_z_mean_value
+                    kwargs['mmd_loss'] = mmd_loss_value
+                    kwargs['cos_z'] = cos_z_value
+                    kwargs['dis_z'] = dis_z_value
+                    kwargs['cos_z_prior'] = cos_z_prior_value
+                    kwargs['dis_z_prior'] = dis_z_prior_value
+                self.writer(mode='train', **kwargs)
 
             timer['statistics'] += self.split_time()
 
@@ -685,26 +704,17 @@ class Processor(object):
             k: f'{int(round(v * 100 / sum(timer.values()))):02d}%'
             for k, v in timer.items()
         }
-        self.print_log(
-            f'\tMean training loss: {np.mean(loss_values):.4f}.'.format()
-        )
-        self.print_log(
-            f'\tMean cos_z loss: {np.mean(cos_z_values):.4f}.'.format()
-        )
-        self.print_log(
-            f'\tMean dis_z loss: {np.mean(dis_z_values):.4f}.'.format()
-        )
-        self.print_log(
-            f'\tMean cos_z_prior loss: {np.mean(cos_z_prior_values):.4f}.'.format()  # noqa
-        )
-        self.print_log(
-            f'\tMean dis_z_prior loss: {np.mean(dis_z_prior_values):.4f}.'.format()  # noqa
-        )
-        self.print_log(
-            f'\tTime consumption: '
-            f'[Data]{proportion["dataloader"]}, '
-            f'[Network]{proportion["model"]}'
-        )
+        self.print_log(f'\tMean training loss: {np.mean(loss_values):.4f}.')
+        if self.mmd_loss is not None:
+            self.print_log(f'\tMean l2_z_mean    : {np.mean(l2_z_mean_values):.4f}.')  # noqa
+            self.print_log(f'\tMean mmd_loss     : {np.mean(mmd_loss_values):.4f}.')  # noqa
+            self.print_log(f'\tMean cos_z        : {np.mean(cos_z_values):.4f}.')  # noqa
+            self.print_log(f'\tMean dis_z        : {np.mean(dis_z_values):.4f}.')  # noqa
+            self.print_log(f'\tMean cos_z_prior  : {np.mean(cos_z_prior_values):.4f}.')  # noqa
+            self.print_log(f'\tMean dis_z_prior  : {np.mean(dis_z_prior_values):.4f}.')  # noqa
+        self.print_log(f'\tTime consumption  : '
+                       f'[Data] {proportion["dataloader"]}, '
+                       f'[Network] {proportion["model"]}')
 
         if save_model and self.rank == 0:
             self.save_weights(epoch + 1)
@@ -732,6 +742,13 @@ class Processor(object):
         # 2. loop through data loaders
         for ln in loader_name:
             loss_values = []
+            mmd_loss_values = []
+            l2_z_mean_values = []
+            cos_z_values = []
+            dis_z_values = []
+            cos_z_prior_values = []
+            dis_z_prior_values = []
+
             score_frag = []
             step = 0
             process = self.get_data_iterator(epoch, 'val')
@@ -744,6 +761,19 @@ class Processor(object):
                     data, label = self.to_cuda(data, label)
                     output, loss_dict = self.forward_pass(data, label)
                     loss = loss_dict['loss']
+                    if self.mmd_loss is not None:
+                        l2_z_mean_value = self.tensor_to_value(loss_dict['l2_z_mean'])  # noqa
+                        mmd_loss_value = self.tensor_to_value(loss_dict['mmd_loss'])  # noqa
+                        cos_z_value = self.tensor_to_value(loss_dict['cos_z'])
+                        dis_z_value = self.tensor_to_value(loss_dict['dis_z'])
+                        cos_z_prior_value = self.tensor_to_value(loss_dict['cos_z_prior'])  # noqa
+                        dis_z_prior_value = self.tensor_to_value(loss_dict['dis_z_prior'])  # noqa
+                        l2_z_mean_values.append(l2_z_mean_value)
+                        mmd_loss_values.append(mmd_loss_value)
+                        cos_z_values.append(cos_z_value)
+                        dis_z_values.append(dis_z_value)
+                        cos_z_prior_values.append(cos_z_prior_value)
+                        dis_z_prior_values.append(dis_z_prior_value)
                     score_frag.append(output.data.cpu().numpy())
                     loss_values.append(self.tensor_to_value(loss))
                     _, predict_label = torch.max(output.data, 1)
@@ -762,6 +792,13 @@ class Processor(object):
 
             # 4. loss
             loss_value = np.mean(loss_values)
+            if self.mmd_loss is not None:
+                l2_z_mean_value = np.mean(l2_z_mean_values)
+                mmd_loss_value = np.mean(mmd_loss_values)
+                cos_z_value = np.mean(cos_z_values)
+                dis_z_value = np.mean(dis_z_values)
+                cos_z_prior_value = np.mean(cos_z_prior_values)
+                dis_z_prior_value = np.mean(dis_z_prior_values)
 
             # 5. logits
             score = np.concatenate(score_frag)
@@ -781,13 +818,33 @@ class Processor(object):
             # 7. logging
             if self.rank == 0:
                 if self.arg.phase == 'train':
-                    self.writer(mode='val', acc=accuracy, loss=loss_value)
+                    kwargs = {
+                        'acc': accuracy,
+                        'loss': loss_value
+                    }
+                    if self.mmd_loss is not None:
+                        kwargs['l2_z_mean'] = l2_z_mean_value
+                        kwargs['mmd_loss'] = mmd_loss_value
+                        kwargs['cos_z'] = cos_z_value
+                        kwargs['dis_z'] = dis_z_value
+                        kwargs['cos_z_prior'] = cos_z_prior_value
+                        kwargs['dis_z_prior'] = dis_z_prior_value
+                    self.writer(mode='val', **kwargs)
 
-            # self.print_log(f'\tAccuracy: {accuracy:.4f}')
             # self.print_log(f'Model   : {self.arg.work_dir}')
-            self.print_log(f'\tMean {ln} '
-                           f'loss of {len(self.data_loader[ln])} '
-                           f'batches: {loss_value:.4f}')
+            self.print_log(
+                f'\tMean {ln} '
+                f'loss of {len(self.data_loader[ln])} '
+                f'batches: {loss_value:.4f}'
+            )
+            self.print_log(f'\tAccuracy   : {accuracy:.4f}')
+            if self.mmd_loss is not None:
+                self.print_log(f'\tl2_z_mean  : {np.mean(l2_z_mean_values):.4f}.')  # noqa
+                self.print_log(f'\tmmd_loss   : {np.mean(mmd_loss_values):.4f}.')  # noqa
+                self.print_log(f'\tcos_z      : {np.mean(cos_z_values):.4f}.')
+                self.print_log(f'\tdis_z      : {np.mean(dis_z_values):.4f}.')
+                self.print_log(f'\tcos_z_prior: {np.mean(cos_z_prior_values):.4f}.')  # noqa
+                self.print_log(f'\tdis_z_prior: {np.mean(dis_z_prior_values):.4f}.')  # noqa
 
             for k in self.arg.show_topk:
                 top_k = 100 * self.data_loader[ln].dataset.top_k(score, k)
