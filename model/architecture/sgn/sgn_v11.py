@@ -108,7 +108,8 @@ class SGN(PyTorchModule):
     ffn_mode = [0, 1, 2, 3, 101, 102, 103, 104, 201, 202]
     emb_modes = [0, 1, 2, 3, 4, 5, 6, 7, 8]
     c1, c2, c3, c4 = c1, c2, c3, c4
-    g_activation_fn = nn.Identity  # nn.Softmax
+    # g_activation_fn = nn.Identity
+    g_activation_fn = nn.Softmax
 
     def __init__(self,
                  num_class: int = 60,

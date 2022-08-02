@@ -135,7 +135,8 @@ class SGN(PyTorchModule):
 
     # CONSTANTS
     c1, c2, c3, c4 = c1, c2, c3, c4
-    g_activation_fn = nn.Identity  # nn.Softmax
+    # g_activation_fn = nn.Identity
+    g_activation_fn = nn.Softmax
 
     def __init__(self,
                  num_class: int = 60,
