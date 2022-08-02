@@ -295,26 +295,35 @@ sgn_v11:
 
 sgn_v12:
         - this has the infogcn MMD-based loss
-        - ./data/data/ntu_result/xview/sgn/sgn_v12/220706103001_bs64_adam_lr1e3:
+        - 220706103001_bs64_adam_lr1e3:
                   - 89.06%
-        - ./data/data/ntu_result/xview/sgn/sgn_v12/220706103001_bs128_adam_lr1e3:
+        - 220706103001_bs128_adam_lr1e3:
                   - 90.42%
-        - ./data/data/ntu_result/xview/sgn/sgn_v12/220706103001_bs128_adam_lr1e2:
+        - 220706103001_bs128_adam_lr1e2:
                   - 74.98%
-        - ./data/data/ntu_result/xview/sgn/sgn_v12/220706103001_bs128_adam_lr1e1:
+        - 220706103001_bs128_adam_lr1e1:
                   - 1.65%
-        - ./data/data/ntu_result/xview/sgn/sgn_v12/220706103001_bs128_sgd_lr1e3:
+        - 220706103001_bs128_sgd_lr1e3:
                   - 59.49%
-        - ./data/data/ntu_result/xview/sgn/sgn_v12/220706103001_bs128_sgd_lr1e2:
+        - 220706103001_bs128_sgd_lr1e2:
                   - 86.83%
-        - ./data/data/ntu_result/xview/sgn/sgn_v12/220706103001_bs128_sgd_lr1e1:
+        - 220706103001_bs128_sgd_lr1e1:
                   - 90.98%
 
-        - ./data/data/ntu_result/xview/sgn/sgn_v12/220712163001_bs128_adam_lr1e3_lambda21e0:
+        - 220712163001_bs128_adam_lr1e3_lambda21e0:
                   - 89.83%
-        - ./data/data/ntu_result/xview/sgn/sgn_v12/220712163001_bs128_adam_lr1e3_gain1:
+        - 220712163001_bs128_adam_lr1e3_gain1:
                   - 89.92%
-        - ./data/data/ntu_result/xview/sgn/sgn_v12/220712163001_bs128_sgd_lr1e1_steps90110:
+        - 220712163001_bs128_sgd_lr1e1_steps90110:
+                  - 91.43%
+        
+        - 220714183001_bs128_sgd_lr1e1_steps90110_noise09:
+                  - 1.65%
+        - 220714183001_bs128_sgd_lr1e1_steps90110_noise05:
+                  - 1.65%
+        - 220714183001_bs128_sgd_lr1e1_steps90110_gain10:
+                  - 91.40%
+        - 220714183001_bs128_sgd_lr1e1_steps90110:
                   - 91.43%
 
 sgn-code:

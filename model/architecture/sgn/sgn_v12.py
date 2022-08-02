@@ -1564,9 +1564,14 @@ if __name__ == '__main__':
         multi_t=[[], [], [3]],
         # multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7]],
         # multi_t_shared=2,
+        infogcn_noise_ratio=0.01,
+        infogcn_gain=1,
     )
     model(inputs)
     print(model)
+
+    for param in model.named_parameters():
+        print(param[0], param[1].requires_grad)
 
     try:
         flops = FlopCountAnalysis(model, inputs)
