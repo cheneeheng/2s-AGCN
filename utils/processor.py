@@ -114,17 +114,18 @@ class Processor(object):
             pred_dir = os.path.join(self.arg.work_dir, 'prediction')
             dir_check(pred_dir)
         # events
-        event_dir = os.path.join(self.arg.work_dir, 'event')
-        if not self.arg.train_feeder_args['debug']:
-            dir_check(event_dir)
-            self.train_writer = SummaryWriter(
-                os.path.join(event_dir, 'train'), 'train')
-            self.val_writer = SummaryWriter(
-                os.path.join(event_dir, 'val'), 'val')
-        else:
-            self.train_writer = SummaryWriter(
-                os.path.join(event_dir, 'train_debug'), 'train_debug')
-            self.val_writer = self.train_writer
+        if self.arg.phase == 'train':
+            event_dir = os.path.join(self.arg.work_dir, 'event')
+            if not self.arg.train_feeder_args['debug']:
+                dir_check(event_dir)
+                self.train_writer = SummaryWriter(
+                    os.path.join(event_dir, 'train'), 'train')
+                self.val_writer = SummaryWriter(
+                    os.path.join(event_dir, 'val'), 'val')
+            else:
+                self.train_writer = SummaryWriter(
+                    os.path.join(event_dir, 'train_debug'), 'train_debug')
+                self.val_writer = self.train_writer
 
     def print_time(self):
         localtime = time.asctime(time.localtime(time.time()))
@@ -511,7 +512,9 @@ class Processor(object):
                      label: Optional[torch.Tensor]
                      ) -> Tuple[tuple, Optional[torch.Tensor]]:
         # output, G, Z
-        output, _, z = self.model(*data)
+        output_tuple = self.model(*data)
+        output = output_tuple[0]
+
         if not self.model.training:
             freq = self.arg.test_dataloader_args['multi_test']
             if self.arg.use_sgn_dataloader and freq > 1:
@@ -531,6 +534,7 @@ class Processor(object):
             loss_dict['loss'] = self.loss(output, label) + l1
 
         if self.mmd_loss is not None:
+            z = output_tuple[2]
             if not self.model.training:
                 freq = self.arg.test_dataloader_args['multi_test']
                 if self.arg.use_sgn_dataloader and freq > 1:
