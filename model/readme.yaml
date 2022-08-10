@@ -293,38 +293,56 @@ sgn_v11:
         - 220616130001_gproj512_gcnfpn1k3_multit357357357shared:
                   - 95.66% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
+        - 220804140001_sgnori_smpemb_semj0_c1x2:
+                  - 93.60%
+        - 220804140001_sgnori_smpemb_semj0:
+                  - 93.51%
+        - 220804140001_sgnori_smpemb:
+                  - 94.65%
+
+        - 220804140001_sgnori_tmode3_bottleneck:
+                  - 94.17%
+        - 220804140001_sgnori_tmode3:
+                  - 94.26%
+        - 220809140001_sgnori_tmode3_1layer:
+                  - 94.68%
+
 sgn_v12:
         - this has the infogcn MMD-based loss
-        - 220706103001_bs64_adam_lr1e3:
-                  - 89.06%
-        - 220706103001_bs128_adam_lr1e3:
-                  - 90.42%
-        - 220706103001_bs128_adam_lr1e2:
-                  - 74.98%
-        - 220706103001_bs128_adam_lr1e1:
-                  - 1.65%
-        - 220706103001_bs128_sgd_lr1e3:
-                  - 59.49%
-        - 220706103001_bs128_sgd_lr1e2:
-                  - 86.83%
-        - 220706103001_bs128_sgd_lr1e1:
-                  - 90.98%
-
-        - 220712163001_bs128_adam_lr1e3_lambda21e0:
-                  - 89.83%
-        - 220712163001_bs128_adam_lr1e3_gain1:
-                  - 89.92%
-        - 220712163001_bs128_sgd_lr1e1_steps90110:
-                  - 91.43%
+        - G ACTIVATION IS IDENTITY HERE:
+                - 220706103001_bs64_adam_lr1e3:
+                        - 89.06%
+                - 220706103001_bs128_adam_lr1e3:
+                        - 90.42%
+                - 220706103001_bs128_adam_lr1e2:
+                        - 74.98%
+                - 220706103001_bs128_adam_lr1e1:
+                        - 1.65%
+                - 220706103001_bs128_sgd_lr1e3:
+                        - 59.49%
+                - 220706103001_bs128_sgd_lr1e2:
+                        - 86.83%
+                - 220706103001_bs128_sgd_lr1e1:
+                        - 90.98%
+                - 220712163001_bs128_adam_lr1e3_lambda21e0:
+                        - 89.83%
+                - 220712163001_bs128_adam_lr1e3_gain1:
+                        - 89.92%
+                - 220712163001_bs128_sgd_lr1e1_steps90110:
+                        - 91.43%
+                - 220714183001_bs128_sgd_lr1e1_steps90110_noise09:
+                        - 1.65%
+                - 220714183001_bs128_sgd_lr1e1_steps90110_noise05:
+                        - 1.65%
+                - 220714183001_bs128_sgd_lr1e1_steps90110_gain10:
+                        - 91.40%
+                - 220714183001_bs128_sgd_lr1e1_steps90110:
+                        - 91.43%
         
-        - 220714183001_bs128_sgd_lr1e1_steps90110_noise09:
-                  - 1.65%
-        - 220714183001_bs128_sgd_lr1e1_steps90110_noise05:
-                  - 1.65%
-        - 220714183001_bs128_sgd_lr1e1_steps90110_gain10:
-                  - 91.40%
-        - 220714183001_bs128_sgd_lr1e1_steps90110:
-                  - 91.43%
+        - 220802123001_bs128_sgd_lr1e1_steps90110_c4256d:
+                  - 94.33%
+        - 220802123001_bs128_sgd_lr1e1_steps90110:
+                  - 95.04%
 
 sgn-code:
         - original sgn repo code

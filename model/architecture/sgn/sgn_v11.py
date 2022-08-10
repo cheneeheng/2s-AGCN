@@ -9,6 +9,7 @@
 # Continue from on sgn_v10
 # NO PARTS
 # FREEZE 220704
+# UNFREEZE 220801
 
 import torch
 from torch import nn
@@ -129,6 +130,7 @@ class SGN(PyTorchModule):
                  semantic_joint: int = 1,
                  semantic_frame: int = 1,
                  semantic_class: int = 0,
+                 semantic_joint_smp: int = 0,
 
                  semantic_joint_fusion: int = 0,
                  semantic_frame_fusion: int = 1,
@@ -204,12 +206,14 @@ class SGN(PyTorchModule):
         self.semantic_joint = semantic_joint
         self.semantic_frame = semantic_frame
         self.semantic_class = semantic_class
+        self.semantic_joint_smp = semantic_joint_smp
         self.xem_projection = xem_projection  # projection layer pre GCN
         assert self.input_position in self.emb_modes
         assert self.input_velocity in self.emb_modes
         assert self.semantic_joint in self.emb_modes
         assert self.semantic_frame in self.emb_modes
         assert self.semantic_class in self.emb_modes
+        assert self.semantic_joint_smp in self.emb_modes
         assert self.xem_projection in self.emb_modes
         if self.input_position == 0 and self.semantic_joint > 0:
             raise ValueError("input_position is 0 but semantic_joint is not")
@@ -446,6 +450,27 @@ class SGN(PyTorchModule):
             )
         )
 
+        if self.semantic_joint_smp > 0:
+            self.semantic_joint_smp_embedding = SemanticEmbedding(
+                num_point=self.num_point,
+                num_segment=self.num_segment,
+                sem_spa=self.semantic_joint_smp,
+                sem_tem=0,
+                sem_cls=0,
+                sem_spa_emb_kwargs=dict(
+                    in_channels=self.num_point,
+                    out_channels=out_channels,
+                    bias=self.bias,
+                    dropout=self.dropout_fn,
+                    activation=self.activation_fn,
+                    normalization=self.normalization_fn,
+                    num_point=self.num_point,
+                    mode=self.semantic_joint_smp
+                ),
+                sem_tem_emb_kwargs=dict(),
+                sem_cls_emb_kwargs=dict()
+            )
+
         # Frame level module ---------------------------------------------------
         self.t_mode = t_mode
         self.t_maxpool_kwargs = t_maxpool_kwargs
@@ -538,6 +563,9 @@ class SGN(PyTorchModule):
             raise ValueError("spatial_maxpool=2 not implemented")
         else:
             raise ValueError("Unknown spatial_maxpool")
+
+        if self.semantic_joint_smp > 0:
+            self.smp.return_indices = True
 
         if self.temporal_maxpool == 0:
             self.tmp = nn.Identity()
@@ -677,7 +705,19 @@ class SGN(PyTorchModule):
             x_list = [i + tem_emb if i is not None else None for i in x_list]
 
         # spatial pooling
-        x_list = [self.smp(i) if i is not None else None for i in x_list]
+        if hasattr(self, 'semantic_joint_smp_embedding'):
+            smp_emb = self.semantic_joint_smp_embedding(x)[0]
+            _x_list = []
+            for _x in x_list:
+                if _x is None:
+                    _x_list.append(None)
+                else:
+                    val, idx = self.smp(_x)
+                    _x_list.append(
+                        torch.gather(smp_emb, -2, idx//_x.shape[-1]) + val)
+            x_list = _x_list
+        else:
+            x_list = [self.smp(i) if i is not None else None for i in x_list]
 
         if self.gcn_fpn in [4, 5]:
             x_list = [None for _ in range(len(x_spa_list)-1)] + \
@@ -685,6 +725,7 @@ class SGN(PyTorchModule):
 
         # temporal MLP
         _x_list = []
+        tem_attn_list = []
         for i, t_kernels in enumerate(self.multi_t):
             for j, t_kernel in enumerate(t_kernels):
 
@@ -708,7 +749,9 @@ class SGN(PyTorchModule):
                             name = name_k
                             break
 
-                _x_list.append(getattr(self, name)(x_list[i]))
+                tem_out = getattr(self, name)(x_list[i])
+                _x_list.append(tem_out[0])
+                tem_attn_list.append(tem_out[1])
 
         if self.gcn_fpn_output_merge in [0, 1]:
             x = tensor_list_mean(_x_list)
@@ -754,7 +797,7 @@ class SGN(PyTorchModule):
             y = self.fc_dropout(y)
             y = self.fc(y)
 
-        return y, g_spa
+        return y, [g_spa, tem_attn_list, x_spa_list]
 
 
 class DataNorm(PyTorchModule):
@@ -1074,15 +1117,17 @@ class GCNSpatialUnit(Module):
         self.drop = nn.Identity() if self.dropout is None else self.dropout()
 
     def forward(self, x: Tensor, g: Tensor) -> Tensor:
-        x1 = self.w0(x)
-        x1 = x1.permute(0, 3, 2, 1).contiguous()  # n,t,v,c
-        x1 = g.matmul(x1)
-        x1 = x1.permute(0, 3, 2, 1).contiguous()  # n,c,v,t
-        x1 = self.w1(x1) + self.w2(x)  # z + residual
-        x1 = self.norm(x1)
-        x1 = self.act(x1)
-        x1 = self.drop(x1)
-        return x1
+        x0 = self.w0(x)
+        x1 = x0.permute(0, 3, 2, 1).contiguous()  # n,t,v,c
+        x2 = g.matmul(x1)
+        x3 = x2.permute(0, 3, 2, 1).contiguous()  # n,c,v,t
+        x4 = self.w1(x3)
+        x5 = self.w2(x)
+        x6 = x4 + x5  # z + residual
+        x7 = self.norm(x6)
+        x8 = self.act(x7)
+        x9 = self.drop(x8)
+        return x9
 
 
 class GCNSpatialBlock(PyTorchModule):
@@ -1247,13 +1292,14 @@ class MHATemporal(PyTorchModule):
                             batch_first=True,
                         ))
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor) -> Tuple[Tensor, Optional[list]]:
         if hasattr(self, 'transformer'):
-            x, _ = self.transformer(x)
+            x, attn_list = self.transformer(x)
         else:
+            attn_list = None
             for i in range(self.num_layers):
                 x = getattr(self, f'layer{i+1}')(x)
-        return x
+        return x, attn_list
 
 
 class MLPTemporal(PyTorchModule):
@@ -1399,17 +1445,19 @@ class TemporalBranch(Module):
         else:
             raise ValueError('Unknown t_mode')
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor) -> Tuple[Tensor, Optional[list]]:
+        attn_list = None
         N, _, _, T = x.shape
         x = self.aspp(x)
         if self.t_mode == 3:
             x = x.permute(0, 3, 2, 1).contiguous()  # n,t,v,c
             x = x.reshape(N, T, -1)
-        x = self.cnn(x)
-        if self.t_mode == 3:
+            x, attn_list = self.cnn(x)
             x = x.reshape(N, T, 1, -1)
             x = x.permute(0, 3, 2, 1).contiguous()  # n,c,v,t
-        return x
+        else:
+            x, attn_list = self.cnn(x), None
+        return x, attn_list
 
 
 if __name__ == '__main__':
@@ -1435,34 +1483,35 @@ if __name__ == '__main__':
         input_velocity=1,
         semantic_joint=1,
         semantic_frame=1,
-        semantic_class=1,
+        semantic_class=0,
+        semantic_joint_smp=0,
         semantic_joint_fusion=0,
         semantic_frame_fusion=1,
         semantic_frame_location=0,
-        sgcn_dims=[256, 256, 256],  # [c2, c3, c3],
-        sgcn_kernel=1,  # residual connection in GCN
-        sgcn_padding=0,  # residual connection in GCN
-        sgcn_dropout=0.0,  # residual connection in GCN
-        # int for global res, list for individual gcn
-        sgcn_residual=[0, 0, 0],
-        sgcn_prenorm=False,
-        # sgcn_ffn=0,
-        sgcn_v_kernel=0,
-        sgcn_g_kernel=1,
-        sgcn_g_proj_dim=256,  # c3
-        sgcn_g_proj_shared=False,
-        # sgcn_g_weighted=1,
-        gcn_fpn=9,
-        gcn_fpn_kernel=[3, 5, 7],
-        gcn_fpn_shared=0,
-        # gcn_fpn_output_merge=1,
-        # bifpn_dim=256,
-        # bifpn_layers=1,
-        spatial_maxpool=1,
-        temporal_maxpool=1,
-        aspp_rates=None,
-        t_mode=1,
-        # t_maxpool_kwargs=None,
+        # sgcn_dims=[256, 256, 256],  # [c2, c3, c3],
+        # sgcn_kernel=1,  # residual connection in GCN
+        # sgcn_padding=0,  # residual connection in GCN
+        # sgcn_dropout=0.0,  # residual connection in GCN
+        # # int for global res, list for individual gcn
+        # sgcn_residual=[0, 0, 0],
+        # sgcn_prenorm=False,
+        # # sgcn_ffn=0,
+        # sgcn_v_kernel=0,
+        # sgcn_g_kernel=1,
+        # sgcn_g_proj_dim=256,  # c3
+        # sgcn_g_proj_shared=False,
+        # # sgcn_g_weighted=1,
+        # gcn_fpn=9,
+        # gcn_fpn_kernel=[3, 5, 7],
+        # gcn_fpn_shared=0,
+        # # gcn_fpn_output_merge=1,
+        # # bifpn_dim=256,
+        # # bifpn_layers=1,
+        # spatial_maxpool=1,
+        # temporal_maxpool=1,
+        # aspp_rates=None,
+        # t_mode=3,
+        # # t_maxpool_kwargs=None,
         t_mha_kwargs={
             'd_model': [256, 512],
             'nhead': [1, 1],
@@ -1475,8 +1524,8 @@ if __name__ == '__main__':
             'norm': 'ln',
             'global_norm': False
         },
-        multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7]],
-        multi_t_shared=2,
+        # multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7]],
+        # multi_t_shared=2,
     )
     model(inputs)
     print(model)
