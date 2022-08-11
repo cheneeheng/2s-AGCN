@@ -15,6 +15,7 @@ import torch
 from torch import nn
 from torch import Tensor
 from torch.nn import Module as PyTorchModule
+from torch.nn import functional as F
 
 try:
     from fvcore.nn import FlopCountAnalysis
@@ -150,6 +151,11 @@ class SGN(PyTorchModule):
                  sgcn_g_proj_dim: Optional[T3] = None,  # c3
                  sgcn_g_proj_shared: bool = False,
                  sgcn_g_weighted: int = 0,
+                 # 0: mat mul
+                 # 1: w1,w2 linear proj
+                 # 2: squeeze excite
+                 # 3: only w2
+                 sgcn_attn_mode: int = 0,
 
                  gcn_fpn: int = -1,
                  gcn_fpn_kernel: Union[int, list] = -1,
@@ -293,6 +299,7 @@ class SGN(PyTorchModule):
             gcn_residual=sgcn_residual,
             gcn_prenorm=sgcn_prenorm,
             gcn_v_kernel=sgcn_v_kernel,
+            gcn_attn_mode=sgcn_attn_mode,
             gcn_ffn=sgcn_ffn,
             g_kernel=sgcn_g_kernel,
             g_proj_dim=sgcn_g_proj_dim,
@@ -1060,24 +1067,32 @@ class GCNSpatialG(Module):
                                           padding=padding,
                                           bias=bias,
                                           activation=activation)
-        self.g1 = Conv(self.in_channels, self.out_channels, bias=self.bias,
-                       kernel_size=self.kernel_size, padding=self.padding)
-        if g_proj_shared:
-            self.g2 = self.g1
+        if self.kernel_size == 0:
+            self.return_none = True
         else:
-            self.g2 = Conv(self.in_channels, self.out_channels, bias=self.bias,
+            self.return_none = False
+            self.g1 = Conv(self.in_channels, self.out_channels, bias=self.bias,
                            kernel_size=self.kernel_size, padding=self.padding)
-        self.act = self.activation(dim=-1)
-        self.alpha = nn.Parameter(torch.zeros(1))
+            if g_proj_shared:
+                self.g2 = self.g1
+            else:
+                self.g2 = Conv(self.in_channels, self.out_channels,
+                               bias=self.bias, kernel_size=self.kernel_size,
+                               padding=self.padding)
+            self.act = self.activation(dim=-1)
+            self.alpha = nn.Parameter(torch.zeros(1))
 
     def forward(self, x: Tensor, g: Optional[Tensor] = None) -> Tensor:
-        g1 = self.g1(x).permute(0, 3, 2, 1).contiguous()  # n,t,v,c
-        g2 = self.g2(x).permute(0, 3, 1, 2).contiguous()  # n,t,c,v
-        g3 = g1.matmul(g2)  # n,t,v,v
-        g4 = self.act(g3)
-        if g is not None:
-            g4 = (g * self.alpha + g4) / (self.alpha + 1)
-        return g4
+        if self.return_none:
+            return None
+        else:
+            g1 = self.g1(x).permute(0, 3, 2, 1).contiguous()  # n,t,v,c
+            g2 = self.g2(x).permute(0, 3, 1, 2).contiguous()  # n,t,c,v
+            g3 = g1.matmul(g2)  # n,t,v,v
+            g4 = self.act(g3)
+            if g is not None:
+                g4 = (g * self.alpha + g4) / (self.alpha + 1)
+            return g4
 
 
 class GCNSpatialUnit(Module):
@@ -1092,6 +1107,7 @@ class GCNSpatialUnit(Module):
                  normalization: T1 = nn.BatchNorm2d,
                  prenorm: bool = False,
                  v_kernel_size: int = 0,
+                 attn_mode: int = 0
                  ):
         super(GCNSpatialUnit, self).__init__(in_channels,
                                              out_channels,
@@ -1102,6 +1118,8 @@ class GCNSpatialUnit(Module):
                                              activation=activation,
                                              normalization=normalization,
                                              prenorm=prenorm)
+        self.attn_mode = attn_mode
+
         if v_kernel_size > 0:
             self.w0 = Conv(self.in_channels,
                            self.in_channels,
@@ -1110,28 +1128,65 @@ class GCNSpatialUnit(Module):
                            bias=self.bias)
         else:
             self.w0 = nn.Identity()
+
         # in original SGN bias for w1 is false
-        self.w1 = Conv(self.in_channels, self.out_channels, bias=self.bias)
+        if self.attn_mode != 3:
+            self.w1 = Conv(self.in_channels, self.out_channels, bias=self.bias)
+
         if self.kernel_size > 0:
             self.w2 = Conv(self.in_channels, self.out_channels, bias=self.bias,
                            kernel_size=self.kernel_size, padding=self.padding)
         else:
             self.w2 = null_fn
+
+        # squeeze and excite
+        if self.attn_mode == 2:
+            self.w1 = Conv(self.out_channels//2, self.out_channels,
+                           bias=self.bias)
+            self.w3 = Conv(self.in_channels, self.out_channels//2,
+                           bias=self.bias, activation=get_activation_fn('relu'))
+            self.s = nn.Sigmoid()
+
         if self.prenorm:
             self.norm = nn.Identity()
         else:
             self.norm = self.normalization(self.out_channels)
+
         self.act = self.activation()
         self.drop = nn.Identity() if self.dropout is None else self.dropout()
 
-    def forward(self, x: Tensor, g: Tensor) -> Tensor:
+    def forward(self, x: Tensor, g: Optional[Tensor] = None) -> Tensor:
         x0 = self.w0(x)
-        x1 = x0.permute(0, 3, 2, 1).contiguous()  # n,t,v,c
-        x2 = g.matmul(x1)
-        x3 = x2.permute(0, 3, 2, 1).contiguous()  # n,c,v,t
-        x4 = self.w1(x3)
-        x5 = self.w2(x)
-        x6 = x4 + x5  # z + residual
+        if self.attn_mode == 0:
+            x1 = x0.permute(0, 3, 2, 1).contiguous()  # n,t,v,c
+            x2 = g.matmul(x1)
+            x3 = x2.permute(0, 3, 2, 1).contiguous()  # n,c,v,t
+            x4 = self.w1(x3)
+            x5 = self.w2(x)
+            x6 = x4 + x5  # z + residual
+        elif self.attn_mode == 1:
+            x1 = None
+            x2 = None
+            x3 = x0
+            x4 = self.w1(x3)
+            x5 = self.w2(x)
+            x6 = x4 + x5  # z + residual
+        elif self.attn_mode == 2:
+            N, _, V, T = x0.shape
+            # x1 = nn.AdaptiveAvgPool2d((1, T))  # n,c,1,t
+            x1 = F.adaptive_avg_pool2d(x0, (1, T))
+            x2 = self.w3(x1)
+            x3 = self.w1(x2)
+            x4 = self.s(x3).expand((N, -1, V, T))
+            x5 = self.w2(x)
+            x6 = x4 + x5  # z + residual
+        elif self.attn_mode == 3:
+            x1 = None
+            x2 = None
+            x3 = None
+            x4 = None
+            x5 = self.w2(x)
+            x6 = x5
         x7 = self.norm(x6)
         x8 = self.act(x7)
         x9 = self.drop(x8)
@@ -1152,6 +1207,7 @@ class GCNSpatialBlock(PyTorchModule):
                  gcn_prenorm: bool = False,
                  gcn_v_kernel: int = 0,
                  gcn_ffn: Optional[float] = None,
+                 gcn_attn_mode: int = 0,
                  g_proj_dim: T3 = 256,
                  g_kernel: int = 1,
                  g_proj_shared: bool = False,
@@ -1200,7 +1256,8 @@ class GCNSpatialBlock(PyTorchModule):
                                    activation=activation,
                                    normalization=normalization,
                                    prenorm=gcn_prenorm,
-                                   v_kernel_size=gcn_v_kernel))
+                                   v_kernel_size=gcn_v_kernel,
+                                   attn_mode=gcn_attn_mode))
 
         if gcn_prenorm:
             for i in range(self.num_blocks):
@@ -1501,7 +1558,7 @@ if __name__ == '__main__':
         semantic_frame_fusion=1,
         semantic_frame_location=0,
         # sgcn_dims=[256, 256, 256],  # [c2, c3, c3],
-        # sgcn_kernel=1,  # residual connection in GCN
+        sgcn_kernel=1,  # residual connection in GCN
         # sgcn_padding=0,  # residual connection in GCN
         # sgcn_dropout=0.0,  # residual connection in GCN
         # # int for global res, list for individual gcn
@@ -1509,7 +1566,8 @@ if __name__ == '__main__':
         # sgcn_prenorm=False,
         # # sgcn_ffn=0,
         # sgcn_v_kernel=0,
-        # sgcn_g_kernel=1,
+        sgcn_attn_mode=2,
+        sgcn_g_kernel=1,
         # sgcn_g_proj_dim=256,  # c3
         # sgcn_g_proj_shared=False,
         # # sgcn_g_weighted=1,
