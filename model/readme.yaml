@@ -307,6 +307,9 @@ sgn_v11:
         - 220809140001_sgnori_tmode3_1layer:
                   - 94.68%
 
+        - 220810140001_sgnori_nogcnres:
+                  - 92.48%
+
 sgn_v12:
         - this has the infogcn MMD-based loss
         - G ACTIVATION IS IDENTITY HERE:
@@ -343,6 +346,8 @@ sgn_v12:
                   - 94.33%
         - 220802123001_bs128_sgd_lr1e1_steps90110:
                   - 95.04%
+        - 220802123001_bs128_sgd_lr1e1_steps90110_gcnfpn1_multit357357357shared:
+                  - 95.94%
 
 sgn-code:
         - original sgn repo code

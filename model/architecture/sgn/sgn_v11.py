@@ -660,7 +660,7 @@ class SGN(PyTorchModule):
             x = x + tem_emb
 
         # GCN ------------------------------------------------------------------
-        _, g_spa, x_spa_list = self.sgcn(x)
+        _, g_spa, x_spa_list, featuremap_spa_list = self.sgcn(x)
 
         # gcn fpn
         if self.gcn_fpn == 0:
@@ -725,7 +725,7 @@ class SGN(PyTorchModule):
 
         # temporal MLP
         _x_list = []
-        tem_attn_list = []
+        attn_tem_list = []
         for i, t_kernels in enumerate(self.multi_t):
             for j, t_kernel in enumerate(t_kernels):
 
@@ -751,7 +751,7 @@ class SGN(PyTorchModule):
 
                 tem_out = getattr(self, name)(x_list[i])
                 _x_list.append(tem_out[0])
-                tem_attn_list.append(tem_out[1])
+                attn_tem_list.append(tem_out[1])
 
         if self.gcn_fpn_output_merge in [0, 1]:
             x = tensor_list_mean(_x_list)
@@ -797,7 +797,15 @@ class SGN(PyTorchModule):
             y = self.fc_dropout(y)
             y = self.fc(y)
 
-        return y, [g_spa, tem_attn_list, x_spa_list]
+        return (
+            y,
+            {
+                'g_spa': g_spa,
+                'attn_tem_list': attn_tem_list,
+                'x_spa_list': x_spa_list,
+                'featuremap_spa_list': featuremap_spa_list
+            }
+        )
 
 
 class DataNorm(PyTorchModule):
@@ -1127,7 +1135,8 @@ class GCNSpatialUnit(Module):
         x7 = self.norm(x6)
         x8 = self.act(x7)
         x9 = self.drop(x8)
-        return x9
+        return x9, {'x': x, 'x0': x0, 'x1': x1, 'x2': x2, 'x3': x3, 'x4': x4,
+                    'x5': x5, 'x6': x6, 'x7': x7, 'x8': x8, 'x9': x9}
 
 
 class GCNSpatialBlock(PyTorchModule):
@@ -1225,6 +1234,7 @@ class GCNSpatialBlock(PyTorchModule):
         x0 = x
         g = []
         gcn_list = []
+        fm_list = []
         for i in range(self.num_blocks):
             x1 = x
 
@@ -1241,16 +1251,18 @@ class GCNSpatialBlock(PyTorchModule):
                         g.append(getattr(self, f'gcn_g{i+1}')(x1))
 
             r = getattr(self, f'gcn_res{i+1}')(x)
-            x = getattr(self, f'gcn{i+1}')(x1, g[-1]) + r
+            z, z_dict = getattr(self, f'gcn{i+1}')(x1, g[-1])
+            x = z + r
 
             if hasattr(self, f'gcn_ffn{i+1}'):
                 x = getattr(self, f'gcn_ffn{i+1}')(x)
 
+            fm_list.append(z_dict)
             gcn_list.append(x)
 
         x += self.res(x0)
 
-        return x, g, gcn_list
+        return x, g, gcn_list, fm_list
         # if self.return_gcn_list and self.return_g:
         #     return x, g, gcn_list
         # elif self.return_gcn_list:
