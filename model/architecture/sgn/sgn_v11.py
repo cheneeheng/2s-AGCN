@@ -1079,7 +1079,10 @@ class GCNSpatialG(Module):
                 self.g2 = Conv(self.in_channels, self.out_channels,
                                bias=self.bias, kernel_size=self.kernel_size,
                                padding=self.padding)
-            self.act = self.activation(dim=-1)
+            try:
+                self.act = self.activation(dim=-1)
+            except TypeError:
+                self.act = self.activation()
             self.alpha = nn.Parameter(torch.zeros(1))
 
     def forward(self, x: Tensor, g: Optional[Tensor] = None) -> Tensor:
@@ -1155,8 +1158,12 @@ class GCNSpatialUnit(Module):
         self.act = self.activation()
         self.drop = nn.Identity() if self.dropout is None else self.dropout()
 
-    def forward(self, x: Tensor, g: Optional[Tensor] = None) -> Tensor:
+    def forward(self,
+                x: Tensor,
+                g: Optional[Tensor] = None,
+                y: Optional[Tensor] = None) -> Tensor:
         x0 = self.w0(x)
+        # Original
         if self.attn_mode == 0:
             x1 = x0.permute(0, 3, 2, 1).contiguous()  # n,t,v,c
             x2 = g.matmul(x1)
@@ -1164,6 +1171,15 @@ class GCNSpatialUnit(Module):
             x4 = self.w1(x3)
             x5 = self.w2(x)
             x6 = x4 + x5  # z + residual
+        # Original, with y
+        elif self.attn_mode == 10:
+            x1 = x0.permute(0, 3, 2, 1).contiguous()  # n,t,v,c
+            x2 = g.matmul(x1)
+            x3 = x2.permute(0, 3, 2, 1).contiguous()  # n,c,v,t
+            x4 = self.w1(x3)
+            x5 = self.w2(y)
+            x6 = x4 + x5  # z + residual
+        # 2 linear projections, no G
         elif self.attn_mode == 1:
             x1 = None
             x2 = None
@@ -1171,6 +1187,7 @@ class GCNSpatialUnit(Module):
             x4 = self.w1(x3)
             x5 = self.w2(x)
             x6 = x4 + x5  # z + residual
+        # SE instead of G
         elif self.attn_mode == 2:
             N, _, V, T = x0.shape
             # x1 = nn.AdaptiveAvgPool2d((1, T))  # n,c,1,t
@@ -1180,6 +1197,7 @@ class GCNSpatialUnit(Module):
             x4 = self.s(x3).expand((N, -1, V, T))
             x5 = self.w2(x)
             x6 = x4 + x5  # z + residual
+        # 1 linear projection.
         elif self.attn_mode == 3:
             x1 = None
             x2 = None
@@ -1213,12 +1231,8 @@ class GCNSpatialBlock(PyTorchModule):
                  g_proj_shared: bool = False,
                  g_activation: T1 = nn.Softmax,
                  g_weighted: int = 0,
-                 #  return_g: bool = True,
-                 #  return_gcn_list: bool = False,
                  ):
         super(GCNSpatialBlock, self).__init__()
-        # self.return_g = return_g
-        # self.return_gcn_list = return_gcn_list
 
         self.num_blocks = len(gcn_dims) - 1
         self.g_shared = isinstance(g_proj_dim, int)
@@ -1308,7 +1322,7 @@ class GCNSpatialBlock(PyTorchModule):
                         g.append(getattr(self, f'gcn_g{i+1}')(x1))
 
             r = getattr(self, f'gcn_res{i+1}')(x)
-            z, z_dict = getattr(self, f'gcn{i+1}')(x1, g[-1])
+            z, z_dict = getattr(self, f'gcn{i+1}')(x1, g[-1], x0)
             x = z + r
 
             if hasattr(self, f'gcn_ffn{i+1}'):
@@ -1320,14 +1334,6 @@ class GCNSpatialBlock(PyTorchModule):
         x += self.res(x0)
 
         return x, g, gcn_list, fm_list
-        # if self.return_gcn_list and self.return_g:
-        #     return x, g, gcn_list
-        # elif self.return_gcn_list:
-        #     return x, gcn_list
-        # elif self.return_g:
-        #     return x, g
-        # else:
-        #     return x
 
 
 class MHATemporal(PyTorchModule):
@@ -1566,7 +1572,7 @@ if __name__ == '__main__':
         # sgcn_prenorm=False,
         # # sgcn_ffn=0,
         # sgcn_v_kernel=0,
-        sgcn_attn_mode=2,
+        sgcn_attn_mode=0,
         sgcn_g_kernel=1,
         # sgcn_g_proj_dim=256,  # c3
         # sgcn_g_proj_shared=False,
@@ -1579,21 +1585,21 @@ if __name__ == '__main__':
         # # bifpn_layers=1,
         # spatial_maxpool=1,
         # temporal_maxpool=1,
-        # aspp_rates=None,
+        # aspp_rates=None, 345402520
         # t_mode=3,
         # # t_maxpool_kwargs=None,
-        t_mha_kwargs={
-            'd_model': [256, 512],
-            'nhead': [1, 1],
-            'd_head': [256*2, 512*2],
-            'dim_feedforward': [256, 512],
-            'dim_feedforward_output': [512, 1024],
-            'dropout': 0.1,
-            'activation': "relu",
-            'num_layers': 2,
-            'norm': 'ln',
-            'global_norm': False
-        },
+        # t_mha_kwargs={
+        #     'd_model': [256, 512],
+        #     'nhead': [1, 1],
+        #     'd_head': [256*2, 512*2],
+        #     'dim_feedforward': [256, 512],
+        #     'dim_feedforward_output': [512, 1024],
+        #     'dropout': 0.1,
+        #     'activation': "relu",
+        #     'num_layers': 2,
+        #     'norm': 'ln',
+        #     'global_norm': False
+        # },
         # multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7]],
         # multi_t_shared=2,
     )

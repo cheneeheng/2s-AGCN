@@ -309,6 +309,14 @@ sgn_v11:
 
         - 220810140001_sgnori_nogcnres:
                   - 92.48%
+        - 220810140001_sgnori_128bs:
+                  - 94.83%
+        - 220810140001_sgnori_sgcnattn1:
+                  - 93.34%
+        - 220810140001_sgnori_sgcnattn2:
+                  - 94.20%
+        - 220810140001_sgnori_sgcnattn3:
+                  - 93.64%
 
 sgn_v12:
         - this has the infogcn MMD-based loss
