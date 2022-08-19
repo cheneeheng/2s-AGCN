@@ -82,8 +82,9 @@ class Residual(Module):
                                        dilation=dilation,
                                        bias=bias)
         self.mode = mode
+        self.zero = torch.zeros(1)
         if mode == 0:
-            self.residual = null_fn
+            self.residual = lambda x: self.zero
         elif mode == 1:
             if self.in_channels == self.out_channels:
                 self.residual = torch.nn.Identity()
