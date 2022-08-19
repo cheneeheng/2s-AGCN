@@ -47,7 +47,7 @@ T1 = Type[PyTorchModule]
 T2 = List[Optional[Type[PyTorchModule]]]
 T3 = Union[List[int], int]
 
-EMB_MODES = [1, 2, 3, 4, 5, 6, 7, 8]
+EMB_MODES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 11, 12]
 
 # GCN-FPN ---
 # -1 no fpn
@@ -108,7 +108,7 @@ class SGN(PyTorchModule):
 
     # CONSTANTS
     ffn_mode = [0, 1, 2, 3, 101, 102, 103, 104, 201, 202]
-    emb_modes = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+    emb_modes = EMB_MODES  # [0, 1, 2, 3, 4, 5, 6, 7, 8]
     c1, c2, c3, c4 = c1, c2, c3, c4
     # g_activation_fn = nn.Identity
     g_activation_fn = nn.Softmax
@@ -247,6 +247,7 @@ class SGN(PyTorchModule):
                 normalization=self.normalization_fn,
                 in_norm=self.normalization_fn_1d,
                 num_point=self.num_point,
+                mode=self.input_position,
             ),
             in_vel_emb_kwargs=dict(
                 in_channels=self.in_channels,
@@ -257,6 +258,7 @@ class SGN(PyTorchModule):
                 normalization=self.normalization_fn,
                 in_norm=self.normalization_fn_1d,
                 num_point=self.num_point,
+                mode=self.input_velocity,
             )
         )
 
@@ -641,7 +643,7 @@ class SGN(PyTorchModule):
             y (Tensor): logits.
             g (Tensor): Attention matrix for GCN.
         """
-        assert x.shape[-1] % 3 == 0, "Only support input of xyz only."
+        assert x.shape[-1] % self.in_channels == 0, "input channel mismatch..."
 
         # Dynamic Representation -----------------------------------------------
         x = self.feature_extractor(x)
@@ -860,26 +862,42 @@ class Embedding(Module):
             if self.mode == 1:
                 ch_list = [self.in_channels,
                            self.out_channels, self.out_channels]
+                k_list = [1, 1]
                 residual = 0
             elif self.mode == 2:
                 ch_list = [self.in_channels,
                            self.out_channels, self.out_channels]
+                k_list = [1, 1]
                 residual = 1
             elif self.mode == 3:
                 ch_list = [self.in_channels,
                            self.out_channels, self.out_channels,
                            self.out_channels]
+                k_list = [1, 1, 1]
                 residual = 0
             elif self.mode == 4:
                 ch_list = [self.in_channels,
                            self.out_channels, self.out_channels,
                            self.out_channels, self.out_channels]
+                k_list = [1, 1, 1, 1]
+                residual = 0
+            elif self.mode == 11:
+                ch_list = [self.in_channels,
+                           self.out_channels, self.out_channels]
+                k_list = [1, 3]
+                residual = 0
+            elif self.mode == 12:
+                ch_list = [self.in_channels,
+                           self.out_channels, self.out_channels]
+                k_list = [3, 3]
                 residual = 0
 
             self.num_layers = len(ch_list) - 1
             for i in range(self.num_layers):
                 setattr(self, f'cnn{i+1}', Conv(ch_list[i],
                                                 ch_list[i+1],
+                                                kernel_size=k_list[i],
+                                                padding=k_list[i]//2,
                                                 bias=self.bias,
                                                 activation=self.activation))
             for i in range(self.num_layers):
