@@ -643,7 +643,16 @@ class SGN(PyTorchModule):
             y (Tensor): logits.
             g (Tensor): Attention matrix for GCN.
         """
-        assert x.shape[-1] % self.in_channels == 0, "input channel mismatch..."
+        bs, step, dim = x.shape
+        x = x.view((bs, step, self.num_point, dim//self.num_point))  # n,t,v,c
+        x = x.permute(0, 3, 2, 1).contiguous()  # n,c,v,t
+
+        if x.shape[1] < self.in_channels:
+            raise ValueError("tensor x has lower ch dim than self.in_channels")
+        elif x.shape[-1] > self.in_channels:
+            # print("tensor x has more ch dim than self.in_channels")
+            # bs, step, dim = x.shape
+            x = x[:, :self.in_channels, :, :]
 
         # Dynamic Representation -----------------------------------------------
         x = self.feature_extractor(x)
@@ -943,10 +952,7 @@ class FeatureExtractor(PyTorchModule):
             raise ValueError("Input args are faulty...")
 
     def forward(self, x: Tensor) -> Optional[Tensor]:
-        bs, step, dim = x.shape
-        num_point = dim // 3
-        x1 = x.view((bs, step, num_point, 3))  # n,t,v,c
-        x = x1.permute(0, 3, 2, 1).contiguous()  # n,c,v,t
+        # x : n,c,v,t
         dif = x[:, :, :, 1:] - x[:, :, :, 0:-1]  # n,c,v,t-1
         dif = pad_zeros(dif)
         if self.in_pos > 0 and self.in_vel > 0:
@@ -1557,7 +1563,7 @@ if __name__ == '__main__':
 
     batch_size = 1
 
-    inputs = torch.ones(batch_size, 20, 75)
+    inputs = torch.ones(batch_size, 20, 100)
     # subjects = torch.ones(batch_size, 40, 1)
 
     model = SGN(

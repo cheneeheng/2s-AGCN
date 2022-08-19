@@ -114,8 +114,13 @@ def get_parser() -> argparse.ArgumentParser:
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v11/220520150001_rerun_orisgn'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v11/220804140001_sgnori_smpemb'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v11/220810140001_sgnori_nogcnres'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v11/220810140001_sgnori_sgcnattn1'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v11/220810140001_sgnori_sgcnattn2'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v11/220810140001_sgnori_sgcnattn3'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v11/220812150001_sgnori_sgcnattn10'  # noqa
+        default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v11/220816140001_sgnori_inpos11_invel11'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v11/220804140001_sgnori_tmode3'  # noqa
-        default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v11/220809140001_sgnori_tmode3_1layer'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v11/220809140001_sgnori_tmode3_1layer'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v12/220714183001_bs128_sgd_lr1e1_steps90110'  # noqa
     )
     parser.add_argument(
@@ -239,13 +244,13 @@ if __name__ == '__main__':
     with open('/code/2s-AGCN/data/data/ntu_sgn/processed_data/NTU_CV_test_label_180.pkl', 'rb') as f:  # noqa
         data2 = pickle.load(f)
 
-    fig1, axes1 = plt.subplots(5, 1)
+    fig1, axes1 = plt.subplots(5, 1, figsize=(10, 7))
     fig1.tight_layout()
-    fig2, axes2 = plt.subplots(5, 1)
+    fig2, axes2 = plt.subplots(5, 1, figsize=(7, 7))
     fig2.tight_layout()
-    fig3, axes3 = plt.subplots(5, 1)
+    fig3, axes3 = plt.subplots(5, 1, figsize=(3, 7))
     fig3.tight_layout()
-    fig4, axes4 = plt.subplots(5, 18)
+    fig4, axes4 = plt.subplots(5, 18, figsize=(20, 10))
     fig4.tight_layout()
 
     freq = 2
@@ -331,24 +336,25 @@ if __name__ == '__main__':
         def vmin_vmax_sgcn_fm(j):
             # input x
             b1 = np.linalg.norm(featuremap_spa_list[j]['x'], axis=1)
+            vmin, vmax = b1.min(), b1.max()
             # G
             b2 = np.linalg.norm(g_spa[0], axis=1)  # in T dimension
+            vmin, vmax = min(vmin, b2.min()), max(vmax, b2.max())
             # G @ x
-            b3 = np.linalg.norm(featuremap_spa_list[j]['x3'], axis=1)
+            if featuremap_spa_list[j]['x3'] is not None:
+                b3 = np.linalg.norm(featuremap_spa_list[j]['x3'], axis=1)
+                vmin, vmax = min(vmin, b3.min()), max(vmax, b3.max())
             # W1 * (G @ x)
-            b4 = np.linalg.norm(featuremap_spa_list[j]['x4'], axis=1)
+            if featuremap_spa_list[j]['x4'] is not None:
+                b4 = np.linalg.norm(featuremap_spa_list[j]['x4'], axis=1)
+                vmin, vmax = min(vmin, b4.min()), max(vmax, b4.max())
             # W2 * x
             if isinstance(featuremap_spa_list[j]['x5'], torch.Tensor):
                 b5 = np.linalg.norm(featuremap_spa_list[j]['x5'], axis=1)
+                vmin, vmax = min(vmin, b5.min()), max(vmax, b5.max())
             # output x
             b6 = np.linalg.norm(featuremap_spa_list[j]['x9'], axis=1)
-
-            if isinstance(featuremap_spa_list[j]['x5'], torch.Tensor):
-                vmin = min([b1.min(), b3.min(), b4.min(), b5.min(), b6.min()])  # noqa
-                vmax = max([b1.max(), b3.max(), b4.max(), b5.max(), b6.max()])  # noqa
-            else:
-                vmin = min([b1.min(), b3.min(), b4.min(), b6.min()])
-                vmax = max([b1.max(), b3.max(), b4.max(), b6.max()])
+            vmin, vmax = min(vmin, b6.min()), max(vmax, b6.max())
 
             return vmin, vmax
 
@@ -364,9 +370,11 @@ if __name__ == '__main__':
             # G
             b2 = np.linalg.norm(g_spa[0], axis=1)  # in T dimension
             # G @ x
-            b3 = np.linalg.norm(featuremap_spa_list[j]['x3'], axis=1)
+            if featuremap_spa_list[j]['x3'] is not None:
+                b3 = np.linalg.norm(featuremap_spa_list[j]['x3'], axis=1)
             # W1 * (G @ x)
-            b4 = np.linalg.norm(featuremap_spa_list[j]['x4'], axis=1)
+            if featuremap_spa_list[j]['x4'] is not None:
+                b4 = np.linalg.norm(featuremap_spa_list[j]['x4'], axis=1)
             # W2 * x
             if isinstance(featuremap_spa_list[j]['x5'], torch.Tensor):
                 b5 = np.linalg.norm(featuremap_spa_list[j]['x5'], axis=1)
@@ -377,10 +385,12 @@ if __name__ == '__main__':
                 ax[i, j*6+0].imshow(b1[i], vmin=vmin, vmax=vmax)
             for i in range(5):
                 ax[i, j*6+1].imshow(b2[i])
-            for i in range(5):
-                ax[i, j*6+2].imshow(b3[i], vmin=vmin, vmax=vmax)
-            for i in range(5):
-                ax[i, j*6+3].imshow(b4[i], vmin=vmin, vmax=vmax)
+            if featuremap_spa_list[j]['x3'] is not None:
+                for i in range(5):
+                    ax[i, j*6+2].imshow(b3[i], vmin=vmin, vmax=vmax)
+            if featuremap_spa_list[j]['x4'] is not None:
+                for i in range(5):
+                    ax[i, j*6+3].imshow(b4[i], vmin=vmin, vmax=vmax)
             # W2 * x
             if isinstance(featuremap_spa_list[j]['x5'], torch.Tensor):
                 for i in range(5):
@@ -391,6 +401,13 @@ if __name__ == '__main__':
         plot_sgcn_fm(0, axes4)
         plot_sgcn_fm(1, axes4)
         plot_sgcn_fm(2, axes4)
+        for i in range(3):
+            axes4[0, 6*i+0].set_title("x")
+            axes4[0, 6*i+1].set_title("g")
+            axes4[0, 6*i+2].set_title("g @ x")
+            axes4[0, 6*i+3].set_title("g @ x @ W1")
+            axes4[0, 6*i+4].set_title("x @ W2")
+            axes4[0, 6*i+5].set_title("x out")
 
         plt.show(block=False)
 
@@ -400,7 +417,5 @@ if __name__ == '__main__':
         # fig2.savefig(f"{out_dir}/{data2[c]:03d}_fig2")  # noqa
         # fig3.savefig(f"{out_dir}/{data2[c]:03d}_fig3")  # noqa
         # fig4.savefig(f"{out_dir}/{data2[c]:03d}_fig4")  # noqa
-        # fig5.savefig(f"{out_dir}/{data2[c]:03d}_fig5")  # noqa
-        # fig6.savefig(f"{out_dir}/{data2[c]:03d}_fig6")  # noqa
 
         c += 1
