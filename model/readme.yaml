@@ -326,9 +326,14 @@ sgn_v11:
                   - 92.08%
 
         - 220816140001_sgnori_inpos12_invel12:
+                  - emb layers use 3, 3 kernels
                   - 94.22%
         - 220816140001_sgnori_inpos11_invel11:
+                  - emb layers use 1, 3 kernels
                   - 94.46%
+
+        - 220819140001_sgnori_inch2:
+                  - 90.41%
 
 sgn_v12:
         - this has the infogcn MMD-based loss

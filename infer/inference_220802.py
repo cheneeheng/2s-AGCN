@@ -111,14 +111,15 @@ def get_parser() -> argparse.ArgumentParser:
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v11/220520150001_gcnfpn0_multit333_pregcntemsem'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v11/220601220001_gcnfpn7_multit357357357shared'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v11/220601220001_gcnfpn7_multit357'  # noqa
-        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v11/220520150001_rerun_orisgn'  # noqa
+        default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v11/220520150001_rerun_orisgn'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v11/220804140001_sgnori_smpemb'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v11/220810140001_sgnori_nogcnres'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v11/220810140001_sgnori_sgcnattn1'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v11/220810140001_sgnori_sgcnattn2'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v11/220810140001_sgnori_sgcnattn3'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v11/220812150001_sgnori_sgcnattn10'  # noqa
-        default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v11/220816140001_sgnori_inpos11_invel11'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v11/220816140001_sgnori_inpos11_invel11'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v11/220819140001_sgnori_inch2'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v11/220804140001_sgnori_tmode3'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v11/220809140001_sgnori_tmode3_1layer'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v12/220714183001_bs128_sgd_lr1e1_steps90110'  # noqa
