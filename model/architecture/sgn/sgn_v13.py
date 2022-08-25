@@ -1283,7 +1283,8 @@ class GCNSpatialUnit(Module):
                  normalization: T1 = nn.BatchNorm2d,
                  prenorm: bool = False,
                  v_kernel_size: int = 0,
-                 attn_mode: int = 0
+                 attn_mode: int = 0,
+                 res_alpha: float = 1.0
                  ):
         super(GCNSpatialUnit, self).__init__(in_channels,
                                              out_channels,
@@ -1294,6 +1295,7 @@ class GCNSpatialUnit(Module):
                                              activation=activation,
                                              normalization=normalization,
                                              prenorm=prenorm)
+        self.res_alpha = res_alpha
         self.attn_mode = attn_mode
 
         if v_kernel_size > 0:
@@ -1342,7 +1344,7 @@ class GCNSpatialUnit(Module):
             x2 = g.matmul(x1)
             x3 = x2.permute(0, 3, 2, 1).contiguous()  # n,c,v,t
             x4 = self.w1(x3)
-            x5 = self.w2(x)
+            x5 = self.w2(x) * self.res_alpha
             x6 = x4 + x5  # z + residual
         # Original, with y
         elif self.attn_mode == 10:
@@ -1350,7 +1352,7 @@ class GCNSpatialUnit(Module):
             x2 = g.matmul(x1)
             x3 = x2.permute(0, 3, 2, 1).contiguous()  # n,c,v,t
             x4 = self.w1(x3)
-            x5 = self.w2(y)
+            x5 = self.w2(y) * self.res_alpha
             x6 = x4 + x5  # z + residual
         # 2 linear projections, no G
         elif self.attn_mode == 1:
@@ -1358,7 +1360,7 @@ class GCNSpatialUnit(Module):
             x2 = None
             x3 = x0
             x4 = self.w1(x3)
-            x5 = self.w2(x)
+            x5 = self.w2(x) * self.res_alpha
             x6 = x4 + x5  # z + residual
         # SE instead of G
         elif self.attn_mode == 2:
@@ -1368,7 +1370,7 @@ class GCNSpatialUnit(Module):
             x2 = self.w3(x1)
             x3 = self.w1(x2)
             x4 = self.s(x3).expand((N, -1, V, T))
-            x5 = self.w2(x)
+            x5 = self.w2(x) * self.res_alpha
             x6 = x4 + x5  # z + residual
         # 1 linear projection.
         elif self.attn_mode == 3:
@@ -1406,12 +1408,10 @@ class GCNSpatialBlock(PyTorchModule):
                  g_weighted: int = 0,
                  g_num_segment: int = 20,
                  g_num_joint: int = 25,
-                 g_res_alpha: float = 1,
+                 g_res_alpha: float = 1.0,
                  gt_mode: int = 1
                  ):
         super(GCNSpatialBlock, self).__init__()
-
-        self.g_res_alpha = g_res_alpha
 
         if gt_mode == 1:
             gcn_spa_gt_cls = GCNSpatialGT
@@ -1461,7 +1461,8 @@ class GCNSpatialBlock(PyTorchModule):
                                    normalization=normalization,
                                    prenorm=gcn_prenorm,
                                    v_kernel_size=gcn_v_kernel,
-                                   attn_mode=gcn_attn_mode))
+                                   attn_mode=gcn_attn_mode,
+                                   res_alpha=g_res_alpha))
 
         if gcn_prenorm:
             for i in range(self.num_blocks):
@@ -1511,7 +1512,7 @@ class GCNSpatialBlock(PyTorchModule):
                     else:
                         g.append(getattr(self, f'gcn_g{i+1}')(x1))
 
-            r = getattr(self, f'gcn_res{i+1}')(x) * self.g_res_alpha
+            r = getattr(self, f'gcn_res{i+1}')(x)
             z, z_dict = getattr(self, f'gcn{i+1}')(x1, g[-1][0], x0)
             x = z + r
 
@@ -1753,6 +1754,7 @@ if __name__ == '__main__':
         semantic_joint_fusion=0,
         semantic_frame_fusion=1,
         semantic_frame_location=0,
+        sgcn_g_res_alpha=10,
         sgcn_gt_mode=2,
         # sgcn_dims=[256, 256, 256],  # [c2, c3, c3],
         sgcn_kernel=1,  # residual connection in GCN
