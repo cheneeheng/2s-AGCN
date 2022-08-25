@@ -11,6 +11,8 @@
 # FREEZE 220704
 # UNFREEZE 220801
 
+from re import A
+from shutil import get_unpack_formats
 import torch
 from torch import nn
 from torch import Tensor
@@ -155,6 +157,9 @@ class SGN(PyTorchModule):
                  sgcn_g_proj_shared: bool = False,
                  sgcn_g_weighted: int = 0,
                  sgcn_g_res_alpha: float = 1.0,
+                 # 1: matmul
+                 # 2: pointwise mul
+                 sgcn_gt_mode: int = 1,
                  # 0: mat mul
                  # 1: w1,w2 linear proj
                  # 2: squeeze excite
@@ -313,7 +318,9 @@ class SGN(PyTorchModule):
             g_activation=self.g_activation_fn,
             g_weighted=sgcn_g_weighted,
             g_num_segment=self.num_segment,
-            g_res_alpha=sgcn_g_res_alpha
+            g_num_joint=self.num_point,
+            g_res_alpha=sgcn_g_res_alpha,
+            gt_mode=sgcn_gt_mode
         )
 
         # GCN FPN --------------------------------------------------------------
@@ -1136,6 +1143,7 @@ class GCNSpatialGT(Module):
                  activation: T1 = nn.Softmax,
                  g_proj_shared: bool = False,
                  num_segment: int = 20,
+                 num_joint: int = 25,
                  ):
         super(GCNSpatialGT, self).__init__(in_channels,
                                            out_channels,
@@ -1145,6 +1153,7 @@ class GCNSpatialGT(Module):
                                            activation=activation)
         if self.kernel_size == 0:
             self.return_none = True
+
         else:
             self.return_none = False
             self.g1 = Conv(self.in_channels, self.out_channels, bias=self.bias,
@@ -1199,6 +1208,67 @@ class GCNSpatialGT(Module):
                 g12 = (g * self.alpha + g12) / (self.alpha + 1)
 
             return g12, g34
+
+
+class GCNSpatialGT2(Module):
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 kernel_size: int = 1,
+                 padding: int = 0,
+                 bias: int = 0,
+                 activation: T1 = nn.Softmax,
+                 g_proj_shared: bool = False,
+                 num_segment: int = 20,
+                 num_joint: int = 25,
+                 ):
+        super(GCNSpatialGT2, self).__init__(in_channels,
+                                            out_channels,
+                                            kernel_size=kernel_size,
+                                            padding=padding,
+                                            bias=bias,
+                                            activation=activation)
+        if self.kernel_size == 0:
+            self.return_none = True
+
+        else:
+            self.return_none = False
+            self.g1 = Conv(self.in_channels, self.out_channels, bias=self.bias,
+                           kernel_size=self.kernel_size, padding=self.padding)
+            if g_proj_shared:
+                self.g2 = self.g1
+            else:
+                self.g2 = Conv(self.in_channels, self.out_channels,
+                               bias=self.bias, kernel_size=self.kernel_size,
+                               padding=self.padding)
+            self.g3 = nn.Linear(self.in_channels*num_joint, 1, bias=self.bias)
+            try:
+                self.act = self.activation(dim=-1)
+            except TypeError:
+                self.act = self.activation()
+            self.alpha = nn.Parameter(torch.zeros(1))
+
+    def forward(self, x: Tensor, g: Optional[Tensor] = None) -> Tensor:
+        if self.return_none:
+            return None, None
+
+        else:
+            g1 = self.g1(x).permute(0, 3, 2, 1).contiguous()  # n,t,v,c
+            g2 = self.g2(x).permute(0, 3, 1, 2).contiguous()  # n,t,c,v
+            g12 = g1.matmul(g2)  # n,t,v,v
+            g12 = self.act(g12)  # n,t,v,v'
+
+            x3 = rearrange(x, 'n c v t -> n t (c v)')  # n,t,cv
+            g3 = self.g3(x3).squeeze(-1)  # n,t
+            g3 = self.act(g3)  # n,t'
+            g3 = g3.unsquueze(-1).unsquueze(-1)  # n,t',1,1
+
+            g12 = g3*g12
+
+            if g is not None:
+                g12 = (g * self.alpha + g12) / (self.alpha + 1)
+
+            return g12, g3
 
 
 class GCNSpatialUnit(Module):
@@ -1335,34 +1405,45 @@ class GCNSpatialBlock(PyTorchModule):
                  g_activation: T1 = nn.Softmax,
                  g_weighted: int = 0,
                  g_num_segment: int = 20,
-                 g_res_alpha: float = 1
+                 g_num_joint: int = 25,
+                 g_res_alpha: float = 1,
+                 gt_mode: int = 1
                  ):
         super(GCNSpatialBlock, self).__init__()
 
         self.g_res_alpha = g_res_alpha
 
+        if gt_mode == 1:
+            gcn_spa_gt_cls = GCNSpatialGT
+        elif gt_mode == 2:
+            gcn_spa_gt_cls = GCNSpatialGT2
+        else:
+            raise ValueError("Unknown gt_mode")
+
         self.num_blocks = len(gcn_dims) - 1
         self.g_shared = isinstance(g_proj_dim, int)
         if self.g_shared:
-            self.gcn_g1 = GCNSpatialGT(gcn_dims[0],
-                                       g_proj_dim,
+            self.gcn_g1 = gcn_spa_gt_cls(gcn_dims[0],
+                                         g_proj_dim,
+                                         bias=bias,
+                                         kernel_size=g_kernel,
+                                         padding=g_kernel//2,
+                                         activation=g_activation,
+                                         g_proj_shared=g_proj_shared,
+                                         num_segment=g_num_segment,
+                                         num_joint=g_num_joint)
+        else:
+            for i in range(self.num_blocks):
+                setattr(self, f'gcn_g{i+1}',
+                        gcn_spa_gt_cls(gcn_dims[i],
+                                       g_proj_dim[i],
                                        bias=bias,
                                        kernel_size=g_kernel,
                                        padding=g_kernel//2,
                                        activation=g_activation,
                                        g_proj_shared=g_proj_shared,
-                                       num_segment=g_num_segment)
-        else:
-            for i in range(self.num_blocks):
-                setattr(self, f'gcn_g{i+1}',
-                        GCNSpatialGT(gcn_dims[i],
-                                     g_proj_dim[i],
-                                     bias=bias,
-                                     kernel_size=g_kernel,
-                                     padding=g_kernel//2,
-                                     activation=g_activation,
-                                     g_proj_shared=g_proj_shared,
-                                     num_segment=g_num_segment))
+                                       num_segment=g_num_segment,
+                                       num_joint=g_num_joint))
 
         if g_weighted == 1:
             assert not self.g_shared
