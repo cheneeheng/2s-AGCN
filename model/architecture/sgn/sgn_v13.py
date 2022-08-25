@@ -154,6 +154,7 @@ class SGN(PyTorchModule):
                  sgcn_g_proj_dim: Optional[T3] = None,  # c3
                  sgcn_g_proj_shared: bool = False,
                  sgcn_g_weighted: int = 0,
+                 sgcn_g_res_alpha: float = 1.0,
                  # 0: mat mul
                  # 1: w1,w2 linear proj
                  # 2: squeeze excite
@@ -311,7 +312,8 @@ class SGN(PyTorchModule):
             g_proj_shared=sgcn_g_proj_shared,
             g_activation=self.g_activation_fn,
             g_weighted=sgcn_g_weighted,
-            g_num_segment=self.num_segment
+            g_num_segment=self.num_segment,
+            g_res_alpha=sgcn_g_res_alpha
         )
 
         # GCN FPN --------------------------------------------------------------
@@ -1169,36 +1171,34 @@ class GCNSpatialGT(Module):
 
     def forward(self, x: Tensor, g: Optional[Tensor] = None) -> Tensor:
         if self.return_none:
-            return None
+            return None, None
 
         else:
             _, _, v, _ = x.shape
 
             g1 = self.g1(x).permute(0, 3, 2, 1).contiguous()  # n,t,v,c
             g2 = self.g2(x).permute(0, 3, 1, 2).contiguous()  # n,t,c,v
+            g12 = g1.matmul(g2)  # n,t,v,v
 
             g3 = self.g3(x)  # n,c,v,t
             g4 = self.g4(x)  # n,c,v,t
             g3p = self.g3p(g3)  # n,c,1,t
             g4p = self.g4p(g4)  # n,c,1,t
 
-            g3p = rearrange(g3p, 'n c v t -> n t (c v)')
-            g4p = rearrange(g4p, 'n c v t -> n (c v) t')
+            g3p = rearrange(g3p, 'n c v t -> n t (c v)')  # n,t,c
+            g4p = rearrange(g4p, 'n c v t -> n (c v) t')  # n,c,t
             g34 = einsum('n i d, n d j -> n i j', g3p, g4p)  # n,t,t
             g34 = self.act(g34)  # n,t,t'
 
-            g12 = g1.matmul(g2)  # n,t,v,v
             g12 = rearrange(g12, 'n t i j -> n t (i j)')  # n,t,vv
-
             g12 = g34.matmul(g12)  # n,t,vv
             g12 = rearrange(g12, 'n t (i j) -> n t i j', i=v)  # n,t,v,v
-
             g12 = self.act(g12)  # n,t,v,v'
 
             if g is not None:
                 g12 = (g * self.alpha + g12) / (self.alpha + 1)
 
-            return g12
+            return g12, g34
 
 
 class GCNSpatialUnit(Module):
@@ -1334,9 +1334,12 @@ class GCNSpatialBlock(PyTorchModule):
                  g_proj_shared: bool = False,
                  g_activation: T1 = nn.Softmax,
                  g_weighted: int = 0,
-                 g_num_segment: int = 20
+                 g_num_segment: int = 20,
+                 g_res_alpha: float = 1
                  ):
         super(GCNSpatialBlock, self).__init__()
+
+        self.g_res_alpha = g_res_alpha
 
         self.num_blocks = len(gcn_dims) - 1
         self.g_shared = isinstance(g_proj_dim, int)
@@ -1427,8 +1430,8 @@ class GCNSpatialBlock(PyTorchModule):
                     else:
                         g.append(getattr(self, f'gcn_g{i+1}')(x1))
 
-            r = getattr(self, f'gcn_res{i+1}')(x)
-            z, z_dict = getattr(self, f'gcn{i+1}')(x1, g[-1], x0)
+            r = getattr(self, f'gcn_res{i+1}')(x) * self.g_res_alpha
+            z, z_dict = getattr(self, f'gcn{i+1}')(x1, g[-1][0], x0)
             x = z + r
 
             if hasattr(self, f'gcn_ffn{i+1}'):
