@@ -1261,7 +1261,7 @@ class GCNSpatialGT2(Module):
             x3 = rearrange(x, 'n c v t -> n t (c v)')  # n,t,cv
             g3 = self.g3(x3).squeeze(-1)  # n,t
             g3 = self.act(g3)  # n,t'
-            g3 = g3.unsquueze(-1).unsquueze(-1)  # n,t',1,1
+            g3 = g3.unsqueeze(-1).unsqueeze(-1)  # n,t',1,1
 
             g12 = g3*g12
 
@@ -1753,6 +1753,7 @@ if __name__ == '__main__':
         semantic_joint_fusion=0,
         semantic_frame_fusion=1,
         semantic_frame_location=0,
+        sgcn_gt_mode=2,
         # sgcn_dims=[256, 256, 256],  # [c2, c3, c3],
         sgcn_kernel=1,  # residual connection in GCN
         # sgcn_padding=0,  # residual connection in GCN
