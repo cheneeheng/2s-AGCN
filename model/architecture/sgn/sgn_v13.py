@@ -157,9 +157,15 @@ class SGN(PyTorchModule):
                  sgcn_g_proj_shared: bool = False,
                  sgcn_g_weighted: int = 0,
                  sgcn_g_res_alpha: float = 1.0,
+
                  # 1: matmul
-                 # 2: pointwise mul
+                 # 2: pointwise mul post G-softmax
                  sgcn_gt_mode: int = 1,
+
+                 # 1: softmax
+                 # 2: sigmoid
+                 sgcn_gt_act: int = 1,
+
                  # 0: mat mul
                  # 1: w1,w2 linear proj
                  # 2: squeeze excite
@@ -320,7 +326,8 @@ class SGN(PyTorchModule):
             g_num_segment=self.num_segment,
             g_num_joint=self.num_point,
             g_res_alpha=sgcn_g_res_alpha,
-            gt_mode=sgcn_gt_mode
+            gt_mode=sgcn_gt_mode,
+            gt_act=sgcn_gt_act
         )
 
         # GCN FPN --------------------------------------------------------------
@@ -1142,6 +1149,7 @@ class GCNSpatialGT(Module):
                  bias: int = 0,
                  activation: T1 = nn.Softmax,
                  g_proj_shared: bool = False,
+                 gt_activation: int = 1,
                  num_segment: int = 20,
                  num_joint: int = 25,
                  ):
@@ -1173,9 +1181,13 @@ class GCNSpatialGT(Module):
             self.g3p = nn.AdaptiveMaxPool2d((1, num_segment))
             self.g4p = nn.AdaptiveMaxPool2d((1, num_segment))
             try:
-                self.act = self.activation(dim=-1)
+                self.act1 = self.activation(dim=-1)
             except TypeError:
-                self.act = self.activation()
+                self.act1 = self.activation()
+            if gt_activation == 1:
+                self.act2 = self.act1
+            elif gt_activation == 2:
+                self.act2 = nn.Sigmoid()
             self.alpha = nn.Parameter(torch.zeros(1))
 
     def forward(self, x: Tensor, g: Optional[Tensor] = None) -> Tensor:
@@ -1197,12 +1209,12 @@ class GCNSpatialGT(Module):
             g3p = rearrange(g3p, 'n c v t -> n t (c v)')  # n,t,c
             g4p = rearrange(g4p, 'n c v t -> n (c v) t')  # n,c,t
             g34 = einsum('n i d, n d j -> n i j', g3p, g4p)  # n,t,t
-            g34 = self.act(g34)  # n,t,t'
+            g34 = self.act1(g34)  # n,t,t'
 
             g12 = rearrange(g12, 'n t i j -> n t (i j)')  # n,t,vv
             g12 = g34.matmul(g12)  # n,t,vv
             g12 = rearrange(g12, 'n t (i j) -> n t i j', i=v)  # n,t,v,v
-            g12 = self.act(g12)  # n,t,v,v'
+            g12 = self.act2(g12)  # n,t,v,v'
 
             if g is not None:
                 g12 = (g * self.alpha + g12) / (self.alpha + 1)
@@ -1219,6 +1231,7 @@ class GCNSpatialGT2(Module):
                  bias: int = 0,
                  activation: T1 = nn.Softmax,
                  g_proj_shared: bool = False,
+                 gt_activation: int = 1,
                  num_segment: int = 20,
                  num_joint: int = 25,
                  ):
@@ -1243,9 +1256,13 @@ class GCNSpatialGT2(Module):
                                padding=self.padding)
             self.g3 = nn.Linear(self.in_channels*num_joint, 1, bias=self.bias)
             try:
-                self.act = self.activation(dim=-1)
+                self.act1 = self.activation(dim=-1)
             except TypeError:
-                self.act = self.activation()
+                self.act1 = self.activation()
+            if gt_activation == 1:
+                self.act2 = self.act1
+            elif gt_activation == 2:
+                self.act2 = nn.Sigmoid()
             self.alpha = nn.Parameter(torch.zeros(1))
 
     def forward(self, x: Tensor, g: Optional[Tensor] = None) -> Tensor:
@@ -1256,11 +1273,11 @@ class GCNSpatialGT2(Module):
             g1 = self.g1(x).permute(0, 3, 2, 1).contiguous()  # n,t,v,c
             g2 = self.g2(x).permute(0, 3, 1, 2).contiguous()  # n,t,c,v
             g12 = g1.matmul(g2)  # n,t,v,v
-            g12 = self.act(g12)  # n,t,v,v'
+            g12 = self.act1(g12)  # n,t,v,v'
 
             x3 = rearrange(x, 'n c v t -> n t (c v)')  # n,t,cv
             g3 = self.g3(x3).squeeze(-1)  # n,t
-            g3 = self.act(g3)  # n,t'
+            g3 = self.act2(g3)  # n,t'
             g3 = g3.unsqueeze(-1).unsqueeze(-1)  # n,t',1,1
 
             g12 = g3*g12
@@ -1295,7 +1312,11 @@ class GCNSpatialUnit(Module):
                                              activation=activation,
                                              normalization=normalization,
                                              prenorm=prenorm)
-        self.res_alpha = res_alpha
+        if res_alpha < 0:
+            self.res_alpha = nn.Parameter(torch.ones(1))
+        else:
+            self.res_alpha = res_alpha
+
         self.attn_mode = attn_mode
 
         if v_kernel_size > 0:
@@ -1409,7 +1430,8 @@ class GCNSpatialBlock(PyTorchModule):
                  g_num_segment: int = 20,
                  g_num_joint: int = 25,
                  g_res_alpha: float = 1.0,
-                 gt_mode: int = 1
+                 gt_mode: int = 1,
+                 gt_act: int = 1
                  ):
         super(GCNSpatialBlock, self).__init__()
 
@@ -1417,6 +1439,8 @@ class GCNSpatialBlock(PyTorchModule):
             gcn_spa_gt_cls = GCNSpatialGT
         elif gt_mode == 2:
             gcn_spa_gt_cls = GCNSpatialGT2
+        # elif gt_mode == 3:
+        #     gcn_spa_gt_cls = GCNSpatialGT3
         else:
             raise ValueError("Unknown gt_mode")
 
@@ -1430,6 +1454,7 @@ class GCNSpatialBlock(PyTorchModule):
                                          padding=g_kernel//2,
                                          activation=g_activation,
                                          g_proj_shared=g_proj_shared,
+                                         gt_activation=gt_act,
                                          num_segment=g_num_segment,
                                          num_joint=g_num_joint)
         else:
@@ -1442,6 +1467,7 @@ class GCNSpatialBlock(PyTorchModule):
                                        padding=g_kernel//2,
                                        activation=g_activation,
                                        g_proj_shared=g_proj_shared,
+                                       gt_activation=gt_act,
                                        num_segment=g_num_segment,
                                        num_joint=g_num_joint))
 
