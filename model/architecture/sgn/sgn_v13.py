@@ -66,7 +66,8 @@ EMB_MODES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 11, 12]
 # 7 proj with 1x3 and sum, similar to 1
 # 8 bifpn 1 layer 64 dim
 # 9 proj with 1x3 and sum, similar to 1, but witk K kernels and summed
-GCN_FPN_MODES = [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+# 10 second sgcn in fpn style
+GCN_FPN_MODES = [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 # how the gcn fpns are merged for fc.
 # 0: no merge + no fpn
@@ -157,20 +158,35 @@ class SGN(PyTorchModule):
                  sgcn_g_proj_shared: bool = False,
                  sgcn_g_weighted: int = 0,
                  sgcn_g_res_alpha: float = 1.0,
-
                  # 1: matmul
                  # 2: pointwise mul post G-softmax
                  sgcn_gt_mode: int = 1,
-
                  # 1: softmax
                  # 2: sigmoid
                  sgcn_gt_act: int = 1,
-
                  # 0: mat mul
                  # 1: w1,w2 linear proj
                  # 2: squeeze excite
                  # 3: only w2
                  sgcn_attn_mode: int = 0,
+
+                 sgcn2_dims: Optional[list] = None,  # [c2, c3, c3],
+                 sgcn2_kernel: int = 1,  # res connection in GCN, 0 = no res
+                 sgcn2_padding: int = 0,  # res connection in GCN
+                 sgcn2_dropout: float = 0.0,  # res connection in GCN
+                 # int for global res, list for individual gcn
+                 sgcn2_residual: T3 = [0, 0, 0],
+                 sgcn2_prenorm: bool = False,
+                 sgcn2_ffn: Optional[float] = None,
+                 sgcn2_v_kernel: int = 0,
+                 sgcn2_g_kernel: int = 1,
+                 sgcn2_g_proj_dim: Optional[T3] = None,  # c3
+                 sgcn2_g_proj_shared: bool = False,
+                 sgcn2_g_weighted: int = 0,
+                 sgcn2_g_res_alpha: float = 1.0,
+                 sgcn2_gt_mode: int = 1,
+                 sgcn2_gt_act: int = 1,
+                 sgcn2_attn_mode: int = 0,
 
                  gcn_fpn: int = -1,
                  gcn_fpn_kernel: Union[int, list] = -1,
@@ -329,6 +345,30 @@ class SGN(PyTorchModule):
             gt_mode=sgcn_gt_mode,
             gt_act=sgcn_gt_act
         )
+        self.sgcn2 = GCNSpatialBlock2(
+            kernel_size=sgcn2_kernel,
+            padding=sgcn2_padding,
+            bias=self.bias,
+            dropout=lambda: nn.Dropout2d(sgcn2_dropout),
+            activation=self.activation_fn,
+            normalization=self.normalization_fn,
+            gcn_dims=[sgcn_dims[-1]] + sgcn2_dims,
+            gcn_residual=sgcn2_residual,
+            gcn_prenorm=sgcn2_prenorm,
+            gcn_v_kernel=sgcn2_v_kernel,
+            gcn_attn_mode=sgcn2_attn_mode,
+            gcn_ffn=sgcn2_ffn,
+            g_kernel=sgcn2_g_kernel,
+            g_proj_dim=sgcn2_g_proj_dim,
+            g_proj_shared=sgcn2_g_proj_shared,
+            g_activation=self.g_activation_fn,
+            g_weighted=sgcn2_g_weighted,
+            g_num_segment=self.num_segment,
+            g_num_joint=self.num_point,
+            g_res_alpha=sgcn2_g_res_alpha,
+            gt_mode=sgcn2_gt_mode,
+            gt_act=sgcn2_gt_act
+        )
 
         # GCN FPN --------------------------------------------------------------
         self.gcn_fpn = gcn_fpn
@@ -352,6 +392,9 @@ class SGN(PyTorchModule):
                 self.gcn_fpn_kernel = 3
 
         if self.gcn_fpn < 0:
+            pass
+
+        elif self.gcn_fpn == 10:
             pass
 
         elif self.gcn_fpn == 0:
@@ -535,6 +578,8 @@ class SGN(PyTorchModule):
                     in_ch = 64
                 elif self.gcn_fpn == 8:
                     in_ch = bifpn_dim
+                elif self.gcn_fpn == 10:
+                    in_ch = sgcn2_dims[i]
                 else:
                     in_ch = sgcn_dims[-1]
 
@@ -731,6 +776,13 @@ class SGN(PyTorchModule):
             assert hasattr(self, 'sgcn')
             assert hasattr(self, 'bifpn')
             x_list = self.bifpn(x_spa_list)
+        elif self.gcn_fpn == 10:
+            _x_list = [x] + x_spa_list[:-1]
+            _x_list.reverse()
+            _, g_spa2, x_spa_list2, featuremap_spa_list2 = \
+                self.sgcn2(x_spa_list[-1], _x_list, g_spa[-1][0])
+            x_list = [None for _ in range(len(x_spa_list2)-1)] + \
+                     [x_spa_list2[-1]]
         else:
             x_list = [None for _ in range(len(x_spa_list)-1)] + \
                      [x_spa_list[-1]]
@@ -833,15 +885,29 @@ class SGN(PyTorchModule):
             y = self.fc_dropout(y)
             y = self.fc(y)
 
-        return (
-            y,
-            {
-                'g_spa': g_spa,
-                'attn_tem_list': attn_tem_list,
-                'x_spa_list': x_spa_list,
-                'featuremap_spa_list': featuremap_spa_list
-            }
-        )
+        if self.gcn_fpn == 10:
+            return (
+                y,
+                {
+                    'attn_tem_list': attn_tem_list,
+                    'g_spa': g_spa,
+                    'x_spa_list': x_spa_list,
+                    'featuremap_spa_list': featuremap_spa_list,
+                    'g_spa2': g_spa2,
+                    'x_spa_list2': x_spa_list2,
+                    'featuremap_spa_list2': featuremap_spa_list2
+                }
+            )
+        else:
+            return (
+                y,
+                {
+                    'g_spa': g_spa,
+                    'attn_tem_list': attn_tem_list,
+                    'x_spa_list': x_spa_list,
+                    'featuremap_spa_list': featuremap_spa_list
+                }
+            )
 
 
 class DataNorm(PyTorchModule):
@@ -1301,7 +1367,8 @@ class GCNSpatialUnit(Module):
                  prenorm: bool = False,
                  v_kernel_size: int = 0,
                  attn_mode: int = 0,
-                 res_alpha: float = 1.0
+                 res_alpha: float = 1.0,
+                 in_channels2: int = 128
                  ):
         super(GCNSpatialUnit, self).__init__(in_channels,
                                              out_channels,
@@ -1333,8 +1400,18 @@ class GCNSpatialUnit(Module):
             self.w1 = Conv(self.in_channels, self.out_channels, bias=self.bias)
 
         if self.kernel_size > 0:
-            self.w2 = Conv(self.in_channels, self.out_channels, bias=self.bias,
-                           kernel_size=self.kernel_size, padding=self.padding)
+            if self.attn_mode == 10:
+                self.w2 = Conv(in_channels2,
+                               self.out_channels,
+                               bias=self.bias,
+                               kernel_size=self.kernel_size,
+                               padding=self.padding)
+            else:
+                self.w2 = Conv(self.in_channels,
+                               self.out_channels,
+                               bias=self.bias,
+                               kernel_size=self.kernel_size,
+                               padding=self.padding)
         else:
             self.w2 = null_fn
 
@@ -1439,8 +1516,6 @@ class GCNSpatialBlock(PyTorchModule):
             gcn_spa_gt_cls = GCNSpatialGT
         elif gt_mode == 2:
             gcn_spa_gt_cls = GCNSpatialGT2
-        # elif gt_mode == 3:
-        #     gcn_spa_gt_cls = GCNSpatialGT3
         else:
             raise ValueError("Unknown gt_mode")
 
@@ -1520,9 +1595,7 @@ class GCNSpatialBlock(PyTorchModule):
 
     def forward(self, x: Tensor) -> Tuple[Tensor, list, list]:
         x0 = x
-        g = []
-        gcn_list = []
-        fm_list = []
+        g, gcn_list, fm_list = [], [], []
         for i in range(self.num_blocks):
             x1 = x
 
@@ -1541,6 +1614,163 @@ class GCNSpatialBlock(PyTorchModule):
             r = getattr(self, f'gcn_res{i+1}')(x)
             z, z_dict = getattr(self, f'gcn{i+1}')(x1, g[-1][0], x0)
             x = z + r
+
+            if hasattr(self, f'gcn_ffn{i+1}'):
+                x = getattr(self, f'gcn_ffn{i+1}')(x)
+
+            fm_list.append(z_dict)
+            gcn_list.append(x)
+
+        x += self.res(x0)
+
+        return x, g, gcn_list, fm_list
+
+
+class GCNSpatialBlock2(PyTorchModule):
+    def __init__(self,
+                 kernel_size: int = 1,
+                 padding: int = 0,
+                 bias: int = 0,
+                 dropout: Optional[Type[PyTorchModule]] = None,
+                 activation: T1 = nn.ReLU,
+                 normalization: T1 = nn.BatchNorm2d,
+                 gcn_dims_in: List[int] = [256, 128, 128],
+                 gcn_dims: List[int] = [256, 256, 256],
+                 gcn_residual: T3 = [0, 0, 0],
+                 gcn_prenorm: bool = False,
+                 gcn_v_kernel: int = 0,
+                 gcn_ffn: Optional[float] = None,
+                 gcn_attn_mode: int = 0,
+                 g_proj_dim: T3 = 256,
+                 g_kernel: int = 1,
+                 g_proj_shared: bool = False,
+                 g_activation: T1 = nn.Softmax,
+                 g_weighted: int = 0,
+                 g_num_segment: int = 20,
+                 g_num_joint: int = 25,
+                 g_res_alpha: float = 1.0,
+                 gt_mode: int = 1,
+                 gt_act: int = 1
+                 ):
+        super(GCNSpatialBlock2, self).__init__()
+
+        if gt_mode == 1:
+            gcn_spa_gt_cls = GCNSpatialGT
+        elif gt_mode == 2:
+            gcn_spa_gt_cls = GCNSpatialGT2
+        else:
+            raise ValueError("Unknown gt_mode")
+
+        self.num_blocks = len(gcn_dims) - 1
+        self.g_shared = isinstance(g_proj_dim, int)
+        if self.g_shared:
+            self.gcn_g1 = gcn_spa_gt_cls(gcn_dims[0],
+                                         g_proj_dim,
+                                         bias=bias,
+                                         kernel_size=g_kernel,
+                                         padding=g_kernel//2,
+                                         activation=g_activation,
+                                         g_proj_shared=g_proj_shared,
+                                         gt_activation=gt_act,
+                                         num_segment=g_num_segment,
+                                         num_joint=g_num_joint)
+        else:
+            for i in range(self.num_blocks):
+                setattr(self, f'gcn_g{i+1}',
+                        gcn_spa_gt_cls(gcn_dims[i],
+                                       g_proj_dim[i],
+                                       bias=bias,
+                                       kernel_size=g_kernel,
+                                       padding=g_kernel//2,
+                                       activation=g_activation,
+                                       g_proj_shared=g_proj_shared,
+                                       gt_activation=gt_act,
+                                       num_segment=g_num_segment,
+                                       num_joint=g_num_joint))
+
+        if g_weighted == 1:
+            assert not self.g_shared
+            self.g_weighted = g_weighted
+
+        for i in range(self.num_blocks):
+            setattr(self, f'gcn{i+1}',
+                    GCNSpatialUnit(gcn_dims[i],
+                                   gcn_dims[i+1],
+                                   bias=bias,
+                                   kernel_size=kernel_size,
+                                   padding=padding,
+                                   dropout=dropout,
+                                   activation=activation,
+                                   normalization=normalization,
+                                   prenorm=gcn_prenorm,
+                                   v_kernel_size=gcn_v_kernel,
+                                   attn_mode=gcn_attn_mode,
+                                   res_alpha=g_res_alpha,
+                                   in_channels2=gcn_dims_in[i]))
+
+        if gcn_prenorm:
+            for i in range(self.num_blocks):
+                setattr(self, f'gcn_prenorm{i+1}', normalization(gcn_dims[i]))
+
+        if gcn_ffn is not None:
+            for i in range(self.num_blocks):
+                setattr(self, f'gcn_ffn{i+1}',
+                        GCNSpatialFFN(gcn_dims[i+1],
+                                      gcn_dims[i+1],
+                                      bias=bias,
+                                      activation=activation,
+                                      normalization=normalization,
+                                      multiplier=gcn_ffn))
+
+        if isinstance(gcn_residual, list):
+            assert len(gcn_residual) == self.num_blocks
+            for i, r in enumerate(gcn_residual):
+                setattr(self, f'gcn_res{i+1}',
+                        residual_layer(r, gcn_dims[i], gcn_dims[i+1], bias))
+            self.res = null_fn
+
+        elif isinstance(gcn_residual, int):
+            self.res = residual_layer(
+                gcn_residual, gcn_dims[0], gcn_dims[-1], bias)
+
+        else:
+            raise ValueError("Unknown residual modes...")
+
+    def forward(self,
+                x: Tensor,
+                x_list: List[Tensor],
+                g_attn: Optional[Tensor] = None,
+                ) -> Tuple[Tensor, list, list]:
+
+        # x_list: fm prior to GCN, high to low level
+        assert len(x_list) == self.num_blocks
+
+        x0 = x
+        g, gcn_list, fm_list = [], [], []
+        for i in range(self.num_blocks):
+            x1 = x
+
+            if hasattr(self, f'gcn_prenorm{i+1}'):
+                x1 = getattr(self, f'gcn_prenorm{i+1}')(x1)
+
+            if g_attn is None:
+                if len(g) == 0:
+                    g.append(getattr(self, f'gcn_g{i+1}')(x1))
+                else:
+                    if not self.g_shared:
+                        if hasattr(self, 'g_weighted'):
+                            g.append(getattr(self, f'gcn_g{i+1}')(x1, g[-1]))
+                        else:
+                            g.append(getattr(self, f'gcn_g{i+1}')(x1))
+
+                r = getattr(self, f'gcn_res{i+1}')(x)
+                z, z_dict = getattr(self, f'gcn{i+1}')(x1, g[-1][0], x_list[i])
+                x = z + r
+
+            else:
+                r = getattr(self, f'gcn_res{i+1}')(x)
+                z, z_dict = getattr(self, f'gcn{i+1}')(x1, g_attn, x_list[i])
+                x = z + r
 
             if hasattr(self, f'gcn_ffn{i+1}'):
                 x = getattr(self, f'gcn_ffn{i+1}')(x)
@@ -1793,9 +2023,17 @@ if __name__ == '__main__':
         # sgcn_v_kernel=0,
         sgcn_attn_mode=0,
         sgcn_g_kernel=1,
-        # sgcn_g_proj_dim=256,  # c3
+        sgcn_g_proj_dim=256,  # c3
         # sgcn_g_proj_shared=False,
         # # sgcn_g_weighted=1,
+
+        sgcn2_g_proj_dim=256,  # c3
+        sgcn2_dims=[256, 256, 256],
+        sgcn2_kernel=1,
+        sgcn2_g_kernel=0,
+        sgcn2_attn_mode=10,
+        gcn_fpn=10,
+
         # gcn_fpn=9,
         # gcn_fpn_kernel=[3, 5, 7],
         # gcn_fpn_shared=0,
@@ -1805,20 +2043,20 @@ if __name__ == '__main__':
         # spatial_maxpool=1,
         # temporal_maxpool=1,
         # aspp_rates=None, 345402520
-        t_mode=3,
+        t_mode=1,
         # t_maxpool_kwargs=None,
-        t_mha_kwargs={
-            'd_model': [256, 512],
-            'nhead': [1, 1],
-            'd_head': [256*2, 512*2],
-            'dim_feedforward': [256, 512],
-            'dim_feedforward_output': [512, 1024],
-            'dropout': 0.1,
-            'activation': "relu",
-            'num_layers': 2,
-            'norm': 'ln',
-            'global_norm': False
-        },
+        # t_mha_kwargs={
+        #     'd_model': [256, 512],
+        #     'nhead': [1, 1],
+        #     'd_head': [256*2, 512*2],
+        #     'dim_feedforward': [256, 512],
+        #     'dim_feedforward_output': [512, 1024],
+        #     'dropout': 0.1,
+        #     'activation': "relu",
+        #     'num_layers': 2,
+        #     'norm': 'ln',
+        #     'global_norm': False
+        # },
         # multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7]],
         # multi_t_shared=2,
     )
