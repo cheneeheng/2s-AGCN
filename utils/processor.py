@@ -26,6 +26,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from feeders.loader import FeederDataLoader
 from model.module import LabelSmoothingLoss
+from model.module import CategorialFocalLoss
 from model.module import MaximumMeanDiscrepancyLoss
 
 from sam.sam.sam import SAM
@@ -285,7 +286,14 @@ class Processor(object):
             self.model = DDP(self.model, device_ids=[self.rank])
 
     def get_loss(self):
-        if self.arg.label_smoothing > 0.0:
+        if self.arg.fl_gamma > 0.0:
+            self.loss = CategorialFocalLoss(
+                classes=self.arg.model_args.get('num_class', None),
+                smoothing=self.arg.label_smoothing,
+                alpha=self.arg.fl_alpha,
+                gamma=self.arg.fl_gamma
+            ).cuda(self.output_device)
+        elif self.arg.label_smoothing > 0.0:
             self.loss = LabelSmoothingLoss(
                 classes=self.arg.model_args.get('num_class', None),
                 smoothing=self.arg.label_smoothing

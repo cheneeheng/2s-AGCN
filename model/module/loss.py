@@ -1,7 +1,8 @@
+from optparse import Option
 import torch
 import torch.nn.functional as F
 
-from typing import Tuple
+from typing import Tuple, Optional
 
 
 # From: https://github.com/microsoft/SGN/blob/master/main.py
@@ -22,6 +23,46 @@ class LabelSmoothingLoss(torch.nn.Module):
         return torch.mean(torch.sum(-true_dist * pred, dim=self.dim))
 
 
+# Based on:
+# https://github.com/umbertogriffo/focal-loss-keras/blob/master/src/loss_function/losses.py
+# https://github.com/artemmavrin/focal-loss/blob/master/src/focal_loss/_categorical_focal_loss.py
+class CategorialFocalLoss(torch.nn.Module):
+    def __init__(self,
+                 classes: int,
+                 smoothing=0.0,
+                 alpha: Optional[torch.Tensor] = None,
+                 gamma: float = 2):
+        super().__init__()
+        self.eps = smoothing / classes
+        self.confidence = 1.0 - smoothing + self.eps
+        self.gamma = gamma
+        self.alpha = alpha
+        assert alpha.shape[0] == classes
+
+    def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        # https://discuss.pytorch.org/t/what-is-the-formula-for-cross-entropy-loss-with-label-smoothing/149848
+        # the formulation here is slightly different than the one used
+        # in `LabelSmoothingLoss()` above.
+        # CE
+        preds = pred.log_softmax(dim=-1)
+        with torch.no_grad():
+            true_dist = torch.zeros_like(preds)
+            true_dist.fill_(self.eps)
+            true_dist.scatter_(1, target.data.unsqueeze(1), self.confidence)
+        ce_loss = torch.sum(-true_dist * pred, dim=-1)  # N
+
+        # alpha is a form of class weighting.
+        if self.alpha is not None:
+            ce_loss *= torch.gather(self.alpha, -1, target)
+
+        # FL
+        probs = F.softmax(pred, dim=-1)  # N,C
+        probs = torch.gather(probs, -1, target.data.unsqueeze(1)).squeeze(1)
+        focal_modulation = (1 - probs) ** self.gamma  # N
+        focal_loss = focal_modulation * ce_loss  # N
+        return focal_loss
+
+
 # From: https://github.com/stnoah1/infogcn/blob/master/loss.py
 class MaximumMeanDiscrepancyLoss(torch.nn.Module):
     def __init__(self, classes: int):
@@ -40,3 +81,12 @@ class MaximumMeanDiscrepancyLoss(torch.nn.Module):
         l2_z_mean = torch.linalg.norm(z.mean(dim=0), ord=2)
         mmd_loss = F.mse_loss(z_mean[y_valid], z_prior[y_valid].to(z.device))
         return mmd_loss, l2_z_mean, z_mean[y_valid]
+
+
+if __name__ == '__main__':
+    weight = torch.Tensor([1, 2, 3, 4, 5, 6]).cuda()
+    CFL = CategorialFocalLoss(6, 0.1, weight, 0.5)
+    logits = torch.rand(4, 6).cuda()
+    target = torch.Tensor([2, 4, 3, 1]).type(torch.int64).cuda()
+    losses = CFL(logits, target)
+    print(logits, target, losses)

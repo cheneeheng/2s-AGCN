@@ -83,7 +83,16 @@ def get_parser() -> argparse.ArgumentParser:
                    default=[],
                    nargs='+',
                    help='name of weights to be ignored in the initialization')
-    p.add_argument('--label-smoothing', default=0.0)
+    p.add_argument('--label-smoothing',
+                   type=float,
+                   default=0.0)
+    p.add_argument('--fl-alpha',
+                   type=float,
+                   default=[],
+                   nargs='+')
+    p.add_argument('--fl-gamma',
+                   type=float,
+                   default=-1.0)
 
     # optim
     p.add_argument('--start-epoch',

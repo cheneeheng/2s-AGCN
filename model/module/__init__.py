@@ -15,6 +15,7 @@ from .pytorch_module_wrapper import ASPP
 
 from .bifpn import BiFPN
 from .layernorm import LayerNorm
+from .loss import CategorialFocalLoss
 from .loss import LabelSmoothingLoss
 from .loss import MaximumMeanDiscrepancyLoss
 
