@@ -36,8 +36,13 @@ class CategorialFocalLoss(torch.nn.Module):
         self.eps = smoothing / classes
         self.confidence = 1.0 - smoothing + self.eps
         self.gamma = gamma
-        self.alpha = alpha
-        assert alpha.shape[0] == classes
+        if alpha is None:
+            self.alpha = None
+        elif len(alpha) == 0:
+            self.alpha = None
+        else:
+            self.alpha = alpha
+            assert alpha.shape[0] == classes
 
     def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         # https://discuss.pytorch.org/t/what-is-the-formula-for-cross-entropy-loss-with-label-smoothing/149848

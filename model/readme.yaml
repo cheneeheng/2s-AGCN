@@ -231,63 +231,63 @@ sgn_v11:
         - 220613180001_tmode3_d256h4ffn1024relu:
                   - gcnfpn1k3_multit357357357shared
                   - 94.42%
-        - 220614140001_gcnfpn1k3_multit357357357shared_tmode3_d512h4ffn128relu2l:
-                  - 94.06%
-        - 220614140001_gcnfpn1k3_multit357357357shared_tmode3_d512h4ffn2048relu2l:
-                  - 91.84%
+        - ? 220614140001_gcnfpn1k3_multit357357357shared_tmode3_d512h4ffn128relu2l
+          : - 94.06%
+        - ? 220614140001_gcnfpn1k3_multit357357357shared_tmode3_d512h4ffn2048relu2l
+          : - 91.84%
 
-        - 220616130001_gcnfpn1k3_multit357357357shared_tmode3_d256h1ffn256relu2l:
-                  - 94.46%
-        - 220616130001_gcnfpn1k3_multit357357357shared_tmode3_d256h1ffn1024relu2l:
-                  - 94.50%
-        - 220616130001_gcnfpn1k3_multit357357357shared_tmp0_tmode3_d128h1ffn128relu2l:
-                  - no temporal maxpool
-                  - 94.21%
-        - 220616130001_gcnfpn1k3_multit357357357shared_tmp0_tmode3_d128h1ffn512relu2l:
-                  - no temporal maxpool
-                  - 94.03%
-        - 220616130001_gcnfpn1k3_multit357357357shared_tmp0_tmode3_d256h1ffn256relu2l:
-                  - no temporal maxpool
-                  - 94.52%
-        - 220617113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out512layer2bn:
-                  - 95.08%
+        - ? 220616130001_gcnfpn1k3_multit357357357shared_tmode3_d256h1ffn256relu2l
+          : - 94.46%
+        - ? 220616130001_gcnfpn1k3_multit357357357shared_tmode3_d256h1ffn1024relu2l
+          : - 94.50%
+        - ? 220616130001_gcnfpn1k3_multit357357357shared_tmp0_tmode3_d128h1ffn128relu2l
+          : - no temporal maxpool
+            - 94.21%
+        - ? 220616130001_gcnfpn1k3_multit357357357shared_tmp0_tmode3_d128h1ffn512relu2l
+          : - no temporal maxpool
+            - 94.03%
+        - ? 220616130001_gcnfpn1k3_multit357357357shared_tmp0_tmode3_d256h1ffn256relu2l
+          : - no temporal maxpool
+            - 94.52%
+        - ? 220617113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out512layer2bn
+          : - 95.08%
         - 220617113001_gcnfpn1k3_multit357357357shared_tmode3ffn256layer2bn:
                   - 94.56%
         - 220617113001_gcnfpn1k3_multit357357357shared_tmode3ffn1024layer2bn:
                   - 94.59%
-        - 220620113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out1024layer2bn:
-                  - 95.31% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-        - 220620113001_gcnfpn1k3_multit357357357shared_tmode3ffn512out1024layer2bn:
-                  - 95.05%
-        - 220620113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out2048layer2bn:
-                  - 95.19%
-        - 220620113001_gcnfpn1k3_multit357357357shared_tmode3ffn128out1024layer2bn:
-                  - 95.21% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-        - 220620113001_gcnfpn1k3_multit357357357shared_tmode3ffn64out1024layer2bn:
-                  - 94.64%
-        - 220620113001_gcnfpn1k3_multit357357357shared_tmode3dim256512ffnx1out1024layer2bn:
-                  - 94.45%
-        - 220620113001_gcnfpn1k3_multit357357357shared_tmode3dim256512ffnX2out1024layer2bn:
-                  - 94.51%
-        - 220620113001_gcnfpn1k3_multit357357357shared_tmode3dim256512ffnX4out1024layer2bn:
-                  - 94.46%
-        - 220620113001_gcndim128256512_gproj512_gcnfpn1k3_multit357357357shared_tmode3ffn512out1024layer2bn:
-                  - 94.64%
+        - ? 220620113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out1024layer2bn
+          : - 95.31% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        - ? 220620113001_gcnfpn1k3_multit357357357shared_tmode3ffn512out1024layer2bn
+          : - 95.05%
+        - ? 220620113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out2048layer2bn
+          : - 95.19%
+        - ? 220620113001_gcnfpn1k3_multit357357357shared_tmode3ffn128out1024layer2bn
+          : - 95.21% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        - ? 220620113001_gcnfpn1k3_multit357357357shared_tmode3ffn64out1024layer2bn
+          : - 94.64%
+        - ? 220620113001_gcnfpn1k3_multit357357357shared_tmode3dim256512ffnx1out1024layer2bn
+          : - 94.45%
+        - ? 220620113001_gcnfpn1k3_multit357357357shared_tmode3dim256512ffnX2out1024layer2bn
+          : - 94.51%
+        - ? 220620113001_gcnfpn1k3_multit357357357shared_tmode3dim256512ffnX4out1024layer2bn
+          : - 94.46%
+        - ? 220620113001_gcndim128256512_gproj512_gcnfpn1k3_multit357357357shared_tmode3ffn512out1024layer2bn
+          : - 94.64%
         # 1 layer of MHA
-        - 220623113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out512layer1bn:
-                  - 94.69%
-        - 220623113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out1024layer1bn:
-                  - 95.27% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-        - 220623113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out2048layer1bn:
-                  - 94.92%
-        - 220623113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out1024layer1bnh1d512:
-                  - 95.09%
-        - 220623113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out1024layer1bnh2d512:
-                  - 95.25% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-        - 220623113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out1024layer1bnh2d256:
-                  - 95.30% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        - ? 220623113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out512layer1bn
+          : - 94.69%
+        - ? 220623113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out1024layer1bn
+          : - 95.27% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        - ? 220623113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out2048layer1bn
+          : - 94.92%
+        - ? 220623113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out1024layer1bnh1d512
+          : - 95.09%
+        - ? 220623113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out1024layer1bnh2d512
+          : - 95.25% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        - ? 220623113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out1024layer1bnh2d256
+          : - 95.30% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-        # MORE GCNS + higher proj dim                  
+        # MORE GCNS + higher proj dim
         - 220616130001_gcndim128128256256_gcnfpn1k3_multit357357357shared:
                   - 95.63% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
         - 220616130001_gproj512_gcnfpn1k3_multit357357357shared:
@@ -319,7 +319,7 @@ sgn_v11:
                   - 93.64%
         - 220812150001_sgnori_sgcnattn10:
                   - 93.89%
-                  
+
         - 220812150001_sgnori_gsigmoid:
                   - 89.77%
         - 220812150001_sgnori_nogcnres_nosharedg:
@@ -335,38 +335,40 @@ sgn_v11:
         - 220819140001_sgnori_inch2:
                   - 90.41%
 
+        - 220830130001_sgnori_6gcn:
+                  - 94.69%
 sgn_v12:
         - this has the infogcn MMD-based loss
         - G ACTIVATION IS IDENTITY HERE:
-                - 220706103001_bs64_adam_lr1e3:
-                        - 89.06%
-                - 220706103001_bs128_adam_lr1e3:
-                        - 90.42%
-                - 220706103001_bs128_adam_lr1e2:
-                        - 74.98%
-                - 220706103001_bs128_adam_lr1e1:
-                        - 1.65%
-                - 220706103001_bs128_sgd_lr1e3:
-                        - 59.49%
-                - 220706103001_bs128_sgd_lr1e2:
-                        - 86.83%
-                - 220706103001_bs128_sgd_lr1e1:
-                        - 90.98%
-                - 220712163001_bs128_adam_lr1e3_lambda21e0:
-                        - 89.83%
-                - 220712163001_bs128_adam_lr1e3_gain1:
-                        - 89.92%
-                - 220712163001_bs128_sgd_lr1e1_steps90110:
-                        - 91.43%
-                - 220714183001_bs128_sgd_lr1e1_steps90110_noise09:
-                        - 1.65%
-                - 220714183001_bs128_sgd_lr1e1_steps90110_noise05:
-                        - 1.65%
-                - 220714183001_bs128_sgd_lr1e1_steps90110_gain10:
-                        - 91.40%
-                - 220714183001_bs128_sgd_lr1e1_steps90110:
-                        - 91.43%
-        
+                  - 220706103001_bs64_adam_lr1e3:
+                            - 89.06%
+                  - 220706103001_bs128_adam_lr1e3:
+                            - 90.42%
+                  - 220706103001_bs128_adam_lr1e2:
+                            - 74.98%
+                  - 220706103001_bs128_adam_lr1e1:
+                            - 1.65%
+                  - 220706103001_bs128_sgd_lr1e3:
+                            - 59.49%
+                  - 220706103001_bs128_sgd_lr1e2:
+                            - 86.83%
+                  - 220706103001_bs128_sgd_lr1e1:
+                            - 90.98%
+                  - 220712163001_bs128_adam_lr1e3_lambda21e0:
+                            - 89.83%
+                  - 220712163001_bs128_adam_lr1e3_gain1:
+                            - 89.92%
+                  - 220712163001_bs128_sgd_lr1e1_steps90110:
+                            - 91.43%
+                  - 220714183001_bs128_sgd_lr1e1_steps90110_noise09:
+                            - 1.65%
+                  - 220714183001_bs128_sgd_lr1e1_steps90110_noise05:
+                            - 1.65%
+                  - 220714183001_bs128_sgd_lr1e1_steps90110_gain10:
+                            - 91.40%
+                  - 220714183001_bs128_sgd_lr1e1_steps90110:
+                            - 91.43%
+
         - 220802123001_bs128_sgd_lr1e1_steps90110_c4256d:
                   - 94.33%
         - 220802123001_bs128_sgd_lr1e1_steps90110:
@@ -427,15 +429,37 @@ sgn_v13:
 
         - 220826153001_tmode0:
                   - 92.52%
-        - 220826153001_varalpha: 
+        - 220826153001_varalpha:
                   - tmode 0
                   - 92.61%
+        - 220829113001_varalpha:
+                  - 94.54%
         - 220826153001_gt2_tmode0:
                   - 88.87%
         - 220826153001_gt2_varalpha:
                   - tmode 0
                   - 91.32%
+        - 220829113001_gt2_varalpha:
+                  - 94.39%
+        - 220829113001_gt2_varalpha_sigmoid:
+                  - 94.72%
 
+        - 220829113001_gt2_varalpha_sigmoid_lr001:
+                  - 86.34%
+
+        - 220830170001_gt2_fpn10_sigmoid:
+                  - varalpha
+                  - lr = 0.01
+                  - 88.17%
+        - 220831100001_gt2_fpn10_sigmoid:
+                  - varalpha
+                  - 94.45%
+        - 220831170001_gt2_fpn10_sigmoid_allvaralpha_multit333:
+                  - 94.34%
+        - 220831170001_gt2_fpn10_sigmoid_allvaralpha:
+                  - 94.50%
+        - 220831170001_gt2_fpn10_sigmoid_labelsmooth02:
+                  - 93.89%
 
 sgn-code:
         - original sgn repo code
