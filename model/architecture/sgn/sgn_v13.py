@@ -11,8 +11,6 @@
 # FREEZE 220704
 # UNFREEZE 220801
 
-from re import A
-from shutil import get_unpack_formats
 import torch
 from torch import nn
 from torch import Tensor
@@ -781,7 +779,7 @@ class SGN(PyTorchModule):
             _x_list = [x] + x_spa_list[:-1]
             _x_list.reverse()
             _, g_spa2, x_spa_list2, featuremap_spa_list2 = \
-                self.sgcn2(x_spa_list[-1], _x_list, g_spa[-1][0])
+                self.sgcn2(x_spa_list[-1], _x_list, g_spa[-1])
             x_list = [None for _ in range(len(x_spa_list2)-1)] + \
                      [x_spa_list2[-1]]
         else:
@@ -1257,7 +1255,7 @@ class GCNSpatialGT(Module):
                 self.act2 = nn.Sigmoid()
             self.alpha = nn.Parameter(torch.zeros(1))
 
-    def forward(self, x: Tensor, g: Optional[Tensor] = None) -> Tensor:
+    def forward(self, x: Tensor, g: Optional[Tensor] = None) -> Tuple[Tensor]:
         if self.return_none:
             return None, None
 
@@ -1332,7 +1330,7 @@ class GCNSpatialGT2(Module):
                 self.act2 = nn.Sigmoid()
             self.alpha = nn.Parameter(torch.zeros(1))
 
-    def forward(self, x: Tensor, g: Optional[Tensor] = None) -> Tensor:
+    def forward(self, x: Tensor, g: Optional[Tensor] = None) -> Tuple[Tensor]:
         if self.return_none:
             return None, None
 
@@ -1411,7 +1409,7 @@ class GCNSpatialGT3(Module):
                 self.act2 = nn.Sigmoid()
             self.alpha = nn.Parameter(torch.zeros(1))
 
-    def forward(self, x: Tensor, g: Optional[Tensor] = None) -> Tensor:
+    def forward(self, x: Tensor, g: Optional[Tensor] = None) -> Tuple[Tensor]:
         if self.return_none:
             return None, None
 
@@ -1434,6 +1432,83 @@ class GCNSpatialGT3(Module):
             return g12, g3
 
 
+class GCNSpatialGT4(Module):
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 kernel_size: int = 1,
+                 padding: int = 0,
+                 bias: int = 0,
+                 activation: T1 = nn.Softmax,
+                 g_proj_shared: bool = False,
+                 gt_activation: int = 1,
+                 num_joint: int = 25,
+                 kernel_size2: int = 3,
+                 g3_idx: int = 2,
+                 **kwargs
+                 ):
+        super(GCNSpatialGT4, self).__init__(in_channels,
+                                            out_channels,
+                                            kernel_size=kernel_size,
+                                            padding=padding,
+                                            bias=bias,
+                                            activation=activation)
+        if self.kernel_size == 0:
+            self.return_none = True
+
+        else:
+            self.return_none = False
+            self.g1 = Conv(self.in_channels, self.out_channels, bias=self.bias,
+                           kernel_size=self.kernel_size, padding=self.padding)
+            if g_proj_shared:
+                self.g2 = self.g1
+            else:
+                self.g2 = Conv(self.in_channels, self.out_channels,
+                               bias=self.bias, kernel_size=self.kernel_size,
+                               padding=self.padding)
+
+            idx = g3_idx
+            assert idx > 1
+            self.g3 = MLPTemporal(
+                channels=[self.in_channels*num_joint] +
+                [self.in_channels] * (idx-1) + [1],
+                kernel_sizes=[kernel_size2] * (idx-1) + [1],
+                paddings=[kernel_size2//2] * (idx-1) + [0],
+                dilations=[1] * idx,
+                biases=[self.bias] * idx,
+                residuals=[0] * idx,
+                dropouts=[nn.Dropout2d] + [None] * (idx-1),
+                activations=[nn.ReLU] * (idx-1) + [None],
+                normalizations=[nn.BatchNorm2d] * (idx-1) + [None],
+            )
+            try:
+                self.act1 = self.activation(dim=-1)
+            except TypeError:
+                self.act1 = self.activation()
+            if gt_activation == 1:
+                self.act2 = self.act1
+            elif gt_activation == 2:
+                self.act2 = nn.Sigmoid()
+            self.alpha = nn.Parameter(torch.zeros(1))
+
+    def forward(self, x: Tensor, g: Optional[Tensor] = None) -> Tuple[Tensor]:
+        if self.return_none:
+            return None, None
+
+        else:
+            g1 = self.g1(x).permute(0, 3, 2, 1).contiguous()  # n,t,v,c
+            g2 = self.g2(x).permute(0, 3, 1, 2).contiguous()  # n,t,c,v
+            g12 = g1.matmul(g2)  # n,t,v,v
+            g12 = self.act1(g12)  # n,t,v,v'
+
+            x3 = rearrange(x, 'n c v t -> n (c v) t').unsqueeze(2)  # n,cv,1,t
+            g3 = self.g3(x3).squeeze(1).squeeze(1)  # n,t
+            g3 = self.act2(g3)  # n,t'
+            g3 = g3.unsqueeze(1).unsqueeze(1)  # n,t',1,1
+
+            return g12, g3
+
+
 class GCNSpatialUnit(Module):
     def __init__(self,
                  in_channels: int,
@@ -1448,7 +1523,8 @@ class GCNSpatialUnit(Module):
                  v_kernel_size: int = 0,
                  attn_mode: int = 0,
                  res_alpha: float = 1.0,
-                 in_channels2: int = 128
+                 in_channels2: int = 128,
+                 gt_mode: int = 0
                  ):
         super(GCNSpatialUnit, self).__init__(in_channels,
                                              out_channels,
@@ -1464,6 +1540,7 @@ class GCNSpatialUnit(Module):
         else:
             self.res_alpha = res_alpha
 
+        self.gt_mode = gt_mode
         self.attn_mode = attn_mode
 
         if v_kernel_size > 0:
@@ -1513,16 +1590,25 @@ class GCNSpatialUnit(Module):
 
     def forward(self,
                 x: Tensor,
-                g: Optional[Tensor] = None,
+                g_list: Optional[Tuple[Tensor]] = None,
                 y: Optional[Tensor] = None) -> Tensor:
-        x0 = self.w0(x)
+
+        g = g_list[0]
+        g1 = g_list[1]
+
+        if self.gt_mode == 4:
+            xg = g1*x
+        else:
+            xg = x
+
+        x0 = self.w0(xg)
         # Original
         if self.attn_mode == 0:
             x1 = x0.permute(0, 3, 2, 1).contiguous()  # n,t,v,c
             x2 = g.matmul(x1)
             x3 = x2.permute(0, 3, 2, 1).contiguous()  # n,c,v,t
             x4 = self.w1(x3)
-            x5 = self.w2(x) * self.res_alpha
+            x5 = self.w2(xg) * self.res_alpha
             x6 = x4 + x5  # z + residual
         # Original, with y
         elif self.attn_mode == 10:
@@ -1538,7 +1624,7 @@ class GCNSpatialUnit(Module):
             x2 = None
             x3 = x0
             x4 = self.w1(x3)
-            x5 = self.w2(x) * self.res_alpha
+            x5 = self.w2(xg) * self.res_alpha
             x6 = x4 + x5  # z + residual
         # SE instead of G
         elif self.attn_mode == 2:
@@ -1548,7 +1634,7 @@ class GCNSpatialUnit(Module):
             x2 = self.w3(x1)
             x3 = self.w1(x2)
             x4 = self.s(x3).expand((N, -1, V, T))
-            x5 = self.w2(x) * self.res_alpha
+            x5 = self.w2(xg) * self.res_alpha
             x6 = x4 + x5  # z + residual
         # 1 linear projection.
         elif self.attn_mode == 3:
@@ -1556,7 +1642,7 @@ class GCNSpatialUnit(Module):
             x2 = None
             x3 = None
             x4 = None
-            x5 = self.w2(x)
+            x5 = self.w2(xg)
             x6 = x5
         x7 = self.norm(x6)
         x8 = self.act(x7)
@@ -1588,7 +1674,8 @@ class GCNSpatialBlock(PyTorchModule):
                  g_num_joint: int = 25,
                  g_res_alpha: float = 1.0,
                  gt_mode: int = 1,
-                 gt_act: int = 1
+                 gt_act: int = 1,
+                 gt_g3_idx: int = 2
                  ):
         super(GCNSpatialBlock, self).__init__()
 
@@ -1598,6 +1685,8 @@ class GCNSpatialBlock(PyTorchModule):
             gcn_spa_gt_cls = GCNSpatialGT2
         elif gt_mode == 3:
             gcn_spa_gt_cls = GCNSpatialGT3
+        elif gt_mode == 4:
+            gcn_spa_gt_cls = GCNSpatialGT4
         else:
             raise ValueError("Unknown gt_mode")
 
@@ -1613,7 +1702,8 @@ class GCNSpatialBlock(PyTorchModule):
                                          g_proj_shared=g_proj_shared,
                                          gt_activation=gt_act,
                                          num_segment=g_num_segment,
-                                         num_joint=g_num_joint)
+                                         num_joint=g_num_joint,
+                                         g3_idx=gt_g3_idx)
         else:
             for i in range(self.num_blocks):
                 setattr(self, f'gcn_g{i+1}',
@@ -1626,7 +1716,8 @@ class GCNSpatialBlock(PyTorchModule):
                                        g_proj_shared=g_proj_shared,
                                        gt_activation=gt_act,
                                        num_segment=g_num_segment,
-                                       num_joint=g_num_joint))
+                                       num_joint=g_num_joint,
+                                       g3_idx=gt_g3_idx))
 
         if g_weighted == 1:
             assert not self.g_shared
@@ -1645,7 +1736,8 @@ class GCNSpatialBlock(PyTorchModule):
                                    prenorm=gcn_prenorm,
                                    v_kernel_size=gcn_v_kernel,
                                    attn_mode=gcn_attn_mode,
-                                   res_alpha=g_res_alpha))
+                                   res_alpha=g_res_alpha,
+                                   gt_mode=gt_mode))
 
         if gcn_prenorm:
             for i in range(self.num_blocks):
@@ -1694,7 +1786,7 @@ class GCNSpatialBlock(PyTorchModule):
                         g.append(getattr(self, f'gcn_g{i+1}')(x1))
 
             r = getattr(self, f'gcn_res{i+1}')(x)
-            z, z_dict = getattr(self, f'gcn{i+1}')(x1, g[-1][0], x0)
+            z, z_dict = getattr(self, f'gcn{i+1}')(x1, g[-1], x0)
             x = z + r
 
             if hasattr(self, f'gcn_ffn{i+1}'):
@@ -1740,6 +1832,10 @@ class GCNSpatialBlock2(PyTorchModule):
             gcn_spa_gt_cls = GCNSpatialGT
         elif gt_mode == 2:
             gcn_spa_gt_cls = GCNSpatialGT2
+        elif gt_mode == 3:
+            gcn_spa_gt_cls = GCNSpatialGT3
+        elif gt_mode == 4:
+            gcn_spa_gt_cls = GCNSpatialGT4
         else:
             raise ValueError("Unknown gt_mode")
 
@@ -1788,7 +1884,8 @@ class GCNSpatialBlock2(PyTorchModule):
                                    v_kernel_size=gcn_v_kernel,
                                    attn_mode=gcn_attn_mode,
                                    res_alpha=g_res_alpha,
-                                   in_channels2=gcn_dims_in[i]))
+                                   in_channels2=gcn_dims_in[i],
+                                   gt_mode=gt_mode))
 
         if gcn_prenorm:
             for i in range(self.num_blocks):
@@ -1821,7 +1918,7 @@ class GCNSpatialBlock2(PyTorchModule):
     def forward(self,
                 x: Tensor,
                 x_list: List[Tensor],
-                g_attn: Optional[Tensor] = None,
+                g_attn: Optional[Tuple[Tensor]] = None,
                 ) -> Tuple[Tensor, list, list]:
 
         # x_list: fm prior to GCN, high to low level
@@ -1846,7 +1943,7 @@ class GCNSpatialBlock2(PyTorchModule):
                             g.append(getattr(self, f'gcn_g{i+1}')(x1))
 
                 r = getattr(self, f'gcn_res{i+1}')(x)
-                z, z_dict = getattr(self, f'gcn{i+1}')(x1, g[-1][0], x_list[i])
+                z, z_dict = getattr(self, f'gcn{i+1}')(x1, g[-1], x_list[i])
                 x = z + r
 
             else:
@@ -2092,8 +2189,8 @@ if __name__ == '__main__':
         semantic_joint_fusion=0,
         semantic_frame_fusion=1,
         semantic_frame_location=0,
-        sgcn_g_res_alpha=10,
-        sgcn_gt_mode=3,
+        sgcn_g_res_alpha=-1,
+        sgcn_gt_mode=4,
         # sgcn_dims=[256, 256, 256],  # [c2, c3, c3],
         sgcn_kernel=1,  # residual connection in GCN
         # sgcn_padding=0,  # residual connection in GCN

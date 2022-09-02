@@ -1,481 +1,555 @@
 sgn_v11:
-        - 220525170001_midvel1:
-                  - 94.21%
-        - 220525170001_midvel1_multit357:
-                  - 94.82%
+    - 220525170001_midvel1:
+          - 94.21%
+    - 220525170001_midvel1_multit357:
+          - 94.82%
 
-        - 220527120001_gcnweighted1:
-                  - added previous G to the current G
-                  - G not shared among the GCNs
-                  - 94.61%
+    - 220527120001_gcnweighted1:
+          - added previous G to the current G
+          - G not shared among the GCNs
+          - 94.61%
 
-        - 220527120001_vkernel1:
-                  - 94.60%
-        - 220527120001_vkernel1_gcnffn1:
-                  - NO FFN
-                  - 94.60%
-        - 220527120001_vkernel1_gcnffn1_rerun:
-                  - 94.46%
-        - 220527120001_vkernel1_gcnffn2:
-                  - 93.67%
-        - 220527120001_gnonshared_vkernel1_gcnffn1:
-                  - 93.90%
-        - 220527120001_gnonshared_vkernel1_gcnffn2:
-                  - 93.80%
-        - 220530120001_gcnffnres025:
-                  - 94.67%
-        - 220530120001_gcnffnres05:
-                  - 94.55%
-        - 220527120001_gcnffn1:
-                  - ffn multiplier 1
-                  - 94.35%
-        - 220527120001_gcnffnres1:
-                  - ffn multiplier 1
-                  - residual addition in code
-                  - 94.74%
-        - 220527120001_gcnffn2:
-                  - ffn multiplier 2
-                  - 94.12%
-        - 220527120001_gcnffnres2:
-                  - ffn multiplier 2
-                  - residual addition in code
-                  - 94.62%
+    - 220527120001_vkernel1:
+          - 94.60%
+    - 220527120001_vkernel1_gcnffn1:
+          - NO FFN
+          - 94.60%
+    - 220527120001_vkernel1_gcnffn1_rerun:
+          - 94.46%
+    - 220527120001_vkernel1_gcnffn2:
+          - 93.67%
+    - 220527120001_gnonshared_vkernel1_gcnffn1:
+          - 93.90%
+    - 220527120001_gnonshared_vkernel1_gcnffn2:
+          - 93.80%
+    - 220530120001_gcnffnres025:
+          - 94.67%
+    - 220530120001_gcnffnres05:
+          - 94.55%
+    - 220527120001_gcnffn1:
+          - ffn multiplier 1
+          - 94.35%
+    - 220527120001_gcnffnres1:
+          - ffn multiplier 1
+          - residual addition in code
+          - 94.74%
+    - 220527120001_gcnffn2:
+          - ffn multiplier 2
+          - 94.12%
+    - 220527120001_gcnffnres2:
+          - ffn multiplier 2
+          - residual addition in code
+          - 94.62%
 
-        - 220527120001_nogcnres:
-                  - no residual in gcn (w2 = 0)
-                  - 92.78%
+    - 220527120001_nogcnres:
+          - no residual in gcn (w2 = 0)
+          - 92.78%
 
-        - 220520150001_rerun_orisgn:
-                  - 94.56%
-        - 220520150001_multit333:
-                  - 95.14% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-        - 220520150001_multit357:
-                  - 95.03%
-        - 220525170001_multit357357357_cmulti11105:
-                  - 95.08%
-        - 220525170001_multit357357357shared_cmulti11105:
-                  - 95.14%
+    - 220520150001_rerun_orisgn:
+          - 94.56%
+    - 220520150001_multit333:
+          - 95.14% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    - 220520150001_multit357:
+          - 95.03%
+    - 220525170001_multit357357357_cmulti11105:
+          - 95.08%
+    - 220525170001_multit357357357shared_cmulti11105:
+          - 95.14%
 
-        - 220520150001_gcnfpn0_multit333_pregcntemsem:
-                  - no fpn
-                  - 94.83%
-        - 220520150001_gcnfpn0_multit555_pregcntemsem:
-                  - 94.90%
-        - 220520150001_gcnfpn0_multit357357357_pregcntemsem:
-                  - 94.94%
-        - 220601220001_gcnfpn0_multit357357357_allgcndim256:
-                  - 94.98%
-        - 220601220001_gcnfpn0_multit357357357shared_allgcndim256:
-                  - 93.37%
+    - 220520150001_gcnfpn0_multit333_pregcntemsem:
+          - no fpn
+          - 94.83%
+    - 220520150001_gcnfpn0_multit555_pregcntemsem:
+          - 94.90%
+    - 220520150001_gcnfpn0_multit357357357_pregcntemsem:
+          - 94.94%
+    - 220601220001_gcnfpn0_multit357357357_allgcndim256:
+          - 94.98%
+    - 220601220001_gcnfpn0_multit357357357shared_allgcndim256:
+          - 93.37%
 
-        - 220520150001_gcnfpn1_multit333:
-                  - proj and sum
-                  - 95.12%
-        - 220520150001_gcnfpn1_multit333shared:
-                  - 95.12%
-        - 220520150001_gcnfpn1_multit555:
-                  - 95.25% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-                  - best epoch was 94
-        - 220520150001_gcnfpn1_multit555shared:
-                  - 94.88%
-        - 220520150001_gcnfpn1_multit777:
-                  - 95.24%
-        - 220520150001_gcnfpn1_multit777shared:
-                  - 94.92%
-        - 220520150001_gcnfpn1_multit357357357:
-                  - 95.21%
-        - 220520150001_gcnfpn1_multit357357357shared:
-                  - 95.52% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-        - 220520150001_gcnfpn1_multit357935793579shared:
-                  - 95.24%
-        - 220520150001_gcnfpn1_aspp1357:
-                  - 94.52%
-        - 220520150001_gcnfpn1_aspp01357:
-                  - 94.67%
-        - 220520150001_gcnfpn1_multit371137113711shared:
-                  - 95.37% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-        - 220601220001_gcnfpn7_multit357357357shared:
-                  - same as fpn1 but with kernel3
-                  - 95.66% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< BEST
-        - 220601220001_gcnfpn7_multit357357357:
-                  - 95.48% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-        - 220601220001_gcnfpn7_multit357:
-                  - 95.61% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-        - 220607103001_gcnfpn1_multit357357357shared_fcmerge2:
-                  - 95.22%
-        - 220607103001_gcnfpn7_multit357357357shared_fcmerge2:
-                  - 95.42%
-        - 220607103001_gcnfpn7_multit357357357shared_tmode2:
-                  - 95.42%
-        - 220607103001_gcnfpn1k9_multit357357357shared:
-                  - 95.50% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-        - 220607103001_gcnfpn1k7_multit357357357shared:
-                  - 95.62% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-        - 220607103001_gcnfpn1k5_multit357357357shared:
-                  - 95.62% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    - 220520150001_gcnfpn1_multit333:
+          - proj and sum
+          - 95.12%
+    - 220520150001_gcnfpn1_multit333shared:
+          - 95.12%
+    - 220520150001_gcnfpn1_multit555:
+          - 95.25% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+          - best epoch was 94
+    - 220520150001_gcnfpn1_multit555shared:
+          - 94.88%
+    - 220520150001_gcnfpn1_multit777:
+          - 95.24%
+    - 220520150001_gcnfpn1_multit777shared:
+          - 94.92%
+    - 220520150001_gcnfpn1_multit357357357:
+          - 95.21%
+    - 220520150001_gcnfpn1_multit357357357shared:
+          - 95.52% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    - 220520150001_gcnfpn1_multit357935793579shared:
+          - 95.24%
+    - 220520150001_gcnfpn1_aspp1357:
+          - 94.52%
+    - 220520150001_gcnfpn1_aspp01357:
+          - 94.67%
+    - 220520150001_gcnfpn1_multit371137113711shared:
+          - 95.37% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    - 220601220001_gcnfpn7_multit357357357shared:
+          - same as fpn1 but with kernel3
+          - 95.66% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< BEST
+    - 220601220001_gcnfpn7_multit357357357:
+          - 95.48% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    - 220601220001_gcnfpn7_multit357:
+          - 95.61% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    - 220607103001_gcnfpn1_multit357357357shared_fcmerge2:
+          - 95.22%
+    - 220607103001_gcnfpn7_multit357357357shared_fcmerge2:
+          - 95.42%
+    - 220607103001_gcnfpn7_multit357357357shared_tmode2:
+          - 95.42%
+    - 220607103001_gcnfpn1k9_multit357357357shared:
+          - 95.50% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    - 220607103001_gcnfpn1k7_multit357357357shared:
+          - 95.62% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    - 220607103001_gcnfpn1k5_multit357357357shared:
+          - 95.62% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-        - 220628140001_gcndim256256256_gcnfpn1k3_multit357357357shared:
-                  - 95.34% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-        - 220616130001_gcnfpn1k3_multit357357357shared_tmp2:
-                  - temporal max pool with indices
-                  - 95.37% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-        - 220623113001_gcnfpn1k3_multit111111111shared:
-                  - 95.28% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-        - 220630190001_gcnfpn1k3_multit357357357shared_semcls1:
-                  - 92.06%
+    - 220628140001_gcndim256256256_gcnfpn1k3_multit357357357shared:
+          - 95.34% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    - 220616130001_gcnfpn1k3_multit357357357shared_tmp2:
+          - temporal max pool with indices
+          - 95.37% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    - 220623113001_gcnfpn1k3_multit111111111shared:
+          - 95.28% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    - 220630190001_gcnfpn1k3_multit357357357shared_semcls1:
+          - 92.06%
 
-        - 220520150001_gcnfpn2_multit333:
-                  - proj to lower and sum
-                  - 94.78%
-        - 220520150001_gcnfpn2_multit333shared:
-                  - 94.02%
-        - 220520150001_gcnfpn2_multit555:
-                  - 94.72%
-        - 220520150001_gcnfpn2_multit357357357:
-                  - 95.11%
-        - 220520150001_gcnfpn2_multit357357357shared:
-                  - 95.05%
-        - 220603153001_gcnfpn2kernel3_multit357357357:
-                  - 95.30%
-        - 220603153001_gcnfpn2kernel3_multit357357357shared:
-                  - 95.35%
+    - 220520150001_gcnfpn2_multit333:
+          - proj to lower and sum
+          - 94.78%
+    - 220520150001_gcnfpn2_multit333shared:
+          - 94.02%
+    - 220520150001_gcnfpn2_multit555:
+          - 94.72%
+    - 220520150001_gcnfpn2_multit357357357:
+          - 95.11%
+    - 220520150001_gcnfpn2_multit357357357shared:
+          - 95.05%
+    - 220603153001_gcnfpn2kernel3_multit357357357:
+          - 95.30%
+    - 220603153001_gcnfpn2kernel3_multit357357357shared:
+          - 95.35%
 
-        - 220520150001_gcnfpn3_multit333:
-                  - proj
-                  - 94.94%
-        - 220520150001_gcnfpn3_multit333shared:
-                  - 94.44%
-        - 220520150001_gcnfpn3_multit555:
-                  - 94.95%
-        - 220520150001_gcnfpn3_multit555shared:
-                  - 94.97%
-        - 220520150001_gcnfpn3_multit777:
-                  - 95.07%
-        - 220520150001_gcnfpn3_multit777shared:
-                  - 94.94%
-        - 220520150001_gcnfpn3_multit357357357shared:
-                  - 95.09%
-        - 220520150001_gcnfpn3_multit357357357:
-                  - 95.23% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    - 220520150001_gcnfpn3_multit333:
+          - proj
+          - 94.94%
+    - 220520150001_gcnfpn3_multit333shared:
+          - 94.44%
+    - 220520150001_gcnfpn3_multit555:
+          - 94.95%
+    - 220520150001_gcnfpn3_multit555shared:
+          - 94.97%
+    - 220520150001_gcnfpn3_multit777:
+          - 95.07%
+    - 220520150001_gcnfpn3_multit777shared:
+          - 94.94%
+    - 220520150001_gcnfpn3_multit357357357shared:
+          - 95.09%
+    - 220520150001_gcnfpn3_multit357357357:
+          - 95.23% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-        - 220525170001_gcnfpn4_multit357:
-                  - proj and concat
-                  - 95.17%
-        - 220525170001_gcnfpn4_multit3:
-                  - 95.32% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    - 220525170001_gcnfpn4_multit357:
+          - proj and concat
+          - 95.17%
+    - 220525170001_gcnfpn4_multit3:
+          - 95.32% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-        - 220525170001_gcnfpn5_multit357_cmulti111025_notmp:
-                  - proj to lower and concat
-                  - 94.59%
-        - 220525170001_gcnfpn5_multit357_cmulti111025:
-                  - 94.61%
+    - 220525170001_gcnfpn5_multit357_cmulti111025_notmp:
+          - proj to lower and concat
+          - 94.59%
+    - 220525170001_gcnfpn5_multit357_cmulti111025:
+          - 94.61%
 
-        - NO temporal_maxpool:
-                  - 220525170001_gcnfpn6_multit357___cmulti1111:
-                            - 93.09%
-                  - 220525170001_gcnfpn6_multit357___cmulti11105:
-                            - 93.09%
-                  - 220525170001_gcnfpn6_multit357___cmulti111025:
-                            - 93.25%
-                  - 220525170001_gcnfpn6_multit357357357shared_cmulti1111:
-                            - 93.78%
-                  - 220525170001_gcnfpn6_multit357357357shared_cmulti11105:
-                            - 93.53%
-                  - 220525170001_gcnfpn6_multit357357357shared_cmulti111025:
-                            - 93.70%
-                  - 220525170001_gcnfpn6_multit357357357_cmulti111025:
-                            - 93.74%
-                  - 220525170001_gcnfpn6_multit357357357_cmulti11105:
-                            - 93.95%
-                  - 220525170001_gcnfpn6_multit357357357_cmulti1111:
-                            - 93.37%
+    - NO temporal_maxpool:
+          - 220525170001_gcnfpn6_multit357___cmulti1111:
+                - 93.09%
+          - 220525170001_gcnfpn6_multit357___cmulti11105:
+                - 93.09%
+          - 220525170001_gcnfpn6_multit357___cmulti111025:
+                - 93.25%
+          - 220525170001_gcnfpn6_multit357357357shared_cmulti1111:
+                - 93.78%
+          - 220525170001_gcnfpn6_multit357357357shared_cmulti11105:
+                - 93.53%
+          - 220525170001_gcnfpn6_multit357357357shared_cmulti111025:
+                - 93.70%
+          - 220525170001_gcnfpn6_multit357357357_cmulti111025:
+                - 93.74%
+          - 220525170001_gcnfpn6_multit357357357_cmulti11105:
+                - 93.95%
+          - 220525170001_gcnfpn6_multit357357357_cmulti1111:
+                - 93.37%
 
-        - 220527120001_gcnfpn6_multit357357357shared_cmulti111025:
-                  - proj to 64 and sum
-                  - 93.34%
-        - 220527120001_gcnfpn6_multit357357357shared_cmulti11105:
-                  - 93.89%
-        - 220527120001_gcnfpn6_multit357357357shared_cmulti1111:
-                  - 93.99%
+    - 220527120001_gcnfpn6_multit357357357shared_cmulti111025:
+          - proj to 64 and sum
+          - 93.34%
+    - 220527120001_gcnfpn6_multit357357357shared_cmulti11105:
+          - 93.89%
+    - 220527120001_gcnfpn6_multit357357357shared_cmulti1111:
+          - 93.99%
 
-        - 220603153001_gcnfpn83layer_multit357357357shared:
-                  - bifpn, 64dim, 3 layers
-                  - 93.75%
-        - 220603153001_gcnfpn8_multit357357357shared:
-                  - bifpn, 64dim, 1 layers
-                  - 94.04%
-        - 220603153001_gcnfpn8_multit357357357:
-                  - bifpn, 64dim, 1 layers
-                  - 94.13%
-        - 220607103001_gcnfpn8dim128_multit357357357shared:
-                  - 95.05% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-        - 220607103001_gcnfpn8dim128layer3_multit357357357shared:
-                  - 94.55%
-        - 220607103001_gcnfpn8dim256_multit357357357shared:
-                  - 91.83%
-        - 220607103001_gcnfpn8dim256layer3_multit357357357shared:
-                  - 91.83%
-        - 220607103001_gcnfpn8dim256layer3_multit357357357shared_fcmerge2:
-                  - 82.26%
-        # multiple kernels for fpn
-        - 220628140001_gcndim256256256_gcnfpn9k357_multit357357357shared:
-                  - multiple kernels for fpn
-                  - 91.54%
-        - 220628140001_gcndim256256256_gcnfpn9k357shared_multit357357357shared:
-                  - 90.48%
+    - 220603153001_gcnfpn83layer_multit357357357shared:
+          - bifpn, 64dim, 3 layers
+          - 93.75%
+    - 220603153001_gcnfpn8_multit357357357shared:
+          - bifpn, 64dim, 1 layers
+          - 94.04%
+    - 220603153001_gcnfpn8_multit357357357:
+          - bifpn, 64dim, 1 layers
+          - 94.13%
+    - 220607103001_gcnfpn8dim128_multit357357357shared:
+          - 95.05% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    - 220607103001_gcnfpn8dim128layer3_multit357357357shared:
+          - 94.55%
+    - 220607103001_gcnfpn8dim256_multit357357357shared:
+          - 91.83%
+    - 220607103001_gcnfpn8dim256layer3_multit357357357shared:
+          - 91.83%
+    - 220607103001_gcnfpn8dim256layer3_multit357357357shared_fcmerge2:
+          - 82.26%
+    # multiple kernels for fpn
+    - 220628140001_gcndim256256256_gcnfpn9k357_multit357357357shared:
+          - multiple kernels for fpn
+          - 91.54%
+    - 220628140001_gcndim256256256_gcnfpn9k357shared_multit357357357shared:
+          - 90.48%
 
-        # TMODE = 3
-        - 220613180001_tmode3_d256h4ffn64relu:
-                  - gcnfpn1k3_multit357357357shared
-                  - 94.32%
-        - 220613180001_tmode3_d256h4ffn1024relu:
-                  - gcnfpn1k3_multit357357357shared
-                  - 94.42%
-        - ? 220614140001_gcnfpn1k3_multit357357357shared_tmode3_d512h4ffn128relu2l
-          : - 94.06%
-        - ? 220614140001_gcnfpn1k3_multit357357357shared_tmode3_d512h4ffn2048relu2l
-          : - 91.84%
+    # TMODE = 3
+    - 220613180001_tmode3_d256h4ffn64relu:
+          - gcnfpn1k3_multit357357357shared
+          - 94.32%
+    - 220613180001_tmode3_d256h4ffn1024relu:
+          - gcnfpn1k3_multit357357357shared
+          - 94.42%
+    - 220614140001_gcnfpn1k3_multit357357357shared_tmode3_d512h4ffn128relu2l:
+          - 94.06%
+    - 220614140001_gcnfpn1k3_multit357357357shared_tmode3_d512h4ffn2048relu2l:
+          - 91.84%
 
-        - ? 220616130001_gcnfpn1k3_multit357357357shared_tmode3_d256h1ffn256relu2l
-          : - 94.46%
-        - ? 220616130001_gcnfpn1k3_multit357357357shared_tmode3_d256h1ffn1024relu2l
-          : - 94.50%
-        - ? 220616130001_gcnfpn1k3_multit357357357shared_tmp0_tmode3_d128h1ffn128relu2l
-          : - no temporal maxpool
-            - 94.21%
-        - ? 220616130001_gcnfpn1k3_multit357357357shared_tmp0_tmode3_d128h1ffn512relu2l
-          : - no temporal maxpool
-            - 94.03%
-        - ? 220616130001_gcnfpn1k3_multit357357357shared_tmp0_tmode3_d256h1ffn256relu2l
-          : - no temporal maxpool
-            - 94.52%
-        - ? 220617113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out512layer2bn
-          : - 95.08%
-        - 220617113001_gcnfpn1k3_multit357357357shared_tmode3ffn256layer2bn:
-                  - 94.56%
-        - 220617113001_gcnfpn1k3_multit357357357shared_tmode3ffn1024layer2bn:
-                  - 94.59%
-        - ? 220620113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out1024layer2bn
-          : - 95.31% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-        - ? 220620113001_gcnfpn1k3_multit357357357shared_tmode3ffn512out1024layer2bn
-          : - 95.05%
-        - ? 220620113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out2048layer2bn
-          : - 95.19%
-        - ? 220620113001_gcnfpn1k3_multit357357357shared_tmode3ffn128out1024layer2bn
-          : - 95.21% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-        - ? 220620113001_gcnfpn1k3_multit357357357shared_tmode3ffn64out1024layer2bn
-          : - 94.64%
-        - ? 220620113001_gcnfpn1k3_multit357357357shared_tmode3dim256512ffnx1out1024layer2bn
-          : - 94.45%
-        - ? 220620113001_gcnfpn1k3_multit357357357shared_tmode3dim256512ffnX2out1024layer2bn
-          : - 94.51%
-        - ? 220620113001_gcnfpn1k3_multit357357357shared_tmode3dim256512ffnX4out1024layer2bn
-          : - 94.46%
-        - ? 220620113001_gcndim128256512_gproj512_gcnfpn1k3_multit357357357shared_tmode3ffn512out1024layer2bn
-          : - 94.64%
-        # 1 layer of MHA
-        - ? 220623113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out512layer1bn
-          : - 94.69%
-        - ? 220623113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out1024layer1bn
-          : - 95.27% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-        - ? 220623113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out2048layer1bn
-          : - 94.92%
-        - ? 220623113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out1024layer1bnh1d512
-          : - 95.09%
-        - ? 220623113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out1024layer1bnh2d512
-          : - 95.25% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-        - ? 220623113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out1024layer1bnh2d256
-          : - 95.30% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    - 220616130001_gcnfpn1k3_multit357357357shared_tmode3_d256h1ffn256relu2l:
+          - 94.46%
+    - 220616130001_gcnfpn1k3_multit357357357shared_tmode3_d256h1ffn1024relu2l:
+          - 94.50%
+    - 220616130001_gcnfpn1k3_multit357357357shared_tmp0_tmode3:
+          - _d128h1ffn128relu2l
+          - no temporal maxpool
+          - 94.21%
+    - 220616130001_gcnfpn1k3_multit357357357shared_tmp0_tmode3:
+          - _d128h1ffn512relu2l
+          - no temporal maxpool
+          - 94.03%
+    - 220616130001_gcnfpn1k3_multit357357357shared_tmp0_tmode3:
+          - _d256h1ffn256relu2l
+          - no temporal maxpool
+          - 94.52%
+    - 220617113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out512layer2bn:
+          - 95.08%
+    - 220617113001_gcnfpn1k3_multit357357357shared_tmode3ffn256layer2bn:
+          - 94.56%
+    - 220617113001_gcnfpn1k3_multit357357357shared_tmode3ffn1024layer2bn:
+          - 94.59%
+    - 220620113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out1024layer2bn:
+          - 95.31% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    - 220620113001_gcnfpn1k3_multit357357357shared_tmode3ffn512out1024layer2bn:
+          - 95.05%
+    - 220620113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out2048layer2bn:
+          - 95.19%
+    - 220620113001_gcnfpn1k3_multit357357357shared_tmode3ffn128out1024layer2bn:
+          - 95.21% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    - 220620113001_gcnfpn1k3_multit357357357shared_tmode3ffn64out1024layer2bn:
+          - 94.64%
+    - 220620113001_gcnfpn1k3_multit357357357shared:
+          - _tmode3dim256512ffnx1out1024layer2bn
+          - 94.45%
+    - 220620113001_gcnfpn1k3_multit357357357shared:
+          - _tmode3dim256512ffnX2out1024layer2bn
+          - 94.51%
+    - 220620113001_gcnfpn1k3_multit357357357shared:
+          - _tmode3dim256512ffnX4out1024layer2bn
+          - 94.46%
+    - 220620113001_gcndim128256512_gproj512_gcnfpn1k3:
+          - _multit357357357shared_tmode3ffn512out1024layer2bn
+          - 94.64%
+    # 1 layer of MHA
+    - 220623113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out512layer1bn:
+          - 94.69%
+    - 220623113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out1024layer1bn:
+          - 95.27% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    - 220623113001_gcnfpn1k3_multit357357357shared_tmode3ffn256out2048layer1bn:
+          - 94.92%
+    - 220623113001_gcnfpn1k3_multit357357357shared:
+          - _tmode3ffn256out1024layer1bnh1d512
+          - 95.09%
+    - 220623113001_gcnfpn1k3_multit357357357shared:
+          - _tmode3ffn256out1024layer1bnh2d512
+          - 95.25% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    - 220623113001_gcnfpn1k3_multit357357357shared:
+          - _tmode3ffn256out1024layer1bnh2d256
+          - 95.30% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-        # MORE GCNS + higher proj dim
-        - 220616130001_gcndim128128256256_gcnfpn1k3_multit357357357shared:
-                  - 95.63% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-        - 220616130001_gproj512_gcnfpn1k3_multit357357357shared:
-                  - 95.66% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    # MORE GCNS + higher proj dim
+    - 220616130001_gcndim128128256256_gcnfpn1k3_multit357357357shared:
+          - 95.63% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    - 220616130001_gproj512_gcnfpn1k3_multit357357357shared:
+          - 95.66% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-        - 220804140001_sgnori_smpemb_semj0_c1x2:
-                  - 93.60%
-        - 220804140001_sgnori_smpemb_semj0:
-                  - 93.51%
-        - 220804140001_sgnori_smpemb:
-                  - 94.65%
+    - 220804140001_sgnori_smpemb_semj0_c1x2:
+          - 93.60%
+    - 220804140001_sgnori_smpemb_semj0:
+          - 93.51%
+    - 220804140001_sgnori_smpemb:
+          - 94.65%
 
-        - 220804140001_sgnori_tmode3_bottleneck:
-                  - 94.17%
-        - 220804140001_sgnori_tmode3:
-                  - 94.26%
-        - 220809140001_sgnori_tmode3_1layer:
-                  - 94.68%
+    - 220804140001_sgnori_tmode3_bottleneck:
+          - 94.17%
+    - 220804140001_sgnori_tmode3:
+          - 94.26%
+    - 220809140001_sgnori_tmode3_1layer:
+          - 94.68%
 
-        - 220810140001_sgnori_nogcnres:
-                  - 92.48%
-        - 220810140001_sgnori_128bs:
-                  - 94.83%
-        - 220810140001_sgnori_sgcnattn1:
-                  - 93.34%
-        - 220810140001_sgnori_sgcnattn2:
-                  - 94.20%
-        - 220810140001_sgnori_sgcnattn3:
-                  - 93.64%
-        - 220812150001_sgnori_sgcnattn10:
-                  - 93.89%
+    - 220810140001_sgnori_nogcnres:
+          - 92.48%
+    - 220810140001_sgnori_128bs:
+          - 94.83%
+    - 220810140001_sgnori_sgcnattn1:
+          - 93.34%
+    - 220810140001_sgnori_sgcnattn2:
+          - 94.20%
+    - 220810140001_sgnori_sgcnattn3:
+          - 93.64%
+    - 220812150001_sgnori_sgcnattn10:
+          - 93.89%
 
-        - 220812150001_sgnori_gsigmoid:
-                  - 89.77%
-        - 220812150001_sgnori_nogcnres_nosharedg:
-                  - 92.08%
+    - 220812150001_sgnori_gsigmoid:
+          - 89.77%
+    - 220812150001_sgnori_nogcnres_nosharedg:
+          - 92.08%
 
-        - 220816140001_sgnori_inpos12_invel12:
-                  - emb layers use 3, 3 kernels
-                  - 94.22%
-        - 220816140001_sgnori_inpos11_invel11:
-                  - emb layers use 1, 3 kernels
-                  - 94.46%
+    - 220816140001_sgnori_inpos12_invel12:
+          - emb layers use 3, 3 kernels
+          - 94.22%
+    - 220816140001_sgnori_inpos11_invel11:
+          - emb layers use 1, 3 kernels
+          - 94.46%
 
-        - 220819140001_sgnori_inch2:
-                  - 90.41%
+    - 220819140001_sgnori_inch2:
+          - 90.41%
 
-        - 220830130001_sgnori_6gcn:
-                  - 94.69%
+    - 220830130001_sgnori_6gcn:
+          - 94.69%
+
+    - 220901130001_sgnori_flgamma1:
+          - 94.72%
+    - 220901130001_sgnori_flgamma2:
+          - 94.51%
+    - 220901130001_sgnori_flgamma3:
+          - 94.20%
+    - 220901130001_sgnori_flgamma4:
+          - 93.92%
+    - 220901130001_sgnori_flgamma5:
+          - 93.55%
+    - 220901130001_sgnori_flgamma01:
+          - 83.50%
+    - 220901130001_sgnori_flgamma001:
+          - 94.76%
+    - 220901130001_sgnori_flgamma0001:
+          - 94.75%
+
 sgn_v12:
-        - this has the infogcn MMD-based loss
-        - G ACTIVATION IS IDENTITY HERE:
-                  - 220706103001_bs64_adam_lr1e3:
-                            - 89.06%
-                  - 220706103001_bs128_adam_lr1e3:
-                            - 90.42%
-                  - 220706103001_bs128_adam_lr1e2:
-                            - 74.98%
-                  - 220706103001_bs128_adam_lr1e1:
-                            - 1.65%
-                  - 220706103001_bs128_sgd_lr1e3:
-                            - 59.49%
-                  - 220706103001_bs128_sgd_lr1e2:
-                            - 86.83%
-                  - 220706103001_bs128_sgd_lr1e1:
-                            - 90.98%
-                  - 220712163001_bs128_adam_lr1e3_lambda21e0:
-                            - 89.83%
-                  - 220712163001_bs128_adam_lr1e3_gain1:
-                            - 89.92%
-                  - 220712163001_bs128_sgd_lr1e1_steps90110:
-                            - 91.43%
-                  - 220714183001_bs128_sgd_lr1e1_steps90110_noise09:
-                            - 1.65%
-                  - 220714183001_bs128_sgd_lr1e1_steps90110_noise05:
-                            - 1.65%
-                  - 220714183001_bs128_sgd_lr1e1_steps90110_gain10:
-                            - 91.40%
-                  - 220714183001_bs128_sgd_lr1e1_steps90110:
-                            - 91.43%
+    - this has the infogcn MMD-based loss
+    - G ACTIVATION IS IDENTITY HERE:
+          - 220706103001_bs64_adam_lr1e3:
+                - 89.06%
+          - 220706103001_bs128_adam_lr1e3:
+                - 90.42%
+          - 220706103001_bs128_adam_lr1e2:
+                - 74.98%
+          - 220706103001_bs128_adam_lr1e1:
+                - 1.65%
+          - 220706103001_bs128_sgd_lr1e3:
+                - 59.49%
+          - 220706103001_bs128_sgd_lr1e2:
+                - 86.83%
+          - 220706103001_bs128_sgd_lr1e1:
+                - 90.98%
+          - 220712163001_bs128_adam_lr1e3_lambda21e0:
+                - 89.83%
+          - 220712163001_bs128_adam_lr1e3_gain1:
+                - 89.92%
+          - 220712163001_bs128_sgd_lr1e1_steps90110:
+                - 91.43%
+          - 220714183001_bs128_sgd_lr1e1_steps90110_noise09:
+                - 1.65%
+          - 220714183001_bs128_sgd_lr1e1_steps90110_noise05:
+                - 1.65%
+          - 220714183001_bs128_sgd_lr1e1_steps90110_gain10:
+                - 91.40%
+          - 220714183001_bs128_sgd_lr1e1_steps90110:
+                - 91.43%
 
-        - 220802123001_bs128_sgd_lr1e1_steps90110_c4256d:
-                  - 94.33%
-        - 220802123001_bs128_sgd_lr1e1_steps90110:
-                  - 95.04%
-        - 220802123001_bs128_sgd_lr1e1_steps90110_gcnfpn1_multit357357357shared:
-                  - 95.94%
+    - 220802123001_bs128_sgd_lr1e1_steps90110_c4256d:
+          - 94.33%
+    - 220802123001_bs128_sgd_lr1e1_steps90110:
+          - 95.04%
+    - 220802123001_bs128_sgd_lr1e1_steps90110_gcnfpn1_multit357357357shared:
+          - 95.94%
 
 sgn_v13:
-        - the G attention matrix is further augmented with a T attention matrix.
-        - GT1 is matmul
-        - GT2 is pointwise mul
-        # WRONG ALPHA PLACEMENTS --------------
-        - 220825143001_alpha005:
-                  - 94.43%
-        - 220825143001_alpha001:
-                  - 94.43%
-        - 220825143001_alpha05:
-                  - 94.43%
-        - 220825143001_alpha01:
-                  - 94.43%
-        - 220825153001_gt2_alpha01:
-                  - 93.66%
-        - 220825153001_gt2_alpha05:
-                  - 93.66%
-        # -------------------------------------
-        - 220824167001:
-                  - 94.43%
-        - 220824167001_tmode3:
-                  - 94.64%
-        - 220825170001_alpha05:
-                  - 94.37%
-        - 220825170001_alpha01:
-                  - 92.36%
+    - the G attention matrix is further augmented with a T attention matrix.
+    - GT1 is matmul
+    - GT2 is pointwise mul
+    # WRONG ALPHA PLACEMENTS --------------
+    - 220825143001_alpha005:
+          - 94.43%
+    - 220825143001_alpha001:
+          - 94.43%
+    - 220825143001_alpha05:
+          - 94.43%
+    - 220825143001_alpha01:
+          - 94.43%
+    - 220825153001_gt2_alpha01:
+          - 93.66%
+    - 220825153001_gt2_alpha05:
+          - 93.66%
+    # -------------------------------------
+    - 220824167001:
+          - 94.43%
+    - 220824167001_tmode3:
+          - 94.64%
+    - 220825170001_alpha05:
+          - 94.37%
+    - 220825170001_alpha01:
+          - 92.36%
 
-        - 220825153001_gt2:
-                  - 93.66%
-        - 220825170001_gt2_alpha05:
-                  - 94.04%
-        - 220825170001_gt2_alpha01:
-                  - 94.67%
-        - 220825170001_gt2_alpha005:
-                  - 94.60%
-        - 220825170001_gt2_alpha001:
-                  - 93.80%
+    - 220825153001_gt2:
+          - 93.66%
+    - 220825170001_gt2_alpha05:
+          - 94.04%
+    - 220825170001_gt2_alpha01:
+          - 94.67%
+    - 220825170001_gt2_alpha005:
+          - 94.60%
+    - 220825170001_gt2_alpha001:
+          - 93.80%
 
-        - 220826113001_sigmoid:
-                  - 89.77%
-        - 220826113001_alpha01_sigmoid:
-                  - 93.60%
-        - 220826113001_alpha05_sigmoid:
-                  - 90.12%
-        - 220826113001_gt2_sigmoid:
-                  - 94.69%
-        - 220826113001_gt2_alpha05_sigmoid:
-                  - 94.67%
-        - 220826113001_gt2_alpha01_sigmoid:
-                  - 92.74%
+    - 220826113001_sigmoid:
+          - 89.77%
+    - 220826113001_alpha01_sigmoid:
+          - 93.60%
+    - 220826113001_alpha05_sigmoid:
+          - 90.12%
+    - 220826113001_gt2_sigmoid:
+          - 94.69%
+    - 220826113001_gt2_alpha05_sigmoid:
+          - 94.67%
+    - 220826113001_gt2_alpha01_sigmoid:
+          - 92.74%
 
-        - 220826153001_tmode0:
-                  - 92.52%
-        - 220826153001_varalpha:
-                  - tmode 0
-                  - 92.61%
-        - 220829113001_varalpha:
-                  - 94.54%
-        - 220826153001_gt2_tmode0:
-                  - 88.87%
-        - 220826153001_gt2_varalpha:
-                  - tmode 0
-                  - 91.32%
-        - 220829113001_gt2_varalpha:
-                  - 94.39%
-        - 220829113001_gt2_varalpha_sigmoid:
-                  - 94.72%
+    - 220826153001_tmode0:
+          - 92.52%
+    - 220826153001_varalpha:
+          - tmode 0
+          - 92.61%
+    - 220829113001_varalpha:
+          - 94.54%
+    - 220826153001_gt2_tmode0:
+          - 88.87%
+    - 220826153001_gt2_varalpha:
+          - tmode 0
+          - 91.32%
+    - 220829113001_gt2_varalpha:
+          - 94.39%
+    - 220829113001_gt2_varalpha_sigmoid:
+          - 94.72%
 
-        - 220829113001_gt2_varalpha_sigmoid_lr001:
-                  - 86.34%
+    - 220829113001_gt2_varalpha_sigmoid_lr001:
+          - 86.34%
 
-        - 220830170001_gt2_fpn10_sigmoid:
-                  - varalpha
-                  - lr = 0.01
-                  - 88.17%
-        - 220831100001_gt2_fpn10_sigmoid:
-                  - varalpha
-                  - 94.45%
-        - 220831170001_gt2_fpn10_sigmoid_allvaralpha_multit333:
-                  - 94.34%
-        - 220831170001_gt2_fpn10_sigmoid_allvaralpha:
-                  - 94.50%
-        - 220831170001_gt2_fpn10_sigmoid_labelsmooth02:
-                  - 93.89%
+    - 220830170001_gt2_fpn10_sigmoid:
+          - varalpha
+          - lr = 0.01
+          - 88.17%
+    - 220831100001_gt2_fpn10_sigmoid:
+          - varalpha
+          - 94.45%
+    - 220831170001_gt2_fpn10_sigmoid_allvaralpha_multit333:
+          - 94.34%
+    - 220831170001_gt2_fpn10_sigmoid_allvaralpha_multit333shared:
+          - 94.50%
+    - 220831170001_gt2_fpn10_sigmoid_allvaralpha_multit357357357shared:
+          - 94.93%
+    - 220831170001_gt2_fpn10_sigmoid_allvaralpha:
+          - 94.50%
+    - 220831170001_gt2_fpn10_sigmoid_labelsmooth02:
+          - 93.89%
+
+    - 220901230001_gt2_varalpha_sigmoid_fl05:
+          - 77.14%
+    - 220901230001_gt2_varalpha_sigmoid_fl2:
+          - 94.74%
+    - 220901230001_gt2_varalpha_sigmoid_fl1:
+          - 94.78%
+
+    - FAULTY, no gcn = 10:
+          - 220831230001_gt3_gcnfpn10_sigmoid_allvaralpha:
+                - 94.92%
+          - 220831230001_gt3_sigmoid_allvaralpha:
+                - 94.56%
+          - 220831230001_gt3_gcnfpn10_sigmoid_allvaralpha_fl05:
+                - 94.41%
+          - 220831230001_gt3_gcnfpn10_sigmoid_allvaralpha_fl1:
+                - 95.00%
+          - 220831230001_gt3_gcnfpn10_sigmoid_allvaralpha_fl2:
+                - 94.56%
+          - 220831230001_gt3_gcnfpn10_sigmoid_allvaralpha_fl3:
+                - 94.41%
+
+    - 220901230001_gt3_fpn10_sigmoid_allvaralpha_fl05:
+          - 55.51%
+    - 220901230001_gt3_fpn10_sigmoid_allvaralpha_fl1:
+          - 94.50%
+    - 220901230001_gt3_fpn10_sigmoid_allvaralpha_fl2:
+          - 94.39%
+    - 220901230001_gt3_sigmoid_allvaralpha:
+          - 94.56%
+    - 220901230001_gt3_sigmoid_allvaralpha_fl05:
+          - 78.24%
+    - 220901230001_gt3_sigmoid_allvaralpha_fl1:
+          - 95.03%
+    - 220901230001_gt3_sigmoid_allvaralpha_fl2:
+          - 94.80%
+    - 220901230001_gt3_idx3_sigmoid_allvaralpha_fl1:
+          - 94.86%
+    - 220901230001_gt3_idx4_sigmoid_allvaralpha_fl1:
+          - 94.61%
+    - 220901230001_gt3_idx5_sigmoid_allvaralpha_fl1:
+          - 94.60%
 
 sgn-code:
-        - original sgn repo code
-        - 220324170001:
-                  - 94.5%
-        - 220324170001_rerun:
-                  - 94.2%
-        - 220324170001_rerun2:
-                  - 94.2%
-        - 220324170001_rerun3:
-                  - 94.2%
-        - 220324170001_rerun4:
-                  - 94.2%
-        - 220324170001_rerun5:
-                  - 94.2%
-        - 220324170001_rerun6_16workers:
-                  - 94.5%
-        - 220324170001_rerun7_32workers:
-                  - 94.0%
+    - original sgn repo code
+    - 220324170001:
+          - 94.5%
+    - 220324170001_rerun:
+          - 94.2%
+    - 220324170001_rerun2:
+          - 94.2%
+    - 220324170001_rerun3:
+          - 94.2%
+    - 220324170001_rerun4:
+          - 94.2%
+    - 220324170001_rerun5:
+          - 94.2%
+    - 220324170001_rerun6_16workers:
+          - 94.5%
+    - 220324170001_rerun7_32workers:
+          - 94.0%

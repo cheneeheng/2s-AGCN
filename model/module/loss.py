@@ -49,12 +49,14 @@ class CategorialFocalLoss(torch.nn.Module):
         # the formulation here is slightly different than the one used
         # in `LabelSmoothingLoss()` above.
         # CE
-        preds = pred.log_softmax(dim=-1)
+        log_probs = pred.log_softmax(dim=-1)  # N,C
         with torch.no_grad():
-            true_dist = torch.zeros_like(preds)
+            true_dist = torch.zeros_like(log_probs)  # N,C
             true_dist.fill_(self.eps)
-            true_dist.scatter_(1, target.data.unsqueeze(1), self.confidence)
-        ce_loss = torch.sum(-true_dist * pred, dim=-1)  # N
+            true_dist.scatter_(1,
+                               target.data.unsqueeze(1),
+                               self.confidence)  # N
+        ce_loss = torch.sum(-true_dist * log_probs, dim=-1)  # N
 
         # alpha is a form of class weighting.
         if self.alpha is not None:
@@ -65,7 +67,7 @@ class CategorialFocalLoss(torch.nn.Module):
         probs = torch.gather(probs, -1, target.data.unsqueeze(1)).squeeze(1)
         focal_modulation = (1 - probs) ** self.gamma  # N
         focal_loss = focal_modulation * ce_loss  # N
-        return focal_loss
+        return torch.mean(focal_loss)
 
 
 # From: https://github.com/stnoah1/infogcn/blob/master/loss.py
