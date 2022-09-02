@@ -162,6 +162,7 @@ class SGN(PyTorchModule):
                  # 1: softmax
                  # 2: sigmoid
                  sgcn_gt_act: int = 1,
+                 sgcn_gt_g3_idx: int = 2,
                  # 0: mat mul
                  # 1: w1,w2 linear proj
                  # 2: squeeze excite
@@ -184,6 +185,7 @@ class SGN(PyTorchModule):
                  sgcn2_g_res_alpha: float = 1.0,
                  sgcn2_gt_mode: int = 1,
                  sgcn2_gt_act: int = 1,
+                 sgcn2_gt_g3_idx: int = 2,
                  sgcn2_attn_mode: int = 0,
 
                  gcn_fpn: int = -1,
@@ -341,7 +343,8 @@ class SGN(PyTorchModule):
             g_num_joint=self.num_point,
             g_res_alpha=sgcn_g_res_alpha,
             gt_mode=sgcn_gt_mode,
-            gt_act=sgcn_gt_act
+            gt_act=sgcn_gt_act,
+            gt_g3_idx=sgcn_gt_g3_idx
         )
         if sgcn2_dims is not None:
             self.sgcn2 = GCNSpatialBlock2(
@@ -366,7 +369,8 @@ class SGN(PyTorchModule):
                 g_num_joint=self.num_point,
                 g_res_alpha=sgcn2_g_res_alpha,
                 gt_mode=sgcn2_gt_mode,
-                gt_act=sgcn2_gt_act
+                gt_act=sgcn2_gt_act,
+                gt_g3_idx=sgcn2_gt_g3_idx
             )
 
         # GCN FPN --------------------------------------------------------------
@@ -1824,7 +1828,8 @@ class GCNSpatialBlock2(PyTorchModule):
                  g_num_joint: int = 25,
                  g_res_alpha: float = 1.0,
                  gt_mode: int = 1,
-                 gt_act: int = 1
+                 gt_act: int = 1,
+                 gt_g3_idx: int = 2
                  ):
         super(GCNSpatialBlock2, self).__init__()
 
@@ -1851,7 +1856,8 @@ class GCNSpatialBlock2(PyTorchModule):
                                          g_proj_shared=g_proj_shared,
                                          gt_activation=gt_act,
                                          num_segment=g_num_segment,
-                                         num_joint=g_num_joint)
+                                         num_joint=g_num_joint,
+                                         g3_idx=gt_g3_idx)
         else:
             for i in range(self.num_blocks):
                 setattr(self, f'gcn_g{i+1}',
@@ -1864,7 +1870,8 @@ class GCNSpatialBlock2(PyTorchModule):
                                        g_proj_shared=g_proj_shared,
                                        gt_activation=gt_act,
                                        num_segment=g_num_segment,
-                                       num_joint=g_num_joint))
+                                       num_joint=g_num_joint,
+                                       g3_idx=gt_g3_idx))
 
         if g_weighted == 1:
             assert not self.g_shared
