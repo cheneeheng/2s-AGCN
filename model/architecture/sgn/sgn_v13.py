@@ -1218,7 +1218,7 @@ class GCNSpatialGT(Module):
                  g_proj_shared: bool = False,
                  gt_activation: int = 1,
                  num_segment: int = 20,
-                 num_joint: int = 25,
+                 **kwargs
                  ):
         super(GCNSpatialGT, self).__init__(in_channels,
                                            out_channels,
@@ -1299,8 +1299,8 @@ class GCNSpatialGT2(Module):
                  activation: T1 = nn.Softmax,
                  g_proj_shared: bool = False,
                  gt_activation: int = 1,
-                 num_segment: int = 20,
                  num_joint: int = 25,
+                 **kwargs
                  ):
         super(GCNSpatialGT2, self).__init__(in_channels,
                                             out_channels,
@@ -1365,9 +1365,9 @@ class GCNSpatialGT3(Module):
                  activation: T1 = nn.Softmax,
                  g_proj_shared: bool = False,
                  gt_activation: int = 1,
-                 num_segment: int = 20,
                  num_joint: int = 25,
                  kernel_size2: int = 3,
+                 **kwargs
                  ):
         super(GCNSpatialGT3, self).__init__(in_channels,
                                             out_channels,
@@ -1388,16 +1388,18 @@ class GCNSpatialGT3(Module):
                 self.g2 = Conv(self.in_channels, self.out_channels,
                                bias=self.bias, kernel_size=self.kernel_size,
                                padding=self.padding)
+
             idx = 2
             self.g3 = MLPTemporal(
-                channels=[self.in_channels*num_joint,
-                          self.in_channels*num_joint,
-                          1],
-                kernel_sizes=[kernel_size2, 1],
-                paddings=[kernel_size2//2, 0],
-                biases=[self.bias for _ in range(idx)],
-                activations=[nn.ReLU, None],
-                normalizations=[nn.BatchNorm2d, None],
+                channels=[self.in_channels*num_joint] * idx + [1],
+                kernel_sizes=[kernel_size2] * (idx-1) + [1],
+                paddings=[kernel_size2//2] * (idx-1) + [0],
+                dilations=[1] * idx,
+                biases=[self.bias] * idx,
+                residuals=[0] * idx,
+                dropouts=[nn.Dropout2d] + [None] * (idx-1),
+                activations=[nn.ReLU] * (idx-1) + [None],
+                normalizations=[nn.BatchNorm2d] * (idx-1) + [None],
             )
             try:
                 self.act1 = self.activation(dim=-1)
@@ -2107,11 +2109,11 @@ if __name__ == '__main__':
         # sgcn_g_proj_shared=False,
         # # sgcn_g_weighted=1,
 
-        sgcn2_g_proj_dim=256,  # c3
+        # sgcn2_g_proj_dim=256,  # c3
         # sgcn2_dims=[256, 256, 256],
-        sgcn2_kernel=1,
-        sgcn2_g_kernel=0,
-        sgcn2_attn_mode=10,
+        # sgcn2_kernel=1,
+        # sgcn2_g_kernel=0,
+        # sgcn2_attn_mode=10,
         # gcn_fpn=10,
 
         # gcn_fpn=9,
