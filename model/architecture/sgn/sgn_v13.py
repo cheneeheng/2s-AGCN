@@ -168,6 +168,7 @@ class SGN(PyTorchModule):
                  # 2: squeeze excite
                  # 3: only w2
                  sgcn_attn_mode: int = 0,
+                 sgcn_gt_out_channels2: int = 512,
 
                  sgcn2_dims: Optional[list] = None,  # [c2, c3, c3],
                  sgcn2_kernel: int = 1,  # res connection in GCN, 0 = no res
@@ -320,6 +321,7 @@ class SGN(PyTorchModule):
             sgcn_dims = [self.c2, self.c3, self.c3]
         if sgcn_g_proj_dim is None:
             sgcn_g_proj_dim = self.c3
+        self.sgcn_gt_mode = sgcn_gt_mode
         self.sgcn_dims = sgcn_dims
         self.sgcn = GCNSpatialBlock(
             kernel_size=sgcn_kernel,
@@ -344,7 +346,8 @@ class SGN(PyTorchModule):
             g_res_alpha=sgcn_g_res_alpha,
             gt_mode=sgcn_gt_mode,
             gt_act=sgcn_gt_act,
-            gt_g3_idx=sgcn_gt_g3_idx
+            gt_g3_idx=sgcn_gt_g3_idx,
+            gt_out_channels2=sgcn_gt_out_channels2
         )
         if sgcn2_dims is not None:
             self.sgcn2 = GCNSpatialBlock2(
@@ -844,6 +847,9 @@ class SGN(PyTorchModule):
                 _x_list.append(tem_out[0])
                 attn_tem_list.append(tem_out[1])
 
+        if self.sgcn_gt_mode == 5:
+            _x_list.append(g_spa[0][1])
+
         if self.gcn_fpn_output_merge in [0, 1]:
             x = tensor_list_mean(_x_list)
         elif self.gcn_fpn_output_merge == 2:
@@ -858,7 +864,7 @@ class SGN(PyTorchModule):
             y = self.tmp(x)
 
         if cls_emb is not None:
-            if isinstance(x, list):
+            if isinstance(y, list):
                 y = [i + cls_emb for i in y]
             else:
                 y += cls_emb
@@ -874,7 +880,7 @@ class SGN(PyTorchModule):
                 y = y + self.tmp_ind_projection(y_ind.float())
 
         # Classification -------------------------------------------------------
-        if isinstance(x, list):
+        if isinstance(y, list):
             if self.gcn_fpn_output_merge == 2:
                 _y_list = []
                 for i, y_i in enumerate(y):
@@ -1513,6 +1519,92 @@ class GCNSpatialGT4(Module):
             return g12, g3
 
 
+class GCNSpatialGT5(Module):
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 kernel_size: int = 1,
+                 padding: int = 0,
+                 bias: int = 0,
+                 activation: T1 = nn.Softmax,
+                 g_proj_shared: bool = False,
+                 num_joint: int = 25,
+                 num_segment: int = 20,
+                 out_channels2: int = 512,
+                 kernel_size2: int = 3,
+                 g3_idx: int = 2,
+                 **kwargs
+                 ):
+        super(GCNSpatialGT5, self).__init__(in_channels,
+                                            out_channels,
+                                            kernel_size=kernel_size,
+                                            padding=padding,
+                                            bias=bias,
+                                            activation=activation)
+        if self.kernel_size == 0:
+            self.return_none = True
+
+        else:
+            self.return_none = False
+            self.g1 = Conv(self.in_channels, self.out_channels, bias=self.bias,
+                           kernel_size=self.kernel_size, padding=self.padding)
+            if g_proj_shared:
+                self.g2 = self.g1
+            else:
+                self.g2 = Conv(self.in_channels, self.out_channels,
+                               bias=self.bias, kernel_size=self.kernel_size,
+                               padding=self.padding)
+
+            idx = g3_idx
+            assert idx > 1
+            self.g3 = MLPTemporal(
+                channels=[num_joint*num_joint] + [out_channels2] * idx,
+                kernel_sizes=[kernel_size2] * (idx-1) + [1],
+                paddings=[kernel_size2//2] * (idx-1) + [0],
+                dilations=[1] * idx,
+                biases=[self.bias] * idx,
+                residuals=[0] * idx,
+                dropouts=[nn.Dropout2d] + [None] * (idx-1),
+                activations=[nn.ReLU] * (idx-1) + [None],
+                normalizations=[nn.BatchNorm2d] * (idx-1) + [None],
+            )
+            try:
+                self.act1 = self.activation(dim=-1)
+            except TypeError:
+                self.act1 = self.activation()
+            self.alpha = nn.Parameter(torch.zeros(1))
+
+            sem_tem_emb_kwargs = dict(
+                in_channels=num_segment,
+                out_channels=num_joint*num_joint,
+                bias=self.bias,
+                dropout=nn.Dropout2d,
+                activation=nn.ReLU,
+                normalization=nn.BatchNorm2d,
+                num_point=num_joint,
+                mode=1
+            )
+            self.tem_onehot = OneHotTensor(num_segment, 1, mode=1)
+            self.tem_embedding = Embedding(**sem_tem_emb_kwargs)
+
+    def forward(self, x: Tensor, g: Optional[Tensor] = None) -> Tuple[Tensor]:
+        if self.return_none:
+            return None, None
+
+        else:
+            g1 = self.g1(x).permute(0, 3, 2, 1).contiguous()  # n,t,v,c
+            g2 = self.g2(x).permute(0, 3, 1, 2).contiguous()  # n,t,c,v
+            g12 = g1.matmul(g2)  # n,t,v,v
+            g12 = self.act1(g12)  # n,t,v,v'
+
+            tem_emb = self.tem_embedding(self.tem_onehot(x.shape[0]))
+            x3 = rearrange(
+                g12, 'n t i j -> n (i j) t').unsqueeze(2)  # n,vv,1,t
+            g3 = self.g3(x3+tem_emb)  # n,c,1,t
+
+            return g12, g3
+
+
 class GCNSpatialUnit(Module):
     def __init__(self,
                  in_channels: int,
@@ -1679,7 +1771,8 @@ class GCNSpatialBlock(PyTorchModule):
                  g_res_alpha: float = 1.0,
                  gt_mode: int = 1,
                  gt_act: int = 1,
-                 gt_g3_idx: int = 2
+                 gt_g3_idx: int = 2,
+                 gt_out_channels2: int = 512
                  ):
         super(GCNSpatialBlock, self).__init__()
 
@@ -1691,6 +1784,8 @@ class GCNSpatialBlock(PyTorchModule):
             gcn_spa_gt_cls = GCNSpatialGT3
         elif gt_mode == 4:
             gcn_spa_gt_cls = GCNSpatialGT4
+        elif gt_mode == 5:
+            gcn_spa_gt_cls = GCNSpatialGT5
         else:
             raise ValueError("Unknown gt_mode")
 
@@ -1707,7 +1802,8 @@ class GCNSpatialBlock(PyTorchModule):
                                          gt_activation=gt_act,
                                          num_segment=g_num_segment,
                                          num_joint=g_num_joint,
-                                         g3_idx=gt_g3_idx)
+                                         g3_idx=gt_g3_idx,
+                                         out_channels2=gt_out_channels2)
         else:
             for i in range(self.num_blocks):
                 setattr(self, f'gcn_g{i+1}',
@@ -1721,7 +1817,8 @@ class GCNSpatialBlock(PyTorchModule):
                                        gt_activation=gt_act,
                                        num_segment=g_num_segment,
                                        num_joint=g_num_joint,
-                                       g3_idx=gt_g3_idx))
+                                       g3_idx=gt_g3_idx,
+                                       out_channels2=gt_out_channels2))
 
         if g_weighted == 1:
             assert not self.g_shared
@@ -2197,7 +2294,7 @@ if __name__ == '__main__':
         semantic_frame_fusion=1,
         semantic_frame_location=0,
         sgcn_g_res_alpha=-1,
-        sgcn_gt_mode=4,
+        sgcn_gt_mode=5,
         # sgcn_dims=[256, 256, 256],  # [c2, c3, c3],
         sgcn_kernel=1,  # residual connection in GCN
         # sgcn_padding=0,  # residual connection in GCN
