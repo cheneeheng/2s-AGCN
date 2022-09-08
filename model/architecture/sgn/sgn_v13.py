@@ -919,21 +919,23 @@ class SGN(PyTorchModule):
                 {
                     'attn_tem_list': attn_tem_list,
                     'g_spa': g_spa,
-                    'x_spa_list': x_spa_list,
-                    'featuremap_spa_list': featuremap_spa_list,
                     'g_spa2': g_spa2,
+                    'featuremap_spa_list': featuremap_spa_list,
+                    'featuremap_spa_list2': featuremap_spa_list2,
+                    'x_spa_list': x_spa_list,
                     'x_spa_list2': x_spa_list2,
-                    'featuremap_spa_list2': featuremap_spa_list2
+                    'x_tem_list': _x_list,
                 }
             )
         else:
             return (
                 y,
                 {
-                    'g_spa': g_spa,
                     'attn_tem_list': attn_tem_list,
+                    'g_spa': g_spa,
+                    'featuremap_spa_list': featuremap_spa_list,
                     'x_spa_list': x_spa_list,
-                    'featuremap_spa_list': featuremap_spa_list
+                    'x_tem_list': _x_list,
                 }
             )
 
@@ -1685,9 +1687,10 @@ class GCNSpatialGT6(Module):
             g12 = g1.matmul(g2)  # n,t,v,v
             g12 = self.act1(g12)  # n,t,v,v'
 
-            g3 = rearrange(g12, 'n t i j -> n (i j) t')
-            g3 = g3.unsqueeze(2)  # n,vv,1,t
-            g3 += self.tem_embedding(self.tem_onehot(x.shape[0]))
+            tem_emb = self.tem_embedding(self.tem_onehot(x.shape[0]))
+            x3 = rearrange(
+                g12, 'n t i j -> n (i j) t').unsqueeze(2)  # n,vv,1,t
+            g3 = x3 + tem_emb
 
             return g12, g3
 

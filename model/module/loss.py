@@ -1,8 +1,24 @@
-from optparse import Option
 import torch
 import torch.nn.functional as F
 
 from typing import Tuple, Optional
+
+
+class CosineLoss(torch.nn.CosineSimilarity):
+    def __init__(self, mode: int = 1):
+        self.mode = mode
+        if self.mode == 2:
+            dim = -1
+        else:
+            dim = 1
+        super().__init__(dim=dim)
+
+    def forward(self, x1: torch.Tensor, x2: torch.Tensor) -> torch.Tensor:
+        if self.mode == 2:
+            x1 = torch.linalg.norm(x1, ord=2, dim=1)
+            x2 = torch.linalg.norm(x2, ord=2, dim=1)
+        loss = super().forward(x1, x2)
+        return torch.mean(loss)
 
 
 # From: https://github.com/microsoft/SGN/blob/master/main.py

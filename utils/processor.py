@@ -25,8 +25,9 @@ from torch.profiler import profile, schedule, tensorboard_trace_handler
 from torch.utils.tensorboard import SummaryWriter
 
 from feeders.loader import FeederDataLoader
-from model.module import LabelSmoothingLoss
 from model.module import CategorialFocalLoss
+from model.module import CosineLoss
+from model.module import LabelSmoothingLoss
 from model.module import MaximumMeanDiscrepancyLoss
 
 from sam.sam.sam import SAM
@@ -286,6 +287,7 @@ class Processor(object):
             self.model = DDP(self.model, device_ids=[self.rank])
 
     def get_loss(self):
+        # Main loss
         if self.arg.fl_gamma >= 0.0:
             self.loss = CategorialFocalLoss(
                 classes=self.arg.model_args.get('num_class', None),
@@ -300,12 +302,22 @@ class Processor(object):
             ).cuda(self.output_device)
         else:
             self.loss = nn.CrossEntropyLoss().cuda(self.output_device)
+        # Opt: NMD loss
         if self.arg.model_args.get('infogcn_noise_ratio', None) is not None:
             self.mmd_loss = MaximumMeanDiscrepancyLoss(
                 classes=self.arg.model_args.get('num_class', None)
             ).cuda(self.output_device)
         else:
             self.mmd_loss = None
+        # Opt: Cosine feature loss
+        if self.arg.get('fsim_mode', None) is None:
+            self.feature_cos_loss = None
+        elif self.arg.get('fsim_mode') == 0:
+            self.feature_cos_loss = None
+        else:
+            self.feature_cos_loss = CosineLoss(
+                mode=self.arg.get('fsim_mode')
+            ).cuda(self.output_device)
 
     def load_model(self):
         self.get_output_device()
@@ -560,6 +572,24 @@ class Processor(object):
             loss_dict['dis_z'] = dis_z
             loss_dict['cos_z_prior'] = cos_z_prior
             loss_dict['dis_z_prior'] = dis_z_prior
+
+        if self.feature_cos_loss is not None:
+            assert self.arg.fsim_alpha is not None
+            assert len(self.arg.fsim_alpha) > 0
+            x_tem_list = output_tuple[1]['x_tem_list']
+            x_tem_list = [i for i in x_tem_list if i is not None]
+            kernels = len(self.arg.model_args.multi_t[-1])
+            levels = (len(x_tem_list)//kernels) - 1
+            fc_loss = 0
+            for i in range(levels):
+                for j in range(kernels):
+                    fc_loss += \
+                        self.arg.fsim_alpha[i*kernels+j] * \
+                        self.feature_cos_loss(
+                            x_tem_list[i*kernels+j],
+                            x_tem_list[-kernels+j]
+                        )
+            loss_dict['fc_loss'] = fc_loss
 
         return output, loss_dict
 

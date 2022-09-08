@@ -154,6 +154,17 @@ def get_parser() -> argparse.ArgumentParser:
                    default=1e-1,
                    help='lambda1 factor in the cmMMD loss calculation')
 
+    # feature similarity loss
+    p.add_argument('--fsim_mode',
+                   type=int,
+                   default=0,
+                   help='1: similarity along C dim, '
+                        '2: similarity along T dim with C dim l2 normed')
+    p.add_argument('--fsim_alpha',
+                   type=float,
+                   default=[],
+                   nargs='+')
+
     # scheduler
     p.add_argument('--scheduler',
                    type=str,
