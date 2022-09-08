@@ -30,6 +30,21 @@ class Graph:
         return A
 
 
+# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# https://github.com/hulianyuyy/STGAT/blob/main/graph/ntu_rgb_d.py
+class AdjMatrixGraph:
+    def __init__(self):
+        self.num_nodes = num_node
+        self.self_loops = [(i, i) for i in range(self.num_nodes)]
+        self.A_binary = tools.get_adjacency_matrix(neighbor, self.num_nodes)
+        self.A_binary_with_I = tools.get_adjacency_matrix(
+            neighbor + self.self_loops, self.num_nodes)
+        self.A = tools.normalize_adjacency_matrix(self.A_binary_with_I)
+        self.A_sep = tools.seperated_adjacency(
+            self.A_binary_with_I, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+# <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     import os

@@ -286,7 +286,7 @@ class Processor(object):
             self.model = DDP(self.model, device_ids=[self.rank])
 
     def get_loss(self):
-        if self.arg.fl_gamma > 0.0:
+        if self.arg.fl_gamma >= 0.0:
             self.loss = CategorialFocalLoss(
                 classes=self.arg.model_args.get('num_class', None),
                 smoothing=self.arg.label_smoothing,
