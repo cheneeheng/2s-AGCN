@@ -310,13 +310,11 @@ class Processor(object):
         else:
             self.mmd_loss = None
         # Opt: Cosine feature loss
-        if self.arg.get('fsim_mode', None) is None:
-            self.feature_cos_loss = None
-        elif self.arg.get('fsim_mode') == 0:
-            self.feature_cos_loss = None
+        if self.arg.fsim_mode == 0:
+            self.fsim_loss = None
         else:
-            self.feature_cos_loss = CosineLoss(
-                mode=self.arg.get('fsim_mode')
+            self.fsim_loss = CosineLoss(
+                mode=self.arg.fsim_mode
             ).cuda(self.output_device)
 
     def load_model(self):
@@ -573,7 +571,7 @@ class Processor(object):
             loss_dict['cos_z_prior'] = cos_z_prior
             loss_dict['dis_z_prior'] = dis_z_prior
 
-        if self.feature_cos_loss is not None:
+        if self.fsim_loss is not None:
             assert self.arg.fsim_alpha is not None
             assert len(self.arg.fsim_alpha) > 0
             x_tem_list = output_tuple[1]['x_tem_list']
@@ -585,7 +583,7 @@ class Processor(object):
                 for j in range(kernels):
                     fc_loss += \
                         self.arg.fsim_alpha[i*kernels+j] * \
-                        self.feature_cos_loss(
+                        self.fsim_loss(
                             x_tem_list[i*kernels+j],
                             x_tem_list[-kernels+j]
                         )
