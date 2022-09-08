@@ -576,7 +576,7 @@ class Processor(object):
             assert len(self.arg.fsim_alpha) > 0
             x_tem_list = output_tuple[1]['x_tem_list']
             x_tem_list = [i for i in x_tem_list if i is not None]
-            kernels = len(self.arg.model_args.multi_t[-1])
+            kernels = len(self.arg.model_args['multi_t'][-1])
             levels = (len(x_tem_list)//kernels) - 1
             fc_loss = 0
             for i in range(levels):
