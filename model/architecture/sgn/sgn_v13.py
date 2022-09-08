@@ -68,7 +68,7 @@ EMB_MODES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 11, 12]
 GCN_FPN_MODES = [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 # how the gcn fpns are merged for fc.
-# 0: no merge + no fpn
+# 0: no merge + no fpn (not needed, use 1)
 # 1: avraged and sent to 1 fc only.
 # 2: no merge and used by multiple fc and averaged.
 GCN_FPN_MERGE_MODES = [0, 1, 2]
@@ -156,8 +156,13 @@ class SGN(PyTorchModule):
                  sgcn_g_proj_shared: bool = False,
                  sgcn_g_weighted: int = 0,
                  sgcn_g_res_alpha: float = 1.0,
-                 # 1: matmul
-                 # 2: pointwise mul post G-softmax
+                 # 1: matmul GT @ G
+                 # 2: pointwise mul post GT-softmax GT * G
+                 # 3: pointwise mul post GT-softmax/sigmoid (2 layers) GT * G
+                 # 4: MLP for GT and used multiplied t input of GCN GT, G
+                 # 5: MLP for GT and used together for final prediction GT, G
+                 # 6: MLP for GT and used together for final prediction GT, G
+                 #    The GT is stacked with FPN list for multikernel pred.
                  sgcn_gt_mode: int = 1,
                  # 1: softmax
                  # 2: sigmoid
@@ -553,7 +558,10 @@ class SGN(PyTorchModule):
         self.t_mha_kwargs = t_mha_kwargs
         self.aspp_rates = aspp_rates  # dilation rates
         self.multi_t = multi_t  # list of list : gcn layers -> kernel sizes
-        assert len(self.multi_t) == len(sgcn_dims)
+        if self.sgcn_gt_mode == 6:
+            assert len(self.multi_t) == len(sgcn_dims) + 1
+        else:
+            assert len(self.multi_t) == len(sgcn_dims)
         # 0: no
         # 1: intra gcn share (no sense)
         # 2: inter gcn share (between layer share)
@@ -561,8 +569,11 @@ class SGN(PyTorchModule):
         assert self.multi_t_shared in [0, 2]
 
         # loop through the gcn fpn
-        for i, (sgcn_dim, t_kernels) in enumerate(zip(self.sgcn_dims,
-                                                      self.multi_t)):
+        if self.sgcn_gt_mode == 6:
+            _dims = self.sgcn_dims + [self.num_point**2]
+        else:
+            _dims = self.sgcn_dims
+        for i, (sgcn_dim, t_kernels) in enumerate(zip(_dims, self.multi_t)):
 
             # # all the kernel size for that gcn layer should be the same
             # if self.multi_t_shared == 1 and len(t_kernels) > 0:
@@ -570,16 +581,21 @@ class SGN(PyTorchModule):
 
             for j, t_kernel in enumerate(t_kernels):
 
+                if self.sgcn_gt_mode == 6 and i == len(_dims)-1:
+                    def_in_ch = _dims[-1]
+                else:
+                    def_in_ch = sgcn_dims[-1]
+
                 if self.gcn_fpn == 0:
                     in_ch = sgcn_dim
                 elif self.gcn_fpn in [1, 3, 7, 9]:
-                    in_ch = sgcn_dims[-1]
+                    in_ch = def_in_ch
                 elif self.gcn_fpn == 2:
                     in_ch = sgcn_dims[0]
                 elif self.gcn_fpn == 4:
-                    in_ch = sgcn_dims[-1]*3
+                    in_ch = def_in_ch*3
                 elif self.gcn_fpn == 5:
-                    in_ch = sgcn_dims[-1]//4 * 3
+                    in_ch = def_in_ch//4 * 3
                 elif self.gcn_fpn == 6:
                     in_ch = 64
                 elif self.gcn_fpn == 8:
@@ -587,7 +603,7 @@ class SGN(PyTorchModule):
                 elif self.gcn_fpn == 10:
                     in_ch = sgcn2_dims[i]
                 else:
-                    in_ch = sgcn_dims[-1]
+                    in_ch = def_in_ch
 
                 if self.t_mode == 3:
                     name = f'tem_mha_{i+1}_{j+1}'
@@ -816,6 +832,9 @@ class SGN(PyTorchModule):
         if self.gcn_fpn in [4, 5]:
             x_list = [None for _ in range(len(x_spa_list)-1)] + \
                      [torch.cat(x_list, dim=1)]
+
+        if self.sgcn_gt_mode == 6:
+            x_list.append(g_spa[0][1])
 
         # temporal MLP
         _x_list = []
@@ -1565,8 +1584,8 @@ class GCNSpatialGT5(Module):
                 biases=[self.bias] * idx,
                 residuals=[0] * idx,
                 dropouts=[nn.Dropout2d] + [None] * (idx-1),
-                activations=[nn.ReLU] * (idx-1) + [None],
-                normalizations=[nn.BatchNorm2d] * (idx-1) + [None],
+                activations=[nn.ReLU] * idx,
+                normalizations=[nn.BatchNorm2d] * idx,
             )
             try:
                 self.act1 = self.activation(dim=-1)
@@ -1601,6 +1620,74 @@ class GCNSpatialGT5(Module):
             x3 = rearrange(
                 g12, 'n t i j -> n (i j) t').unsqueeze(2)  # n,vv,1,t
             g3 = self.g3(x3+tem_emb)  # n,c,1,t
+
+            return g12, g3
+
+
+class GCNSpatialGT6(Module):
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 kernel_size: int = 1,
+                 padding: int = 0,
+                 bias: int = 0,
+                 activation: T1 = nn.Softmax,
+                 g_proj_shared: bool = False,
+                 num_joint: int = 25,
+                 num_segment: int = 20,
+                 **kwargs
+                 ):
+        super(GCNSpatialGT6, self).__init__(in_channels,
+                                            out_channels,
+                                            kernel_size=kernel_size,
+                                            padding=padding,
+                                            bias=bias,
+                                            activation=activation)
+        if self.kernel_size == 0:
+            self.return_none = True
+
+        else:
+            self.return_none = False
+            self.g1 = Conv(self.in_channels, self.out_channels, bias=self.bias,
+                           kernel_size=self.kernel_size, padding=self.padding)
+            if g_proj_shared:
+                self.g2 = self.g1
+            else:
+                self.g2 = Conv(self.in_channels, self.out_channels,
+                               bias=self.bias, kernel_size=self.kernel_size,
+                               padding=self.padding)
+            try:
+                self.act1 = self.activation(dim=-1)
+            except TypeError:
+                self.act1 = self.activation()
+            self.alpha = nn.Parameter(torch.zeros(1))
+
+            sem_tem_emb_kwargs = dict(
+                in_channels=num_segment,
+                out_channels=num_joint*num_joint,
+                bias=self.bias,
+                dropout=nn.Dropout2d,
+                activation=nn.ReLU,
+                normalization=nn.BatchNorm2d,
+                num_point=num_joint,
+                mode=1
+            )
+            self.tem_onehot = OneHotTensor(num_segment, 1, mode=1)
+            self.tem_embedding = Embedding(**sem_tem_emb_kwargs)
+
+    def forward(self, x: Tensor, g: Optional[Tensor] = None) -> Tuple[Tensor]:
+        if self.return_none:
+            return None, None
+
+        else:
+            g1 = self.g1(x).permute(0, 3, 2, 1).contiguous()  # n,t,v,c
+            g2 = self.g2(x).permute(0, 3, 1, 2).contiguous()  # n,t,c,v
+            g12 = g1.matmul(g2)  # n,t,v,v
+            g12 = self.act1(g12)  # n,t,v,v'
+
+            g3 = rearrange(g12, 'n t i j -> n (i j) t')
+            g3 = g3.unsqueeze(2)  # n,vv,1,t
+            g3 += self.tem_embedding(self.tem_onehot(x.shape[0]))
 
             return g12, g3
 
@@ -1786,6 +1873,8 @@ class GCNSpatialBlock(PyTorchModule):
             gcn_spa_gt_cls = GCNSpatialGT4
         elif gt_mode == 5:
             gcn_spa_gt_cls = GCNSpatialGT5
+        elif gt_mode == 6:
+            gcn_spa_gt_cls = GCNSpatialGT6
         else:
             raise ValueError("Unknown gt_mode")
 
@@ -2295,7 +2384,7 @@ if __name__ == '__main__':
         semantic_frame_location=0,
         sgcn_g_res_alpha=-1,
         sgcn_gt_mode=5,
-        # sgcn_dims=[256, 256, 256],  # [c2, c3, c3],
+        sgcn_dims=[128, 256, 256],  # [c2, c3, c3],
         sgcn_kernel=1,  # residual connection in GCN
         # sgcn_padding=0,  # residual connection in GCN
         # sgcn_dropout=0.0,  # residual connection in GCN
@@ -2340,6 +2429,7 @@ if __name__ == '__main__':
         #     'norm': 'ln',
         #     'global_norm': False
         # },
+        # multi_t=[[], [], [3, 5, 7], [3, 5, 7]],
         # multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7]],
         # multi_t_shared=2,
     )
