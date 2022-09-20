@@ -7,7 +7,7 @@ import math
 import warnings
 from typing import Optional, Tuple
 
-from model.module.embedding.rel_embedding import RelPosEmb1D
+from model.layers.rel_embedding import RelPosEmb1D
 
 
 __all__ = ['MultiheadAttention']

@@ -9,9 +9,9 @@ from typing import Optional, OrderedDict, Union
 from model.architecture.aagcn.aagcn import TCNGCNUnit
 from model.architecture.aagcn.aagcn import BaseModel
 
-from model.module.attention.crossattention import Transformer
-from model.module.attention.crossattention import CrossTransformer
-from model.module.attention.crossattention import CrossTransformerIdentity
+from model.layers.crossattention import Transformer
+from model.layers.crossattention import CrossTransformer
+from model.layers.crossattention import CrossTransformerIdentity
 
 
 # ------------------------------------------------------------------------------

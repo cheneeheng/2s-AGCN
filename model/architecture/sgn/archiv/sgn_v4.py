@@ -19,7 +19,7 @@ from torch.profiler import profile, ProfilerActivity
 import math
 from typing import Tuple, Optional, Union, Type
 
-from model.module import *
+from model.layers import *
 from model.resource.common_ntu import *
 
 from utils.utils import *

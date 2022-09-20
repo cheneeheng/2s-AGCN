@@ -29,18 +29,18 @@ from typing import Tuple, Optional, Union, Type, List
 # from model.module import *
 # from model.module.bifpn import BiFPN
 from model.resource.common_ntu import *
-from model.module import Module
-from model.module import BiFPN
-from model.module import Conv
-from model.module import ASPP
-from model.module import null_fn
-from model.module import init_zeros
-from model.module import pad_zeros
-from model.module import get_activation_fn
-from model.module import get_normalization_fn
-from model.module import tensor_list_mean
-from model.module import tensor_list_sum
-from model.module import Transformer
+from model.layers import Module
+from model.layers import BiFPN
+from model.layers import Conv
+from model.layers import ASPP
+from model.layers import null_fn
+from model.layers import init_zeros
+from model.layers import pad_zeros
+from model.layers import get_activation_fn
+from model.layers import get_normalization_fn
+from model.layers import tensor_list_mean
+from model.layers import tensor_list_sum
+from model.layers import Transformer
 from utils.utils import *
 
 T1 = Type[PyTorchModule]

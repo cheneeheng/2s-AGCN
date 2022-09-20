@@ -8,7 +8,7 @@ import pickle
 
 from PIL import Image
 from functools import partial
-from typing import Tuple
+from typing import Tuple, List, Sequence
 
 import torch
 from torch.nn import functional as F
@@ -19,8 +19,67 @@ from infer.data_preprocess import DataPreprocessor
 from utils.parser import get_parser as get_default_parser
 from utils.utils import import_class, init_seed
 
+from model.layers import CosineLoss
+
 import matplotlib
 import matplotlib.pyplot as plt
+
+
+# ------------------------------------------------------------------------------
+# https://stackoverflow.com/questions/67278053
+
+# NTU60
+rightarm = np.array([24, 12, 11, 10, 9, 21]) - 1
+leftarm = np.array([22, 8, 7, 6, 5, 21]) - 1
+righthand = np.array([25, 12]) - 1
+lefthand = np.array([23, 8]) - 1
+rightleg = np.array([19, 18, 17, 1]) - 1
+leftleg = np.array([15, 14, 13, 1]) - 1
+rightfeet = np.array([20, 19]) - 1
+leftfeet = np.array([16, 15]) - 1
+body = np.array([4, 3, 21, 2, 1]) - 1  # body
+
+
+def get_chains(dots: np.ndarray,   # shape == (n_dots, 3)
+               ):
+    return (dots[rightarm.tolist()],
+            dots[leftarm.tolist()],
+            dots[righthand.tolist()],
+            dots[lefthand.tolist()],
+            dots[rightleg.tolist()],
+            dots[leftleg.tolist()],
+            dots[rightfeet.tolist()],
+            dots[leftfeet.tolist()],
+            dots[body.tolist()])
+
+
+def subplot_nodes(dots: np.ndarray, ax):
+    return ax.scatter3D(*dots.T, s=1, c=dots[:, -1])
+
+
+def subplot_bones(chains: Tuple[np.ndarray, ...], ax):
+    return [ax.plot(*chain.T) for chain in chains]
+
+
+def plot_skeletons(skeletons: Sequence[np.ndarray], fig):
+    # fig = plt.figure()
+    for i, dots in enumerate(skeletons, start=1):
+        chains = get_chains(dots)
+        ax = fig.add_subplot(5, 20, i, projection='3d')
+        subplot_nodes(dots, ax)
+        subplot_bones(chains, ax)
+    # plt.show()
+
+
+# def test():
+#     """Plot random poses of simplest skeleton"""
+#     skeletons = np.random.standard_normal(size=(10, 11, 3))
+#     chains_ixs = ([0, 1, 2, 3, 4],  # hand_l, elbow_l, chest, elbow_r, hand_r
+#                   [5, 2, 6],        # pelvis, chest, head
+#                   [7, 8, 5, 9, 10])  # foot_l, knee_l, pelvis, knee_r, foot_r
+#     plot_skeletons(skeletons, chains_ixs)
+
+# ------------------------------------------------------------------------------
 
 # def filter_logits(logits: list) -> Tuple[list, list]:
 #     # {
@@ -134,9 +193,13 @@ def get_parser() -> argparse.ArgumentParser:
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220831100001_gt2_fpn10_sigmoid'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220831170001_gt2_fpn10_sigmoid_allvaralpha'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220902150001_gt4_varalpha_sigmoid'  # noqa
-        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220902150001_gt4_varalpha_sigmoid_flgamma1'  # noqa
+        default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220902150001_gt4_varalpha_sigmoid_flgamma1'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220906163001_gt5_varalpha'  # noqa
-        default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220906163001_gt5_varalpha_allactnorm'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220906163001_gt5_varalpha_allactnorm'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220908210001_gt6_varalpha_fsim1alpha1'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220908210001_gt6_varalpha_fsim2alpha1'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220909150001_gt6_varalpha_fsim1alpha1'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220909150001_gt6_varalpha_fsim2alpha1'  # noqa
     )
     parser.add_argument(
         '--out-folder',
@@ -231,7 +294,7 @@ def model_inference(arg: argparse.Namespace,
 
 if __name__ == '__main__':
 
-    # init_seed(0)
+    init_seed(1337)
 
     [args, _] = parse_arg(get_parser())
     args.data_path = '/code/2s-AGCN/data/data/nturgbd_raw'
@@ -256,36 +319,75 @@ if __name__ == '__main__':
     last_skel_file = None
 
     _data_dir = '/code/2s-AGCN/data/data/ntu_sgn/processed_data'
-    with open(_data_dir + '/NTU_CV_test_180.pkl', 'rb') as f:  # noqa
+    with open(_data_dir + '/NTU_CV_test_180.pkl', 'rb') as f:
         data1 = pickle.load(f)
-    with open(_data_dir + '/NTU_CV_test_label_180.pkl', 'rb') as f:  # noqa
+    with open(_data_dir + '/NTU_CV_test_label_180.pkl', 'rb') as f:
         data2 = pickle.load(f)
-    # with open(_data_dir + '/NTU_CV_test.pkl', 'rb') as f:  # noqa
+    # with open(_data_dir + '/NTU_CV_test.pkl', 'rb') as f:
     #     data1 = pickle.load(f)
-    # with open(_data_dir + '/NTU_CV_test_label.pkl', 'rb') as f:  # noqa
+    # with open(_data_dir + '/NTU_CV_test_label.pkl', 'rb') as f:
+    #     data2 = pickle.load(f)
+    # with open(_data_dir + '/NTU_CV_train_180.pkl', 'rb') as f:
+    #     data1 = pickle.load(f)
+    # with open(_data_dir + '/NTU_CV_train_label_180.pkl', 'rb') as f:
     #     data2 = pickle.load(f)
 
-    fig1, axes1 = plt.subplots(5, 1, figsize=(8, 6))
+    # with open(_data_dir + '/NTU_CV_train_180.pkl', 'wb') as f:
+    #     pickle.dump(data1[:180, :, :], f)
+    # with open(_data_dir + '/NTU_CV_train_label_180.pkl', 'wb') as f:
+    #     pickle.dump(data2[:180], f)
+
+    enable = {i: False for i in range(0, 10, 1)}
+
+    # skeleton -----------
+    fig0 = []
+    for _ in range(6):
+        fig00 = plt.figure()
+        fig00.tight_layout()
+        fig0.append(fig00)
+    enable[0] = True
+    # G spatial -----------
+    fig1, axes1 = plt.subplots(5, 1, figsize=(16, 6))
     fig1.tight_layout()
-    fig2, axes2 = plt.subplots(5, 1, figsize=(7, 7))
-    fig2.tight_layout()
+    enable[1] = True
+    # # A in temporal branch for t_mode=3 -----------
+    # fig2, axes2 = plt.subplots(5, 1, figsize=(7, 7))
+    # fig2.tight_layout()
+    # enable[2] = True
+    # featuremap after each SGCN -----------
     fig3, axes3 = plt.subplots(5, 1, figsize=(3, 7))
     fig3.tight_layout()
-    fig4, axes4 = plt.subplots(5, 18, figsize=(16, 7))
-    fig4.tight_layout()
-    fig5, axes5 = plt.subplots(5, 1, figsize=(3, 7))
-    fig5.tight_layout()
+    enable[3] = True
+    # # featuremaps (l2 in channel dimension) in each SGCN -----------
+    # fig4, axes4 = plt.subplots(5, 18, figsize=(16, 7))
+    # fig4.tight_layout()
+    # enable[4] = True
+    # GT spatial -----------
+    # fig5, axes5 = plt.subplots(5, 4, figsize=(3, 7))
+    # fig5.tight_layout()
+    # enable[5] = True
+    # # featuremap after each SGCN2 -----------
+    # fig6, axes6 = plt.subplots(5, 1, figsize=(3, 7))
+    # fig6.tight_layout()
+    # enable[6] = True
+    # # featuremaps (l2 in channel dimension) in each SGCN2 -----------
+    # fig7, axes7 = plt.subplots(5, 18, figsize=(16, 7))
+    # fig7.tight_layout()
+    # enable[7] = True
+    # # input data distribution -----------
+    # fig8, axes8 = plt.subplots(1, 3, figsize=(6, 3))
+    # fig8.tight_layout()
+    # enable[8] = True
+    # x tem list -----------
+    fig9, axes9 = plt.subplots(5, 4, figsize=(3, 7))
+    fig9.tight_layout()
+    enable[9] = True
 
-    fig6, axes6 = plt.subplots(5, 1, figsize=(3, 7))
-    fig6.tight_layout()
-    fig7, axes7 = plt.subplots(5, 18, figsize=(16, 7))
-    fig7.tight_layout()
-
-    freq = 2
+    freq = 1
     SAMP_FREQ = 5
 
     print("Start loop...")
-    for c in range(0, 120, 1):
+    for c in range(0, 180, 1):
         # for c in [10, 11, 70, 71, 130, 131]:
 
         # infer if
@@ -323,63 +425,91 @@ if __name__ == '__main__':
         featuremap_spa_list = output_dict['featuremap_spa_list']
         x_spa_list2 = output_dict.get('x_spa_list2')
         featuremap_spa_list2 = output_dict.get('featuremap_spa_list2')
+        x_tem_list = output_dict.get('x_tem_list')
 
         logits, preds = output[0].tolist(), predict_label.item()
 
         # if (logits[preds]*100 < 50) or data2[c] != preds:
         print(f"Label : {data2[c]:3d} , Pred : {preds:3d} , Logit : {logits[preds]*100:>5.2f}, SAMP_FREQ : {SAMP_FREQ}, {c}")  # noqa
 
+        # if data2[c] == preds:
+        if data2[c] != 53:
+            continue
+
         # PLOTTING ----------------------------------------------------------
-        fig1.suptitle(MAPPING[preds+1] + " : " + MAPPING[data2[c]+1] +
-                      f" : {logits[preds]*100:>5.2f}")
-        fig4.suptitle(MAPPING[preds+1] + " : " + MAPPING[data2[c]+1])
+
+        if enable[0]:
+            d = input_data.reshape((-1, 25, 3))
+            # d = input_data[0].reshape((-1, 25, 3))
+            for fig00 in fig0:
+                fig00.clear()
+            # dd = np.stack([d[:, :, 0], d[:, :, 1], d[:, :, 2]], axis=-1)
+            # plot_skeletons(dd, fig0[0])
+            # dd = np.stack([d[:, :, 0], d[:, :, 2], d[:, :, 1]], axis=-1)
+            # plot_skeletons(dd, fig0[1])
+            # dd = np.stack([d[:, :, 1], d[:, :, 0], d[:, :, 2]], axis=-1)
+            # plot_skeletons(dd, fig0[2])
+            dd = np.stack([d[:, :, 2], d[:, :, 0], d[:, :, 1]], axis=-1)
+            plot_skeletons(dd, fig0[3])
+            # dd = np.stack([d[:, :, 1], d[:, :, 2], d[:, :, 0]], axis=-1)
+            # plot_skeletons(dd, fig0[4])
+            dd = np.stack([d[:, :, 2], d[:, :, 1], d[:, :, 0]], axis=-1)
+            plot_skeletons(dd, fig0[5])
 
         # G spatial --------------------------------------------------
-        img = []
-        for j in range(SAMP_FREQ):
-            img_j = []
-            for i in range(0, 20, freq):
-                if isinstance(g_spa[0], tuple):
-                    img_i = g_spa[0][0][j][i].data.cpu().numpy()
-                else:
-                    img_i = g_spa[0][j][i].data.cpu().numpy()
-                img_j.append(img_i)
-            img.append(np.concatenate(img_j, axis=1))
-            axes1[j].imshow(img[-1])
-            axes1[j].xaxis.set_ticks(np.arange(0, 25*(20//freq), 25))
-            axes1[j].yaxis.set_ticks(np.arange(0, 25, SAMP_FREQ))
+        if enable[1]:
+            fig1.suptitle(MAPPING[preds+1] + " : " + MAPPING[data2[c]+1] +
+                          f" : {logits[preds]*100:>5.2f}")
+            fig1.subplots_adjust(top=0.9)
+            img = []
+            for j in range(SAMP_FREQ):
+                img_j = []
+                for i in range(0, 20, freq):
+                    if isinstance(g_spa[0], tuple):
+                        img_i = g_spa[0][0][j][i].data.cpu().numpy()
+                    else:
+                        img_i = g_spa[0][j][i].data.cpu().numpy()
+                    img_j.append(img_i)
+                img.append(np.concatenate(img_j, axis=1))
+                axes1[j].imshow(img[-1])
+                axes1[j].xaxis.set_ticks(np.arange(0, 25*(20//freq), 25))
+                axes1[j].yaxis.set_ticks(np.arange(0, 25, SAMP_FREQ))
 
         # A in temporal branch for t_mode=3 ---------------------------
-        # if tem_a[0] is not None:
-        #     img = []
-        #     for j in range(SAMP_FREQ):
-        #         img_j = []
-        #         for i in range(len(tem_a[0])):
-        #             # last 0 cause spa_maxpool
-        #             img_i = tem_a[0][i][j][0].data.cpu().numpy()
-        #             img_j.append(img_i)
-        #         img.append(np.concatenate(img_j, axis=1))
-        #         axes2[j].imshow(img[-1])
-        #         axes2[j].xaxis.set_ticks(np.arange(0, 20*len(tem_a[0]), 20))
-        #         axes2[j].yaxis.set_ticks(np.arange(0, 20, SAMP_FREQ))
+        if enable[2]:
+            if tem_a[0] is not None:
+                img = []
+                for j in range(SAMP_FREQ):
+                    img_j = []
+                    for i in range(len(tem_a[0])):
+                        # last 0 cause spa_maxpool
+                        img_i = tem_a[0][i][j][0].data.cpu().numpy()
+                        img_j.append(img_i)
+                    img.append(np.concatenate(img_j, axis=1))
+                    axes2[j].imshow(img[-1])
+                    axes2[j].xaxis.set_ticks(
+                        np.arange(0, 20*len(tem_a[0]), 20))
+                    axes2[j].yaxis.set_ticks(np.arange(0, 20, SAMP_FREQ))
 
         # featuremap after each SGCN ----------------------------------
-        # featuremap = np.linalg.norm(x_spa_list[-1], axis=1)  # N,V,T
-        # img = []
-        # for j in range(SAMP_FREQ):
-        #     img_j = featuremap[j]
-        #     axes3[j].imshow(img_j)
-        #     axes3[j].xaxis.set_ticks(np.arange(0, 20+1, SAMP_FREQ))
-        #     axes3[j].yaxis.set_ticks(np.arange(0, 25+1, SAMP_FREQ))
+        if enable[3]:
+            featuremap = np.linalg.norm(x_spa_list[-1], axis=1)  # N,V,T
+            img = []
+            for j in range(SAMP_FREQ):
+                img_j = featuremap[j]
+                axes3[j].imshow(img_j)
+                axes3[j].xaxis.set_ticks(np.arange(0, 20+1, SAMP_FREQ))
+                axes3[j].yaxis.set_ticks(np.arange(0, 25+1, SAMP_FREQ))
 
-        # if x_spa_list2 is not None:
-        #     featuremap = np.linalg.norm(x_spa_list2[-1], axis=1)  # N,V,T
-        #     img = []
-        #     for j in range(SAMP_FREQ):
-        #         img_j = featuremap[j]
-        #         axes6[j].imshow(img_j)
-        #         axes6[j].xaxis.set_ticks(np.arange(0, 20+1, SAMP_FREQ))
-        #         axes6[j].yaxis.set_ticks(np.arange(0, 25+1, SAMP_FREQ))
+        if enable[6]:
+            if x_spa_list2 is not None:
+                featuremap = np.linalg.norm(x_spa_list2[-1], axis=1)  # N,V,T
+                img = []
+                for j in range(SAMP_FREQ):
+                    img_j = featuremap[j]
+                    axes6[j].imshow(img_j)
+                    axes6[j].xaxis.set_ticks(np.arange(0, 20+1, SAMP_FREQ))
+                    axes6[j].yaxis.set_ticks(np.arange(0, 25+1, SAMP_FREQ))
 
         # featuremaps (l2 in channel dimension) in each SGCN -----------
         # def vmin_vmax_sgcn_fm(j):
@@ -455,40 +585,79 @@ if __name__ == '__main__':
             for i in range(SAMP_FREQ):
                 ax[i, j*6+5].imshow(b6[i], vmin=vmin, vmax=vmax)
 
-        plot_sgcn_fm(0, axes4, featuremap_spa_list)
-        plot_sgcn_fm(1, axes4, featuremap_spa_list)
-        plot_sgcn_fm(2, axes4, featuremap_spa_list)
-        for i in range(3):
-            axes4[0, 6*i+0].set_title("x")
-            axes4[0, 6*i+1].set_title("g")
-            axes4[0, 6*i+2].set_title("g @ x")
-            axes4[0, 6*i+3].set_title("g @ x @ W1")
-            axes4[0, 6*i+4].set_title("x @ W2")
-            axes4[0, 6*i+5].set_title("x out")
-
-        if featuremap_spa_list2 is not None:
-            plot_sgcn_fm(0, axes7, featuremap_spa_list2)
-            plot_sgcn_fm(1, axes7, featuremap_spa_list2)
-            plot_sgcn_fm(2, axes7, featuremap_spa_list2)
+        if enable[4]:
+            fig4.suptitle(MAPPING[preds+1] + " : " + MAPPING[data2[c]+1])
+            fig4.subplots_adjust(top=0.9)
+            plot_sgcn_fm(0, axes4, featuremap_spa_list)
+            plot_sgcn_fm(1, axes4, featuremap_spa_list)
+            plot_sgcn_fm(2, axes4, featuremap_spa_list)
             for i in range(3):
-                axes7[0, 6*i+0].set_title("x")
-                axes7[0, 6*i+1].set_title("g")
-                axes7[0, 6*i+2].set_title("g @ x")
-                axes7[0, 6*i+3].set_title("g @ x @ W1")
-                axes7[0, 6*i+4].set_title("x @ W2")
-                axes7[0, 6*i+5].set_title("x out")
+                axes4[0, 6*i+0].set_title("x")
+                axes4[0, 6*i+1].set_title("g")
+                axes4[0, 6*i+2].set_title("g @ x")
+                axes4[0, 6*i+3].set_title("g @ x @ W1")
+                axes4[0, 6*i+4].set_title("x @ W2")
+                axes4[0, 6*i+5].set_title("x out")
+
+        if enable[7]:
+            if featuremap_spa_list2 is not None:
+                fig7.suptitle(MAPPING[preds+1] + " : " + MAPPING[data2[c]+1])
+                plot_sgcn_fm(0, axes7, featuremap_spa_list2)
+                plot_sgcn_fm(1, axes7, featuremap_spa_list2)
+                plot_sgcn_fm(2, axes7, featuremap_spa_list2)
+                for i in range(3):
+                    axes7[0, 6*i+0].set_title("x")
+                    axes7[0, 6*i+1].set_title("g")
+                    axes7[0, 6*i+2].set_title("g @ x")
+                    axes7[0, 6*i+3].set_title("g @ x @ W1")
+                    axes7[0, 6*i+4].set_title("x @ W2")
+                    axes7[0, 6*i+5].set_title("x out")
 
         # GT spatial --------------------------------------------------
-        if isinstance(g_spa[0], tuple):
-            for j in range(SAMP_FREQ):
-                img_j = g_spa[0][1][j].data.cpu().numpy()
-                if img_j.shape[-1] != 1:
-                    img_j = img_j.swapaxes(0, -1)
-                if img_j.shape[-1] > 3:
-                    img_j = np.linalg.norm(img_j, axis=-1)
-                axes5[j].imshow(img_j)
+        if enable[5]:
+            if isinstance(g_spa[0], tuple):
+                for i in range(SAMP_FREQ):
+                    img_i = g_spa[0][1][i].data.cpu().numpy()
+                    img_i = img_i.swapaxes(0, -1)
+                    axes5[i, 0].imshow(img_i)
+
+        # x tem list --------------------------------------------------
+        if enable[9]:
+            if x_tem_list is not None:
+                vmin = [100000 for _ in range(SAMP_FREQ)]
+                vmax = [0 for _ in range(SAMP_FREQ)]
+                for i in range(SAMP_FREQ):
+                    for j in range(len(x_tem_list)):
+                        img_ji = x_tem_list[j][i].data.cpu().numpy()
+                        if img_ji.shape[-1] != 1:
+                            img_ji = img_ji.swapaxes(0, -1)
+                        if img_ji.shape[-1] > 3:
+                            img_ji = np.linalg.norm(img_ji, axis=-1)
+                            vmin[i] = min(vmin[i], img_ji.min())
+                            vmax[i] = max(vmax[i], img_ji.max())
+                for i in range(SAMP_FREQ):
+                    for j in range(len(x_tem_list)):
+                        img_ji = x_tem_list[j][i].data.cpu().numpy()
+                        if img_ji.shape[-1] != 1:
+                            img_ji = img_ji.swapaxes(0, -1)
+                        if img_ji.shape[-1] > 3:
+                            img_ji = np.linalg.norm(img_ji, axis=-1)
+                        axes9[i, j].imshow(img_ji, vmin=vmin[i], vmax=vmax[i])
+
+        if enable[8]:
+            axes8[0].cla()
+            axes8[1].cla()
+            axes8[2].cla()
+            axes8[0].hist(input_data.reshape(-1, 75)
+                          [:, 0::3].reshape(-1), bins=10)
+            axes8[1].hist(input_data.reshape(-1, 75)
+                          [:, 1::3].reshape(-1), bins=10)
+            axes8[2].hist(input_data.reshape(-1, 75)
+                          [:, 2::3].reshape(-1), bins=10)
 
         plt.show(block=False)
+
+        # print(CosineLoss(1)(x_tem_list[-2], x_tem_list[-1]))
 
         # out_dir = f"output/{args.weight_path.split('/')[-2]}/{args.weight_path.split('/')[-1]}"  # noqa
         # os.makedirs(out_dir, exist_ok=True)
@@ -496,5 +665,19 @@ if __name__ == '__main__':
         # fig7.savefig(f"{out_dir}/{data2[c]:03d}_2_fig7")  # noqa
         # fig1.savefig(f"{out_dir}/{data2[c]:03d}_3_fig1")  # noqa
         # fig5.savefig(f"{out_dir}/{data2[c]:03d}_4_fig5")  # noqa
+
+        output, predict_label, output_dict = None, None, None
+        g_spa = None
+        tem_a = None
+        x_spa_list = None
+        featuremap_spa_list = None
+        x_spa_list2 = None
+        featuremap_spa_list2 = None
+        # x_tem_list = None
+
+        top5 = sorted(range(len(logits)), key=lambda i: logits[i])[-5:]
+        top5.reverse()
+        top5 = [(round(logits[i], 4), MAPPING[i+1]) for i in top5]
+        print(top5)
 
         a = 1

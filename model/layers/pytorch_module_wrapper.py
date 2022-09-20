@@ -13,7 +13,7 @@ from torch.nn import functional as F
 from torch.nn import Module as PyTorchModule
 from torch.nn import Sequential
 
-from model.module.torch_utils import null_fn
+from model.layers.torch_utils import null_fn
 
 __all__ = ['Module', 'Residual', 'Conv1xN', 'Conv', 'Pool', 'ASPP']
 

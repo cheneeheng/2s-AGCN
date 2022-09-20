@@ -25,10 +25,10 @@ from torch.profiler import profile, schedule, tensorboard_trace_handler
 from torch.utils.tensorboard import SummaryWriter
 
 from feeders.loader import FeederDataLoader
-from model.module import CategorialFocalLoss
-from model.module import CosineLoss
-from model.module import LabelSmoothingLoss
-from model.module import MaximumMeanDiscrepancyLoss
+from model.layers import CategorialFocalLoss
+from model.layers import CosineLoss
+from model.layers import LabelSmoothingLoss
+from model.layers import MaximumMeanDiscrepancyLoss
 
 from sam.sam.sam import SAM
 from sam.sam.example.utility.bypass_bn import enable_running_stats

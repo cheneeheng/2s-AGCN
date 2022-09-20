@@ -9,7 +9,7 @@ from typing import Optional
 from model.architecture.aagcn.aagcn import TCNGCNUnit
 from model.architecture.aagcn.aagcn import BaseModel
 
-from model.module.attention.multiheadattention import MultiheadAttention
+from model.layers.multiheadattention import MultiheadAttention
 
 
 # ------------------------------------------------------------------------------

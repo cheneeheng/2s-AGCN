@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 
-from model.module.ghostbatchnorm import GhostBatchNorm1d, GhostBatchNorm2d
+from model.layers.ghostbatchnorm import GhostBatchNorm1d, GhostBatchNorm2d
 
 
 def import_class(name):

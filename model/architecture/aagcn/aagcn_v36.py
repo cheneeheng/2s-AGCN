@@ -9,8 +9,8 @@ from typing import Optional, Union
 from model.architecture.aagcn.aagcn import TCNGCNUnit
 from model.architecture.aagcn.aagcn import BaseModel
 
-from model.module.attention.multiheadattention import MultiheadAttention
-from model.module.attention.crossattention import ProjectInOut, Attention, PreNorm
+from model.layers.multiheadattention import MultiheadAttention
+from model.layers.crossattention import ProjectInOut, Attention, PreNorm
 
 
 # ------------------------------------------------------------------------------

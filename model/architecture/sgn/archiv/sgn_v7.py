@@ -23,10 +23,10 @@ except ImportError:
 import math
 from typing import OrderedDict, Tuple, Optional, Union, Type, List, Any
 
-from model.module import *
-from model.module import LayerNorm
+from model.layers import *
+from model.layers import LayerNorm
 from model.resource.common_ntu import *
-from model.module.torch_utils import *
+from model.layers.torch_utils import *
 
 from utils.utils import *
 

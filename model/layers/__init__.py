@@ -21,16 +21,16 @@ from .loss import LabelSmoothingLoss
 from .loss import MaximumMeanDiscrepancyLoss
 from .series_decomposition import SeriesDecomposition
 
-from .attention.multiheadattention import MultiheadAttention
-from .attention.crossattention import CrossViT
-from .attention.crossattention import ImageEmbedder
-from .attention.crossattention import MultiScaleEncoder
-from .attention.crossattention import CrossTransformer
-from .attention.crossattention import Transformer
-from .attention.crossattention import PreNorm
-from .attention.crossattention import Attention
-from .attention.crossattention import FeedForward
+from .multiheadattention import MultiheadAttention
+from .crossattention import CrossViT
+from .crossattention import ImageEmbedder
+from .crossattention import MultiScaleEncoder
+from .crossattention import CrossTransformer
+from .crossattention import Transformer
+from .crossattention import PreNorm
+from .crossattention import Attention
+from .crossattention import FeedForward
 
-from .embedding.pos_embedding import PositionalEncoding
-from .embedding.pos_embedding import CosSinPositionalEncoding
-from .embedding.rel_embedding import RelPosEmb1D
+from .pos_embedding import PositionalEncoding
+from .pos_embedding import CosSinPositionalEncoding
+from .rel_embedding import RelPosEmb1D
