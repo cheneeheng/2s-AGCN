@@ -11,6 +11,8 @@
 # FREEZE 220704
 # UNFREEZE 220801
 
+from collections import OrderedDict
+
 import torch
 from torch import nn
 from torch import Tensor
@@ -44,6 +46,7 @@ from model.module import get_normalization_fn
 from model.module import tensor_list_mean
 from model.module import tensor_list_sum
 from model.module import Transformer
+from model.module import SeriesDecomposition
 from utils.utils import *
 
 T1 = Type[PyTorchModule]
@@ -78,7 +81,8 @@ GCN_FPN_MERGE_MODES = [0, 1, 2]
 # 1 original sgn -> 1x3conv + 1x1conv
 # 2 original sgn with residual -> 1x3conv + res + 1x1conv + res
 # 3 trasnformers
-T_MODES = [0, 1, 2, 3]
+# 4 decompose + original sgn -> 1x3conv + 1x1conv
+T_MODES = [0, 1, 2, 3, 4]
 
 # Maxpooling ---
 # 0 no pool
@@ -863,7 +867,12 @@ class SGN(PyTorchModule):
                             break
 
                 tem_out = getattr(self, name)(x_list[i])
-                _x_list.append(tem_out[0])
+
+                if isinstance(tem_out[0], list):
+                    _x_list += tem_out[0]
+                else:
+                    _x_list.append(tem_out[0])
+
                 attn_tem_list.append(tem_out[1])
 
         if self.sgcn_gt_mode == 5:
@@ -2159,7 +2168,7 @@ class GCNSpatialBlock2(PyTorchModule):
 
 
 class MHATemporal(PyTorchModule):
-    def __init__(self, kwargs: dict):
+    def __init__(self, **kwargs):
         super(MHATemporal, self).__init__()
         if 'norm' in kwargs:
             self.transformer = Transformer(
@@ -2265,6 +2274,45 @@ class MLPTemporal(PyTorchModule):
         return x
 
 
+class MLPTemporalDecompose(PyTorchModule):
+    def __init__(self,
+                 channels: List[int],
+                 kernel_sizes: List[int] = [3, 1],
+                 paddings: List[int] = [1, 0],
+                 dilations: List[int] = [1, 1],
+                 biases: List[int] = [0, 0],
+                 residuals: List[int] = [0, 0],
+                 dropouts: T2 = [nn.Dropout2d, None],
+                 activations: T2 = [nn.ReLU, nn.ReLU],
+                 normalizations: T2 = [nn.BatchNorm2d, nn.BatchNorm2d],
+                 maxpool_kwargs: Optional[dict] = None,
+                 residual: int = 0,
+                 prenorm: bool = False,
+                 decomp_kernel_size: int = 3
+                 ):
+        super(MLPTemporalDecompose, self).__init__()
+        kwargs = {'channels': channels, 'kernel_sizes': kernel_sizes,
+                  'paddings': paddings, 'dilations': dilations,
+                  'biases': biases, 'residuals': residuals,
+                  'dropouts': dropouts, 'activations': activations,
+                  'normalizations': normalizations,
+                  'maxpool_kwargs': maxpool_kwargs, 'residual': residual,
+                  'prenorm': prenorm
+                  }
+        self.cnn_raw = MLPTemporal(**kwargs)
+        self.cnn_season = MLPTemporal(**kwargs)
+        self.cnn_trend = MLPTemporal(**kwargs)
+        self.decomp = SeriesDecomposition(decomp_kernel_size)
+
+    def forward(self, x: Tensor) -> List[Tensor]:
+        # x: n,c,v,t ; v=1 due to SMP
+        x_se, x_tr = self.decomp(x)
+        x1 = self.cnn_raw(x)
+        x2 = self.cnn_season(x_se)
+        x3 = self.cnn_trend(x_tr)
+        return [x1, x2, x3]
+
+
 class TemporalBranch(Module):
     def __init__(self,
                  in_channels: int,
@@ -2279,6 +2327,7 @@ class TemporalBranch(Module):
                  aspp_rates: Optional[List[int]] = None,
                  maxpool_kwargs: Optional[dict] = None,
                  mha_kwargs: Optional[dict] = None,
+                 decomp_kernel_size: int = 3
                  ):
         super(TemporalBranch, self).__init__(in_channels,
                                              out_channels,
@@ -2339,6 +2388,22 @@ class TemporalBranch(Module):
             )
         elif t_mode == 3:
             self.cnn = MHATemporal(mha_kwargs)
+        elif t_mode == 4:
+            idx = 2
+            self.cnn = MLPTemporalDecompose(
+                channels=[self.in_channels, self.in_channels,
+                          self.out_channels],
+                kernel_sizes=[self.kernel_size, 1],
+                paddings=[self.kernel_size//2, 0],
+                biases=[self.bias for _ in range(idx)],
+                residuals=[1 for _ in range(idx)],
+                dropouts=[self.dropout, None],
+                activations=[self.activation for _ in range(idx)],
+                normalizations=[self.normalization for _ in range(idx)],
+                maxpool_kwargs=maxpool_kwargs,
+                prenorm=self.prenorm,
+                decomp_kernel_size=decomp_kernel_size
+            )
         else:
             raise ValueError('Unknown t_mode')
 
@@ -2418,7 +2483,7 @@ if __name__ == '__main__':
         # spatial_maxpool=1,
         # temporal_maxpool=1,
         # aspp_rates=None, 345402520
-        t_mode=1,
+        t_mode=4,
         # t_maxpool_kwargs=None,
         # t_mha_kwargs={
         #     'd_model': [256, 512],

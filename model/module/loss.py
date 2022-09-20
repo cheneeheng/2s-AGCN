@@ -18,7 +18,7 @@ class CosineLoss(torch.nn.CosineSimilarity):
             x1 = torch.linalg.norm(x1, ord=2, dim=1)
             x2 = torch.linalg.norm(x2, ord=2, dim=1)
         loss = super().forward(x1, x2)
-        return torch.mean(loss)
+        return 1.0 - torch.mean(loss)
 
 
 # From: https://github.com/microsoft/SGN/blob/master/main.py

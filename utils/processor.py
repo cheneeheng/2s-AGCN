@@ -587,6 +587,7 @@ class Processor(object):
                             x_tem_list[i*kernels+j],
                             x_tem_list[-kernels+j]
                         )
+            loss_dict['loss'] = fc_loss + loss_dict['loss']
             loss_dict['fc_loss'] = fc_loss
 
         return output, loss_dict

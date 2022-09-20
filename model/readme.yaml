@@ -553,12 +553,16 @@ sgn_v13:
         # gt4 uses 2 layer tcn for attention T (like gt3)
         # and multiplies with input x in gcn
         - 220902150001_gt4_varalpha_sigmoid:
+                  - t 357
                   - 95.18%
         - 220902150001_gt4_varalpha_sigmoid_flgamma05:
+                  - t 357
                   - 76.86%
         - 220902150001_gt4_varalpha_sigmoid_flgamma1:
+                  - t 357
                   - 95.12%
         - 220902150001_gt4_varalpha_sigmoid_flgamma2:
+                  - t 357
                   - 94.91%
         - 220905143001_gt4_varalpha:
                   - softmax
@@ -578,6 +582,49 @@ sgn_v13:
                   - 94.61%
         - 220906163001_gt5_varalpha_allactnorm_30fr:
                   - 94.51%
+        - 220908150001_gt6_varalpha_multit357:
+                  - 95.00%
+        - 220908150001_gt6_varalpha:
+                  - 94.56%
+        - 220906163001_gt5_varalpha_allactnorm_64fr:
+                  - 94.21%
+        
+        # feature similarity FAULTY, without 1- x
+        - 220908210001_gt6_varalpha_fsim1alpha001:
+                  - 94.69%
+        - 220908210001_gt6_varalpha_fsim1alpha01:
+                  - 94.48%
+        - 220908210001_gt6_varalpha_fsim1alpha1:
+                  - 94.17%
+        - 220908210001_gt6_varalpha_fsim1alpha10:
+                  - 93.24%
+        - 220908210001_gt6_varalpha_fsim2alpha001:
+                  - 94.58%
+        - 220908210001_gt6_varalpha_fsim2alpha01:
+                  - 94.30%
+        - 220908210001_gt6_varalpha_fsim2alpha1:
+                  - 94.51%
+        - 220908210001_gt6_varalpha_fsim2alpha10:
+                  - 94.45%
+
+        # feature similarity
+        - 220909150001_gt6_varalpha_fsim2alpha001:
+                  - 94.51%
+        - 220909150001_gt6_varalpha_fsim2alpha01:
+                  - 94.73%
+        - 220909150001_gt6_varalpha_fsim2alpha1:
+                  - 94.64%
+        - 220909150001_gt6_varalpha_fsim2alpha10:
+                  - 94.45%
+        - 220909150001_gt6_varalpha_fsim1alpha001:
+                  - 94.58%
+        - 220909150001_gt6_varalpha_fsim1alpha01:
+                  - 94.50%
+        - 220909150001_gt6_varalpha_fsim1alpha1:
+                  - 94.17%
+        - 220909150001_gt6_varalpha_fsim1alpha10:
+                  - 92.94%
+
 
 sgn-code:
         - original sgn repo code

@@ -19,6 +19,7 @@ from .loss import CosineLoss
 from .loss import CategorialFocalLoss
 from .loss import LabelSmoothingLoss
 from .loss import MaximumMeanDiscrepancyLoss
+from .series_decomposition import SeriesDecomposition
 
 from .attention.multiheadattention import MultiheadAttention
 from .attention.crossattention import CrossViT
