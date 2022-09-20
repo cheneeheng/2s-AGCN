@@ -636,6 +636,8 @@ class Processor(object):
         cos_z_prior_values = []
         dis_z_prior_values = []
 
+        f_sim_values = []
+
         # 4. Loader
         process = self.get_data_iterator(epoch, 'train')
 
@@ -715,6 +717,10 @@ class Processor(object):
                 cos_z_prior_values.append(cos_z_prior_value)
                 dis_z_prior_values.append(dis_z_prior_value)
 
+            if self.fsim_loss is not None:
+                f_sim_value = self.tensor_to_value(loss_dict['fc_loss'])
+                f_sim_values.append(f_sim_value)
+
             value, predict_label = torch.max(output.data, 1)
             acc = torch.mean((predict_label == label.data).float())
             acc = self.tensor_to_value(acc)
@@ -753,6 +759,8 @@ class Processor(object):
             self.print_log(f'\tMean dis_z        : {np.mean(dis_z_values):.4f}.')  # noqa
             self.print_log(f'\tMean cos_z_prior  : {np.mean(cos_z_prior_values):.4f}.')  # noqa
             self.print_log(f'\tMean dis_z_prior  : {np.mean(dis_z_prior_values):.4f}.')  # noqa
+        if self.fsim_loss is not None:
+            self.print_log(f'\tMean fc_loss : {np.mean(f_sim_values):.4f}.')  # noqa
         self.print_log(f'\tTime consumption  : '
                        f'[Data] {proportion["dataloader"]}, '
                        f'[Network] {proportion["model"]}')
