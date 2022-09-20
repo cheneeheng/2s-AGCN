@@ -19,7 +19,7 @@ from infer.data_preprocess import DataPreprocessor
 from utils.parser import get_parser as get_default_parser
 from utils.utils import import_class, init_seed
 
-from model.layers import CosineLoss
+from utils.loss import CosineLoss
 
 import matplotlib
 import matplotlib.pyplot as plt

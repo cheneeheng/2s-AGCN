@@ -6,31 +6,27 @@ from .torch_utils import get_normalization_fn
 from .torch_utils import tensor_list_sum
 from .torch_utils import tensor_list_mean
 
-from .pytorch_module_wrapper import Module
-from .pytorch_module_wrapper import Residual
-from .pytorch_module_wrapper import Conv1xN
-from .pytorch_module_wrapper import Conv
-from .pytorch_module_wrapper import Pool
-from .pytorch_module_wrapper import ASPP
+from .module.core import Module
+from .module.core import Residual
+from .module.core import Conv1xN
+from .module.core import Conv
+from .module.core import Pool
+from .module.core import ASPP
 
-from .bifpn import BiFPN
-from .layernorm import LayerNorm
-from .loss import CosineLoss
-from .loss import CategorialFocalLoss
-from .loss import LabelSmoothingLoss
-from .loss import MaximumMeanDiscrepancyLoss
-from .series_decomposition import SeriesDecomposition
+from .module.bifpn import BiFPN
+from .module.layernorm import LayerNorm
+from .module.series_decomposition import SeriesDecomposition
 
-from .multiheadattention import MultiheadAttention
-from .crossattention import CrossViT
-from .crossattention import ImageEmbedder
-from .crossattention import MultiScaleEncoder
-from .crossattention import CrossTransformer
-from .crossattention import Transformer
-from .crossattention import PreNorm
-from .crossattention import Attention
-from .crossattention import FeedForward
+from .attention.multiheadattention import MultiheadAttention
+from .attention.crossattention import CrossViT
+from .attention.crossattention import ImageEmbedder
+from .attention.crossattention import MultiScaleEncoder
+from .attention.crossattention import CrossTransformer
+from .attention.crossattention import Transformer
+from .attention.crossattention import PreNorm
+from .attention.crossattention import Attention
+from .attention.crossattention import FeedForward
 
-from .pos_embedding import PositionalEncoding
-from .pos_embedding import CosSinPositionalEncoding
-from .rel_embedding import RelPosEmb1D
+from .embedding.pos_embedding import PositionalEncoding
+from .embedding.pos_embedding import CosSinPositionalEncoding
+from .embedding.rel_embedding import RelPosEmb1D

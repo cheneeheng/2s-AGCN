@@ -5,7 +5,7 @@ import torch
 
 from typing import Any, Tuple, Type
 
-from model.layers.layernorm import LayerNorm
+from model.layers.module.layernorm import LayerNorm
 
 
 __all__ = ['null_fn', 'init_zeros', 'pad_zeros',
