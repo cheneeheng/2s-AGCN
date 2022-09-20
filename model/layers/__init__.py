@@ -5,6 +5,8 @@ from .torch_utils import get_activation_fn
 from .torch_utils import get_normalization_fn
 from .torch_utils import tensor_list_sum
 from .torch_utils import tensor_list_mean
+from .torch_utils import residual
+from .torch_utils import fuse_features
 
 from .module.core import Module
 from .module.core import Residual

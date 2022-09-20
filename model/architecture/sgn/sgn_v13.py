@@ -11,8 +11,6 @@
 # FREEZE 220704
 # UNFREEZE 220801
 
-from collections import OrderedDict
-
 import torch
 from torch import nn
 from torch import Tensor
@@ -38,6 +36,8 @@ from model.layers import Module
 from model.layers import BiFPN
 from model.layers import Conv
 from model.layers import ASPP
+from model.layers import residual as res
+from model.layers import fuse_features
 from model.layers import null_fn
 from model.layers import init_zeros
 from model.layers import pad_zeros
@@ -89,27 +89,6 @@ T_MODES = [0, 1, 2, 3, 4]
 # 1 pool
 # 2 pool with indices
 POOLING_MODES = [0, 1, 2]
-
-
-def residual_layer(residual: int, in_ch: int, out_ch: int, bias: int = 0):
-    if residual == 0:
-        return null_fn
-    elif residual == 1:
-        if in_ch == out_ch:
-            return nn.Identity()
-        else:
-            return Conv(in_ch, out_ch, bias=bias)
-    else:
-        raise ValueError("Unknown residual modes...")
-
-
-def fuse_features(x1: Tensor, x2: Tensor, mode: int) -> Tensor:
-    if mode == 0:
-        return torch.cat([x1, x2], 1)
-    elif mode == 1:
-        return x1 + x2
-    else:
-        raise ValueError('Unknown feature fusion arg')
 
 
 class SGN(PyTorchModule):
@@ -1033,10 +1012,10 @@ class Embedding(Module):
                                                 bias=self.bias,
                                                 activation=self.activation))
             for i in range(self.num_layers):
-                setattr(self, f'res{i+1}', residual_layer(residual,
-                                                          ch_list[i],
-                                                          ch_list[i+1],
-                                                          self.bias))
+                setattr(self, f'res{i+1}', res(residual,
+                                               ch_list[i],
+                                               ch_list[i+1],
+                                               self.bias))
 
         elif self.mode // 100 == 1:
             # bert style
@@ -1959,12 +1938,11 @@ class GCNSpatialBlock(PyTorchModule):
             assert len(gcn_residual) == self.num_blocks
             for i, r in enumerate(gcn_residual):
                 setattr(self, f'gcn_res{i+1}',
-                        residual_layer(r, gcn_dims[i], gcn_dims[i+1], bias))
+                        res(r, gcn_dims[i], gcn_dims[i+1], bias))
             self.res = null_fn
 
         elif isinstance(gcn_residual, int):
-            self.res = residual_layer(
-                gcn_residual, gcn_dims[0], gcn_dims[-1], bias)
+            self.res = res(gcn_residual, gcn_dims[0], gcn_dims[-1], bias)
 
         else:
             raise ValueError("Unknown residual modes...")
@@ -2110,12 +2088,11 @@ class GCNSpatialBlock2(PyTorchModule):
             assert len(gcn_residual) == self.num_blocks
             for i, r in enumerate(gcn_residual):
                 setattr(self, f'gcn_res{i+1}',
-                        residual_layer(r, gcn_dims[i], gcn_dims[i+1], bias))
+                        res(r, gcn_dims[i], gcn_dims[i+1], bias))
             self.res = null_fn
 
         elif isinstance(gcn_residual, int):
-            self.res = residual_layer(
-                gcn_residual, gcn_dims[0], gcn_dims[-1], bias)
+            self.res = res(gcn_residual, gcn_dims[0], gcn_dims[-1], bias)
 
         else:
             raise ValueError("Unknown residual modes...")
@@ -2230,8 +2207,7 @@ class MLPTemporal(PyTorchModule):
         else:
             self.pool = nn.Identity()
 
-        self.res = residual_layer(residual,
-                                  channels[0], channels[-1], biases[0])
+        self.res = res(residual, channels[0], channels[-1], biases[0])
 
         self.num_layers = len(channels) - 1
         for i in range(self.num_layers):
@@ -2261,8 +2237,7 @@ class MLPTemporal(PyTorchModule):
 
             setattr(self,
                     f'res{i+1}',
-                    residual_layer(residuals[i],
-                                   channels[i], channels[i+1], biases[i]))
+                    res(residuals[i], channels[i], channels[i+1], biases[i]))
 
     def forward(self, x: Tensor, x_n: Optional[Tensor] = None) -> Tensor:
         # x: n,c,v,t ; v=1 due to SMP
