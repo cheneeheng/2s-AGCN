@@ -197,6 +197,7 @@ class SGN(PyTorchModule):
                  t_mha_kwargs: Optional[dict] = None,
                  aspp_rates: Optional[list] = None,
 
+                 decomp_kernel_size: int = 3
                  ):
         super(SGN, self).__init__()
 
@@ -536,6 +537,8 @@ class SGN(PyTorchModule):
             )
 
         # Frame level module ---------------------------------------------------
+        self.decomp_kernel_size = decomp_kernel_size
+
         self.t_mode = t_mode
         self.t_maxpool_kwargs = t_maxpool_kwargs
         self.t_mha_kwargs = t_mha_kwargs
@@ -620,6 +623,7 @@ class SGN(PyTorchModule):
                             aspp_rates=self.aspp_rates,
                             maxpool_kwargs=self.t_maxpool_kwargs,
                             mha_kwargs=self.t_mha_kwargs,
+                            decomp_kernel_size=self.decomp_kernel_size,
                         ))
 
                 # if self.multi_t_shared == 1:
