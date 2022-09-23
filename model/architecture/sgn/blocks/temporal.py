@@ -4,7 +4,7 @@ from torch import nn
 from torch import Tensor
 from torch.nn import Module as PyTorchModule
 
-from typing import Tuple, Optional, Union, Type, List
+from typing import Tuple, Optional, Union, Type, List, Any
 
 from model.resource.common_ntu import *
 from model.layers import Module
@@ -196,7 +196,7 @@ class MLPTemporalPool(PyTorchModule):
                  maxpool_kwargs: Optional[dict] = None,
                  residual: int = 0,
                  prenorm: bool = False,
-                 pool_kernel_sizes: List[int] = [0, 1, 5, 9],
+                 pool_kernel_sizes: List[int] = [3, 5, 7, 9],
                  ):
         super(MLPTemporalPool, self).__init__()
         kwargs = {'channels': channels[-2:],
@@ -212,10 +212,17 @@ class MLPTemporalPool(PyTorchModule):
                   'residual': residual,
                   'prenorm': prenorm
                   }
+
         self.pool_len = len(pool_kernel_sizes)
+
+        if normalizations[0] is None:
+            _normalization = None
+        else:
+            def _normalization(): return normalizations[0](channels[1])
+
         for i, k in enumerate(pool_kernel_sizes):
             setattr(self, f'pad{i+1}',
-                    nn.ReplicationPad2d((0, 0,  (k - 1) // 2, (k - 1) // 2)))
+                    nn.ReplicationPad2d(((k - 1) // 2, (k - 1) // 2, 0, 0)))
             setattr(self, f'pool{i+1}',
                     Pool(channels[0],
                          channels[1],
@@ -228,7 +235,7 @@ class MLPTemporalPool(PyTorchModule):
                          bias=biases[0],
                          dropout=dropouts[0],
                          activation=activations[0],
-                         normalization=normalizations[0]))
+                         normalization=_normalization))
             setattr(self, f'cnn{i+1}', MLPTemporal(**kwargs))
 
     def forward(self, x: Tensor) -> List[Tensor]:
@@ -257,7 +264,7 @@ class TemporalBranch(Module):
                  maxpool_kwargs: Optional[dict] = None,
                  mha_kwargs: Optional[dict] = None,
                  decomp_kernel_size: int = 3,
-                 pool_kernel_sizes: List[int] = [0, 1, 5, 9],
+                 pool_kernel_sizes: List[int] = [3, 5, 7, 9],
                  ):
         super(TemporalBranch, self).__init__(in_channels,
                                              out_channels,
@@ -335,13 +342,6 @@ class TemporalBranch(Module):
             )
         elif t_mode == 5:
             idx = 2
-            self.aspp = ASPP(self.in_channels,
-                             self.in_channels,
-                             bias=self.bias,
-                             dilation=aspp_rates,
-                             dropout=self.dropout,
-                             activation=self.activation,
-                             normalization=self.normalization)
             self.cnn = MLPTemporalPool(
                 channels=[self.in_channels, self.in_channels,
                           self.out_channels],

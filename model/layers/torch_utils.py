@@ -18,7 +18,7 @@ def pad_zeros(x: torch.Tensor) -> torch.Tensor:
     return torch.cat([x.new(*x.shape[:-1], 1).zero_(), x], dim=-1)
 
 
-def get_activation_fn(act_type: str) -> Type[Type[torch.nn.Module]]:
+def get_activation_fn(act_type: str) -> Type[torch.nn.Module]:
     if act_type == 'relu':
         return torch.nn.ReLU
     elif act_type == 'gelu':

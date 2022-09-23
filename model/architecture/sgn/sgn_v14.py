@@ -192,7 +192,7 @@ class SGN(PyTorchModule):
                  aspp_rates: Optional[list] = None,
 
                  decomp_kernel_size: int = 3,
-                 pool_kernel_sizes: List[int] = [0, 1, 5, 9],
+                 pool_kernel_sizes: List[int] = [3, 5, 7, 9],
                  ):
         super(SGN, self).__init__()
 
@@ -980,7 +980,7 @@ if __name__ == '__main__':
         dropout=0.0,  # classifier
         dropout2d=0.0,  # the rest
         c_multiplier=[1.0, 1.0, 1.0, 1.0],
-        norm_type='bn-pre',
+        norm_type='bn',
         act_type='relu',
         xem_projection=0,
         input_position=1,
@@ -1025,7 +1025,7 @@ if __name__ == '__main__':
         # spatial_maxpool=1,
         # temporal_maxpool=1,
         # aspp_rates=None, 345402520
-        t_mode=4,
+        t_mode=5,
         # t_maxpool_kwargs=None,
         # t_mha_kwargs={
         #     'd_model': [256, 512],
