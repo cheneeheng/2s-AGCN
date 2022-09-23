@@ -12,7 +12,7 @@ from einops.layers.torch import Rearrange
 from typing import Callable, Union
 
 from model.layers.torch_utils import get_activation_fn
-from model.layers.torch_utils import get_normalization_fn
+from model.layers.module.module_utils import get_normalization_fn
 
 
 __all__ = ['CrossViT',

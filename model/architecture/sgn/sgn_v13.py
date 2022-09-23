@@ -2375,7 +2375,7 @@ class TemporalBranch(Module):
                 kernel_sizes=[self.kernel_size, 1],
                 paddings=[self.kernel_size//2, 0],
                 biases=[self.bias for _ in range(idx)],
-                residuals=[1 for _ in range(idx)],
+                residuals=[0 for _ in range(idx)],
                 dropouts=[self.dropout, None],
                 activations=[self.activation for _ in range(idx)],
                 normalizations=[self.normalization for _ in range(idx)],

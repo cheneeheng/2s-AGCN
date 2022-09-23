@@ -193,13 +193,17 @@ def get_parser() -> argparse.ArgumentParser:
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220831100001_gt2_fpn10_sigmoid'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220831170001_gt2_fpn10_sigmoid_allvaralpha'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220902150001_gt4_varalpha_sigmoid'  # noqa
-        default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220902150001_gt4_varalpha_sigmoid_flgamma1'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220902150001_gt4_varalpha_sigmoid_flgamma1'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220915120001_gt4_varalpha_sigmoid_multit357'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220906163001_gt5_varalpha'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220906163001_gt5_varalpha_allactnorm'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220908210001_gt6_varalpha_fsim1alpha1'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220908210001_gt6_varalpha_fsim2alpha1'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220909150001_gt6_varalpha_fsim1alpha1'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220909150001_gt6_varalpha_fsim2alpha1'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220920150001_tmode4_k7'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220920140001_gt4_varalpha_tmode4'  # noqa
+        default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220922140001_gt4_varalpha_sigmoid_tmode4_k3'  # noqa
     )
     parser.add_argument(
         '--out-folder',
@@ -341,8 +345,8 @@ if __name__ == '__main__':
 
     # skeleton -----------
     fig0 = []
-    for _ in range(6):
-        fig00 = plt.figure()
+    for _ in range(1):
+        fig00 = plt.figure(figsize=(16, 6))
         fig00.tight_layout()
         fig0.append(fig00)
     enable[0] = True
@@ -432,8 +436,8 @@ if __name__ == '__main__':
         # if (logits[preds]*100 < 50) or data2[c] != preds:
         print(f"Label : {data2[c]:3d} , Pred : {preds:3d} , Logit : {logits[preds]*100:>5.2f}, SAMP_FREQ : {SAMP_FREQ}, {c}")  # noqa
 
-        # if data2[c] == preds:
-        if data2[c] != 53:
+        if data2[c] == preds:
+            # if data2[c] != 53:
             continue
 
         # PLOTTING ----------------------------------------------------------
@@ -443,18 +447,22 @@ if __name__ == '__main__':
             # d = input_data[0].reshape((-1, 25, 3))
             for fig00 in fig0:
                 fig00.clear()
+            dd = np.stack([d[:, :, 2], d[:, :, 0], d[:, :, 1]], axis=-1)
+            plot_skeletons(dd, fig0[0])
+            # dd = np.stack([d[:, :, 2], d[:, :, 1], d[:, :, 0]], axis=-1)
+            # plot_skeletons(dd, fig0[1])
             # dd = np.stack([d[:, :, 0], d[:, :, 1], d[:, :, 2]], axis=-1)
             # plot_skeletons(dd, fig0[0])
             # dd = np.stack([d[:, :, 0], d[:, :, 2], d[:, :, 1]], axis=-1)
             # plot_skeletons(dd, fig0[1])
             # dd = np.stack([d[:, :, 1], d[:, :, 0], d[:, :, 2]], axis=-1)
             # plot_skeletons(dd, fig0[2])
-            dd = np.stack([d[:, :, 2], d[:, :, 0], d[:, :, 1]], axis=-1)
-            plot_skeletons(dd, fig0[3])
+            # dd = np.stack([d[:, :, 2], d[:, :, 0], d[:, :, 1]], axis=-1)
+            # plot_skeletons(dd, fig0[3])
             # dd = np.stack([d[:, :, 1], d[:, :, 2], d[:, :, 0]], axis=-1)
             # plot_skeletons(dd, fig0[4])
-            dd = np.stack([d[:, :, 2], d[:, :, 1], d[:, :, 0]], axis=-1)
-            plot_skeletons(dd, fig0[5])
+            # dd = np.stack([d[:, :, 2], d[:, :, 1], d[:, :, 0]], axis=-1)
+            # plot_skeletons(dd, fig0[5])
 
         # G spatial --------------------------------------------------
         if enable[1]:

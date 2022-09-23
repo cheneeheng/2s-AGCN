@@ -552,6 +552,10 @@ sgn_v13:
 
         # gt4 uses 2 layer tcn for attention T (like gt3)
         # and multiplies with input x in gcn
+        - 220915120001_gt4_varalpha_sigmoid_multit357:
+                  - 95.18%
+        - 220915120001_gt4_varalpha_sigmoid:
+                  - 94.55%
         - 220902150001_gt4_varalpha_sigmoid:
                   - t 357
                   - 95.18%
@@ -588,7 +592,7 @@ sgn_v13:
                   - 94.56%
         - 220906163001_gt5_varalpha_allactnorm_64fr:
                   - 94.21%
-        
+
         # feature similarity FAULTY, without 1- x
         - 220908210001_gt6_varalpha_fsim1alpha001:
                   - 94.69%
@@ -624,6 +628,27 @@ sgn_v13:
                   - 94.17%
         - 220909150001_gt6_varalpha_fsim1alpha10:
                   - 92.94%
+
+        - MLP temporal has residual (not intended):
+                  - 220920150001_tmode4_k9:
+                            - 94.85%
+                  - 220920150001_tmode4_k7:
+                            - 94.86%
+                  - 220920150001_tmode4_k5:
+                            - 94.99%
+                  - 220920140001_tmode4:
+                            - 94.87%
+                  - 220920140001_gt4_varalpha_tmode4:
+                            - 80.37%
+        
+        - 220922140001_gt4_varalpha_sigmoid_tmode4_k3:
+                  - 95.03%
+        - 220922140001_gt4_varalpha_sigmoid_tmode4_k5:
+                  - 95.12%
+        - 220922140001_gt4_varalpha_sigmoid_tmode4_k7:
+                  - 94.91%
+        - 220922140001_gt4_varalpha_sigmoid_tmode4_k9:
+                  - 94.94%
 
 
 sgn-code:

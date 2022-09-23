@@ -7,7 +7,7 @@ import torch.nn as nn
 
 from typing import Union
 
-from model.layers.module.core import Conv
+from model.layers.module.block import Conv
 
 
 class BiFPNBlock(nn.Module):

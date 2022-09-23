@@ -1,3 +1,5 @@
+from multiprocessing import pool
+import torch
 from torch import nn
 from torch import Tensor
 from torch.nn import Module as PyTorchModule
@@ -7,6 +9,7 @@ from typing import Tuple, Optional, Union, Type, List
 from model.resource.common_ntu import *
 from model.layers import Module
 from model.layers import Conv
+from model.layers import Pool
 from model.layers import ASPP
 from model.layers import residual as res
 from model.layers import Transformer
@@ -179,6 +182,66 @@ class MLPTemporalDecompose(PyTorchModule):
         return [x1, x2, x3]
 
 
+class MLPTemporalPool(PyTorchModule):
+    def __init__(self,
+                 channels: List[int],
+                 kernel_sizes: List[int] = [3, 1],
+                 paddings: List[int] = [1, 0],
+                 dilations: List[int] = [1, 1],
+                 biases: List[int] = [0, 0],
+                 residuals: List[int] = [0, 0],
+                 dropouts: T2 = [nn.Dropout2d, None],
+                 activations: T2 = [nn.ReLU, nn.ReLU],
+                 normalizations: T2 = [nn.BatchNorm2d, nn.BatchNorm2d],
+                 maxpool_kwargs: Optional[dict] = None,
+                 residual: int = 0,
+                 prenorm: bool = False,
+                 pool_kernel_sizes: List[int] = [0, 1, 5, 9],
+                 ):
+        super(MLPTemporalPool, self).__init__()
+        kwargs = {'channels': channels[-2:],
+                  'kernel_sizes': kernel_sizes[-1:],
+                  'paddings': paddings[-1:],
+                  'dilations': dilations[-1:],
+                  'biases': biases[-1:],
+                  'residuals': residuals[-1:],
+                  'dropouts': dropouts[-1:],
+                  'activations': activations[-1:],
+                  'normalizations': normalizations[-1:],
+                  'maxpool_kwargs': maxpool_kwargs,
+                  'residual': residual,
+                  'prenorm': prenorm
+                  }
+        self.pool_len = len(pool_kernel_sizes)
+        for i, k in enumerate(pool_kernel_sizes):
+            setattr(self, f'pad{i+1}',
+                    nn.ReplicationPad2d((0, 0,  (k - 1) // 2, (k - 1) // 2)))
+            setattr(self, f'pool{i+1}',
+                    Pool(channels[0],
+                         channels[1],
+                         pooling=nn.AvgPool2d((1, k),
+                                              stride=(1, 1),
+                                              padding=(0, 0)),
+                         kernel_size=kernel_sizes[0],
+                         padding=paddings[0],
+                         dilation=dilations[0],
+                         bias=biases[0],
+                         dropout=dropouts[0],
+                         activation=activations[0],
+                         normalization=normalizations[0]))
+            setattr(self, f'cnn{i+1}', MLPTemporal(**kwargs))
+
+    def forward(self, x: Tensor) -> List[Tensor]:
+        # x: n,c,v,t ; v=1 due to SMP
+        output = []
+        for i in range(self.pool_len):
+            x1 = getattr(self, f'pad{i+1}')(x)
+            x2 = getattr(self, f'pool{i+1}')(x1)
+            x3 = getattr(self, f'cnn{i+1}')(x2)
+            output.append(x3)
+        return output
+
+
 class TemporalBranch(Module):
     def __init__(self,
                  in_channels: int,
@@ -193,7 +256,8 @@ class TemporalBranch(Module):
                  aspp_rates: Optional[List[int]] = None,
                  maxpool_kwargs: Optional[dict] = None,
                  mha_kwargs: Optional[dict] = None,
-                 decomp_kernel_size: int = 3
+                 decomp_kernel_size: int = 3,
+                 pool_kernel_sizes: List[int] = [0, 1, 5, 9],
                  ):
         super(TemporalBranch, self).__init__(in_channels,
                                              out_channels,
@@ -268,6 +332,29 @@ class TemporalBranch(Module):
                 maxpool_kwargs=maxpool_kwargs,
                 prenorm=self.prenorm,
                 decomp_kernel_size=decomp_kernel_size
+            )
+        elif t_mode == 5:
+            idx = 2
+            self.aspp = ASPP(self.in_channels,
+                             self.in_channels,
+                             bias=self.bias,
+                             dilation=aspp_rates,
+                             dropout=self.dropout,
+                             activation=self.activation,
+                             normalization=self.normalization)
+            self.cnn = MLPTemporalPool(
+                channels=[self.in_channels, self.in_channels,
+                          self.out_channels],
+                kernel_sizes=[self.kernel_size, 1],
+                paddings=[self.kernel_size//2, 0],
+                biases=[self.bias for _ in range(idx)],
+                residuals=[1 for _ in range(idx)],
+                dropouts=[self.dropout, None],
+                activations=[self.activation for _ in range(idx)],
+                normalizations=[self.normalization for _ in range(idx)],
+                maxpool_kwargs=maxpool_kwargs,
+                prenorm=self.prenorm,
+                pool_kernel_sizes=pool_kernel_sizes
             )
         else:
             raise ValueError('Unknown t_mode')

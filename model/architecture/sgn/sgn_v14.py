@@ -13,10 +13,6 @@ import torch
 from torch import nn
 from torch import Tensor
 from torch.nn import Module as PyTorchModule
-from torch.nn import functional as F
-from torch import einsum
-
-from einops import rearrange
 
 try:
     from fvcore.nn import FlopCountAnalysis
@@ -28,12 +24,9 @@ import math
 from typing import Tuple, Optional, Union, Type, List
 
 from model.resource.common_ntu import *
-from model.layers import Module
 from model.layers import BiFPN
 from model.layers import Conv
-from model.layers import residual as res
 from model.layers import fuse_features
-from model.layers import null_fn
 from model.layers import init_zeros
 from model.layers import pad_zeros
 from model.layers import get_activation_fn
@@ -89,7 +82,7 @@ POOLING_MODES = [0, 1, 2]
 # 2 original sgn with residual -> 1x3conv + res + 1x1conv + res
 # 3 trasnformers
 # 4 decompose + original sgn -> 1x3conv + 1x1conv
-T_MODES = [0, 1, 2, 3, 4]
+T_MODES = [0, 1, 2, 3, 4, 5]
 
 
 class SGN(PyTorchModule):
@@ -198,6 +191,8 @@ class SGN(PyTorchModule):
                  t_mha_kwargs: Optional[dict] = None,
                  aspp_rates: Optional[list] = None,
 
+                 decomp_kernel_size: int = 3,
+                 pool_kernel_sizes: List[int] = [0, 1, 5, 9],
                  ):
         super(SGN, self).__init__()
 
@@ -537,6 +532,9 @@ class SGN(PyTorchModule):
             )
 
         # Frame level module ---------------------------------------------------
+        self.decomp_kernel_size = decomp_kernel_size
+        self.pool_kernel_sizes = pool_kernel_sizes
+
         self.t_mode = t_mode
         assert t_mode in T_MODES
         self.t_maxpool_kwargs = t_maxpool_kwargs
@@ -622,6 +620,8 @@ class SGN(PyTorchModule):
                             aspp_rates=self.aspp_rates,
                             maxpool_kwargs=self.t_maxpool_kwargs,
                             mha_kwargs=self.t_mha_kwargs,
+                            decomp_kernel_size=self.decomp_kernel_size,
+                            pool_kernel_sizes=self.pool_kernel_sizes,
                         ))
 
                 # if self.multi_t_shared == 1:
@@ -992,8 +992,8 @@ if __name__ == '__main__':
         semantic_joint_fusion=0,
         semantic_frame_fusion=1,
         semantic_frame_location=0,
-        sgcn_g_res_alpha=-1,
-        sgcn_gt_mode=5,
+        # sgcn_g_res_alpha=-1,
+        # sgcn_gt_mode=5,
         sgcn_dims=[128, 256, 256],  # [c2, c3, c3],
         sgcn_kernel=1,  # residual connection in GCN
         # sgcn_padding=0,  # residual connection in GCN
