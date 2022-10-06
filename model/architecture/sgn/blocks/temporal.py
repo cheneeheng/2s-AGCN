@@ -5,6 +5,7 @@ from torch import Tensor
 from torch.nn import Module as PyTorchModule
 
 from typing import Tuple, Optional, Union, Type, List, Any
+from model.layers.torch_utils import null_fn
 
 from model.resource.common_ntu import *
 from model.layers import Module
@@ -14,6 +15,8 @@ from model.layers import ASPP
 from model.layers import residual as res
 from model.layers import Transformer
 from model.layers import SeriesDecomposition
+from model.layers import PositionalEncoding
+from model.layers import CosSinPositionalEncoding
 
 T1 = Type[PyTorchModule]
 T2 = List[Optional[Type[PyTorchModule]]]
@@ -31,7 +34,9 @@ class MHATemporal(PyTorchModule):
                  norm=None,
                  d_head=None,
                  dim_feedforward_output=None,
-                 global_norm=None):
+                 global_norm=None,
+                 pos_enc=None,
+                 max_len=20):
         super(MHATemporal, self).__init__()
         if norm is not None:
             assert d_head is not None
@@ -63,8 +68,17 @@ class MHATemporal(PyTorchModule):
                             layer_norm_eps=1e-5,
                             batch_first=True,
                         ))
+        if pos_enc is None:
+            self.pos_enc = null_fn
+        elif pos_enc == 'abs':
+            self.pos_enc = PositionalEncoding(d_model[0], max_len=max_len)
+        elif pos_enc == 'cos':
+            self.pos_enc = CosSinPositionalEncoding(d_model[0], max_len=max_len)
+        else:
+            raise ValueError("unknown pos_enc")
 
     def forward(self, x: Tensor) -> Tuple[Tensor, Optional[list]]:
+        x = self.pos_enc(x)
         if hasattr(self, 'transformer'):
             x, attn_list = self.transformer(x)
         else:
@@ -323,7 +337,7 @@ class TemporalBranch(Module):
                 prenorm=self.prenorm
             )
         elif t_mode == 3:
-            self.cnn = MHATemporal(mha_kwargs)
+            self.cnn = MHATemporal(**mha_kwargs)
         elif t_mode == 4:
             idx = 2
             self.cnn = MLPTemporalDecompose(

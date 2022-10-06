@@ -917,6 +917,7 @@ class SGN(PyTorchModule):
                     'x_spa_list': x_spa_list,
                     'x_spa_list2': x_spa_list2,
                     'x_tem_list': _x_list,
+                    'tem_emb': tem_emb,
                 }
             )
         else:
@@ -928,6 +929,7 @@ class SGN(PyTorchModule):
                     'featuremap_spa_list': featuremap_spa_list,
                     'x_spa_list': x_spa_list,
                     'x_tem_list': _x_list,
+                    'tem_emb': tem_emb,
                 }
             )
 

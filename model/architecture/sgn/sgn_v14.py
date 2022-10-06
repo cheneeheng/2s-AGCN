@@ -82,6 +82,7 @@ POOLING_MODES = [0, 1, 2]
 # 2 original sgn with residual -> 1x3conv + res + 1x1conv + res
 # 3 trasnformers
 # 4 decompose + original sgn -> 1x3conv + 1x1conv
+# 5 avg pool + cnn
 T_MODES = [0, 1, 2, 3, 4, 5]
 
 
@@ -915,6 +916,7 @@ class SGN(PyTorchModule):
                     'x_spa_list': x_spa_list,
                     'x_spa_list2': x_spa_list2,
                     'x_tem_list': _x_list,
+                    'tem_emb': tem_emb,
                 }
             )
         else:
@@ -926,6 +928,7 @@ class SGN(PyTorchModule):
                     'featuremap_spa_list': featuremap_spa_list,
                     'x_spa_list': x_spa_list,
                     'x_tem_list': _x_list,
+                    'tem_emb': tem_emb,
                 }
             )
 
@@ -1003,8 +1006,8 @@ if __name__ == '__main__':
         # sgcn_prenorm=False,
         # # sgcn_ffn=0,
         # sgcn_v_kernel=0,
-        sgcn_attn_mode=0,
-        sgcn_g_kernel=1,
+        sgcn_attn_mode=1,
+        sgcn_g_kernel=0,
         sgcn_g_proj_dim=256,  # c3
         # sgcn_g_proj_shared=False,
         # # sgcn_g_weighted=1,
@@ -1025,20 +1028,22 @@ if __name__ == '__main__':
         # spatial_maxpool=1,
         # temporal_maxpool=1,
         # aspp_rates=None, 345402520
-        t_mode=5,
+        t_mode=3,
         # t_maxpool_kwargs=None,
-        # t_mha_kwargs={
-        #     'd_model': [256, 512],
-        #     'nhead': [1, 1],
-        #     'd_head': [256*2, 512*2],
-        #     'dim_feedforward': [256, 512],
-        #     'dim_feedforward_output': [512, 1024],
-        #     'dropout': 0.1,
-        #     'activation': "relu",
-        #     'num_layers': 2,
-        #     'norm': 'ln',
-        #     'global_norm': False
-        # },
+        t_mha_kwargs={
+            'd_model': [256, 512],
+            'nhead': [1, 1],
+            'd_head': [256*2, 512*2],
+            'dim_feedforward': [256, 512],
+            'dim_feedforward_output': [512, 1024],
+            'dropout': 0.1,
+            'activation': "relu",
+            'num_layers': 2,
+            'norm': 'ln',
+            'global_norm': False,
+            'pos_enc': 'abs',
+            'max_len': 20
+        },
         # multi_t=[[], [], [3, 5, 7], [3, 5, 7]],
         # multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7]],
         # multi_t_shared=2,
