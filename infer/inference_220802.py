@@ -18,118 +18,15 @@ from feeders.loader import NTUDataLoaders
 from infer.data_preprocess import DataPreprocessor
 from utils.parser import get_parser as get_default_parser
 from utils.utils import import_class, init_seed
-
 from utils.loss import CosineLoss
+from infer.inference import read_xyz
+from infer.inference import parse_arg
+from infer.plot_skeleton import plot_skeletons
 
 import matplotlib
 import matplotlib.pyplot as plt
 
-
-# ------------------------------------------------------------------------------
-# https://stackoverflow.com/questions/67278053
-
-# NTU60
-rightarm = np.array([24, 12, 11, 10, 9, 21]) - 1
-leftarm = np.array([22, 8, 7, 6, 5, 21]) - 1
-righthand = np.array([25, 12]) - 1
-lefthand = np.array([23, 8]) - 1
-rightleg = np.array([19, 18, 17, 1]) - 1
-leftleg = np.array([15, 14, 13, 1]) - 1
-rightfeet = np.array([20, 19]) - 1
-leftfeet = np.array([16, 15]) - 1
-body = np.array([4, 3, 21, 2, 1]) - 1  # body
-
-
-def get_chains(dots: np.ndarray,   # shape == (n_dots, 3)
-               ):
-    return (dots[rightarm.tolist()],
-            dots[leftarm.tolist()],
-            dots[righthand.tolist()],
-            dots[lefthand.tolist()],
-            dots[rightleg.tolist()],
-            dots[leftleg.tolist()],
-            dots[rightfeet.tolist()],
-            dots[leftfeet.tolist()],
-            dots[body.tolist()])
-
-
-def subplot_nodes(dots: np.ndarray, ax):
-    return ax.scatter3D(*dots.T, s=1, c=dots[:, -1])
-
-
-def subplot_bones(chains: Tuple[np.ndarray, ...], ax):
-    return [ax.plot(*chain.T) for chain in chains]
-
-
-def plot_skeletons(skeletons: Sequence[np.ndarray], fig):
-    # fig = plt.figure()
-    for i, dots in enumerate(skeletons, start=1):
-        chains = get_chains(dots)
-        ax = fig.add_subplot(5, 20, i, projection='3d')
-        subplot_nodes(dots, ax)
-        subplot_bones(chains, ax)
-    # plt.show()
-
-
-# def test():
-#     """Plot random poses of simplest skeleton"""
-#     skeletons = np.random.standard_normal(size=(10, 11, 3))
-#     chains_ixs = ([0, 1, 2, 3, 4],  # hand_l, elbow_l, chest, elbow_r, hand_r
-#                   [5, 2, 6],        # pelvis, chest, head
-#                   [7, 8, 5, 9, 10])  # foot_l, knee_l, pelvis, knee_r, foot_r
-#     plot_skeletons(skeletons, chains_ixs)
-
-# ------------------------------------------------------------------------------
-
-# def filter_logits(logits: list) -> Tuple[list, list]:
-#     # {
-#     #     "8": "sitting down",
-#     #     "9": "standing up (from sitting position)",
-#     #     "10": "clapping",
-#     #     "23": "hand waving",
-#     #     "26": "hopping (one foot jumping)",
-#     #     "27": "jump up",
-#     #     "35": "nod head/bow",
-#     #     "36": "shake head",
-#     #     "43": "falling",
-#     #     "56": "giving something to other person",
-#     #     "58": "handshaking",
-#     #     "59": "walking towards each other",
-#     #     "60": "walking apart from each other"
-#     # }
-#     ids = [7, 8, 9, 22, 25, 27, 34, 35, 42, 55, 57, 58, 59]
-#     sort_idx = np.argsort(-np.array(logits)).tolist()
-#     sort_idx = [i for i in sort_idx if i in ids]
-#     new_logits = [logits[i] for i in sort_idx]
-#     return sort_idx, new_logits
-
-
-def read_xyz(file: str, max_body: int = 4, num_joint: int = 25) -> np.ndarray:
-    skel_data = np.loadtxt(file, delimiter=',')
-    data = np.zeros((max_body, 1, num_joint, 3))
-    for m, body_joint in enumerate(skel_data):
-        for j in range(0, len(body_joint), 3):
-            if m < max_body and j//3 < num_joint:
-                # x subject right, y to camera, z up
-                data[m, 0, j//3, :] = [body_joint[j],
-                                       body_joint[j+1],
-                                       body_joint[j+2]]
-            else:
-                pass
-    return data  # M, T, V, C
-
-
-def parse_arg(parser: argparse.ArgumentParser) -> argparse.Namespace:
-    [p, _] = parser.parse_known_args()
-    with open(os.path.join(p.weight_path, 'config.yaml'), 'r') as f:
-        default_arg = yaml.safe_load(f)
-    key = vars(p).keys()
-    for k in default_arg.keys():
-        if k not in key:
-            print(f'WRONG ARG: {k}')
-            assert (k in key)
-    parser.set_defaults(**default_arg)
-    return parser.parse_known_args()
+from model.layers import tensor_list_mean
 
 
 def get_parser() -> argparse.ArgumentParser:
@@ -202,8 +99,30 @@ def get_parser() -> argparse.ArgumentParser:
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220909150001_gt6_varalpha_fsim1alpha1'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220909150001_gt6_varalpha_fsim2alpha1'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220920150001_tmode4_k7'  # noqa
-        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220920140001_gt4_varalpha_tmode4'  # noqa
-        default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220922140001_gt4_varalpha_sigmoid_tmode4_k3'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220922140001_gt4_varalpha_sigmoid_tmode4_k3'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v13/220922140001_gt4_varalpha_sigmoid_tmode4_k5'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v14/220923140001_tmode5_1357'  # noqa
+        default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v14/220928170001_tmode3'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v14/220928170001_tmode3_1layer'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v14/220928170001_tmode3_1layer_sgcnattn1'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v14/220928170001_tmode3_1layer_3heads'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v14/220928170001_tmode3_1layer_6heads'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v14/220928170001_tmode3_1layer_9heads'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v14/220928170001_tmode3_1layer_3heads_1024dhead'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v14/220928170001_tmode3_3heads'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v14/220928170001_tmode3_3layers'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v14/220928170001_tmode3_4layers'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v14/220928170001_tmode3_2layer_6heads'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v14/220928170001_tmode3_2layer_9heads'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v14/221006150001_tmode3_absposenc'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v14/221006150001_tmode3_cosposenc'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v14/221006150001_tmode3_3heads_absposenc'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v14/221006150001_tmode3_6heads_absposenc'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v14/221006150001_tmode3_9heads_absposenc'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v14/221010140001_tmode3_3heads_256ffn_nosemfr'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v14/221010140001_tmode3_3heads_256ffn'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v14/221010140001_tmode3_256ffn'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v14/221010140001_tmode3_3heads_256ffn_absposenc'  # noqa
     )
     parser.add_argument(
         '--out-folder',
@@ -341,7 +260,7 @@ if __name__ == '__main__':
     # with open(_data_dir + '/NTU_CV_train_label_180.pkl', 'wb') as f:
     #     pickle.dump(data2[:180], f)
 
-    enable = {i: False for i in range(0, 10, 1)}
+    enable = {i: False for i in range(0, 15, 1)}
 
     # skeleton -----------
     fig0 = []
@@ -354,10 +273,13 @@ if __name__ == '__main__':
     fig1, axes1 = plt.subplots(5, 1, figsize=(16, 6))
     fig1.tight_layout()
     enable[1] = True
-    # # A in temporal branch for t_mode=3 -----------
-    # fig2, axes2 = plt.subplots(5, 1, figsize=(7, 7))
-    # fig2.tight_layout()
-    # enable[2] = True
+    # A in temporal branch for t_mode=3 -----------
+    fig2, axes2 = plt.subplots(5, 3, figsize=(20, 7))
+    fig2.tight_layout()
+    enable[2] = True
+    fig11, axes11 = plt.subplots(5, 1, figsize=(3, 7))
+    fig11.tight_layout()
+    enable[11] = True
     # featuremap after each SGCN -----------
     fig3, axes3 = plt.subplots(5, 1, figsize=(3, 7))
     fig3.tight_layout()
@@ -383,9 +305,13 @@ if __name__ == '__main__':
     # fig8.tight_layout()
     # enable[8] = True
     # x tem list -----------
-    fig9, axes9 = plt.subplots(5, 4, figsize=(3, 7))
+    fig9, axes9 = plt.subplots(5, 5, figsize=(3, 7))
     fig9.tight_layout()
     enable[9] = True
+
+    fig10, axes10 = plt.subplots(5, 1, figsize=(3, 7))
+    fig10.tight_layout()
+    enable[10] = True
 
     freq = 1
     SAMP_FREQ = 5
@@ -430,13 +356,15 @@ if __name__ == '__main__':
         x_spa_list2 = output_dict.get('x_spa_list2')
         featuremap_spa_list2 = output_dict.get('featuremap_spa_list2')
         x_tem_list = output_dict.get('x_tem_list')
+        tem_emb = output_dict.get('tem_emb')
 
         logits, preds = output[0].tolist(), predict_label.item()
 
         # if (logits[preds]*100 < 50) or data2[c] != preds:
         print(f"Label : {data2[c]:3d} , Pred : {preds:3d} , Logit : {logits[preds]*100:>5.2f}, SAMP_FREQ : {SAMP_FREQ}, {c}")  # noqa
 
-        if data2[c] == preds:
+        if data2[c] < 17:
+            # if data2[c] == preds:
             # if data2[c] != 53:
             continue
 
@@ -488,16 +416,35 @@ if __name__ == '__main__':
             if tem_a[0] is not None:
                 img = []
                 for j in range(SAMP_FREQ):
-                    img_j = []
+                    # img_j = []
+                    # for i in range(len(tem_a[0])):
+                    #     # last 0 cause spa_maxpool
+                    #     img_i = tem_a[0][i][j][0].data.cpu().numpy()
+                    #     img_j.append(img_i)
+                    # img.append(np.concatenate(img_j, axis=1))
+                    # axes2[j].imshow(img[-1])
+                    # axes2[j].xaxis.set_ticks(
+                    #     np.arange(0, 20*len(tem_a[0]), SAMP_FREQ))
+                    # axes2[j].yaxis.set_ticks(np.arange(0, 20, SAMP_FREQ))
                     for i in range(len(tem_a[0])):
                         # last 0 cause spa_maxpool
-                        img_i = tem_a[0][i][j][0].data.cpu().numpy()
-                        img_j.append(img_i)
-                    img.append(np.concatenate(img_j, axis=1))
-                    axes2[j].imshow(img[-1])
-                    axes2[j].xaxis.set_ticks(
-                        np.arange(0, 20*len(tem_a[0]), 20))
-                    axes2[j].yaxis.set_ticks(np.arange(0, 20, SAMP_FREQ))
+                        img_i = tem_a[0][i][j].data.cpu().numpy()
+                        img_i = img_i.swapaxes(0, 1)
+                        img_i = img_i.reshape(img_i.shape[0], -1)
+                        axes2[j, i].imshow(img_i)
+                        axes2[j, i].xaxis.set_ticks(
+                            np.arange(0, 20, SAMP_FREQ))
+                        axes2[j, i].yaxis.set_ticks(
+                            np.arange(0, 20, SAMP_FREQ))
+
+        if enable[11]:
+            try:
+                for j in range(SAMP_FREQ):
+                    img_i = Model.tem_mha_3_1.cnn.pos_enc.pe.data.cpu().numpy()
+                    img_i = np.linalg.norm(img_i, axis=-1, keepdims=True)
+                    axes11[j].imshow(img_i)
+            except:
+                pass
 
         # featuremap after each SGCN ----------------------------------
         if enable[3]:
@@ -650,7 +597,16 @@ if __name__ == '__main__':
                             img_ji = img_ji.swapaxes(0, -1)
                         if img_ji.shape[-1] > 3:
                             img_ji = np.linalg.norm(img_ji, axis=-1)
-                        axes9[i, j].imshow(img_ji, vmin=vmin[i], vmax=vmax[i])
+                        # axes9[i, j].imshow(img_ji, vmin=vmin[i], vmax=vmax[i])
+                        axes9[i, j].imshow(img_ji)
+                # x = tensor_list_mean(x_tem_list)
+                # for i in range(SAMP_FREQ):
+                #     img_ji = x[i].data.cpu().numpy()
+                #     if img_ji.shape[-1] != 1:
+                #         img_ji = img_ji.swapaxes(0, -1)
+                #     if img_ji.shape[-1] > 3:
+                #         img_ji = np.linalg.norm(img_ji, axis=-1)
+                #     axes9[i, -1].imshow(img_ji)
 
         if enable[8]:
             axes8[0].cla()
@@ -662,6 +618,13 @@ if __name__ == '__main__':
                           [:, 1::3].reshape(-1), bins=10)
             axes8[2].hist(input_data.reshape(-1, 75)
                           [:, 2::3].reshape(-1), bins=10)
+
+        if enable[10]:
+            for j in range(SAMP_FREQ):
+                img_j = np.linalg.norm(tem_emb[j], axis=0)
+                axes10[j].imshow(np.expand_dims(img_j, axis=-1))
+                axes10[j].xaxis.set_ticks(np.arange(0, 20+1, SAMP_FREQ))
+                axes10[j].yaxis.set_ticks(np.arange(0, 25+1, SAMP_FREQ))
 
         plt.show(block=False)
 
@@ -682,6 +645,7 @@ if __name__ == '__main__':
         x_spa_list2 = None
         featuremap_spa_list2 = None
         # x_tem_list = None
+        tem_emb = None
 
         top5 = sorted(range(len(logits)), key=lambda i: logits[i])[-5:]
         top5.reverse()

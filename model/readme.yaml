@@ -640,7 +640,7 @@ sgn_v13:
                             - 94.87%
                   - 220920140001_gt4_varalpha_tmode4:
                             - 80.37%
-        
+
         - 220922140001_gt4_varalpha_sigmoid_tmode4_k3:
                   - 95.03%
         - 220922140001_gt4_varalpha_sigmoid_tmode4_k5:
@@ -650,6 +650,82 @@ sgn_v13:
         - 220922140001_gt4_varalpha_sigmoid_tmode4_k9:
                   - 94.94%
 
+sgn_v14:
+        - 220923140001_tmode5_9:
+                  - 92.91%
+        - 220923140001_tmode5_7:
+                  - 93.28%
+        - 220923140001_tmode5_5:
+                  - 93.75%
+        - 220923140001_tmode5_3:
+                  - 94.04%
+        - 220923140001_tmode5_35:
+                  - 94.08%
+        - 220923140001_tmode5_357:
+                  - 94.44%
+        - 220923140001_tmode5_3579:
+                  - 94.40%
+        - 220923140001_tmode5_1357_multit111:
+                  - 94.50%
+        - 220923140001_tmode5_1357:
+                  - 94.78%
+        - 220923140001_tmode1_aspp1357:
+                  - 94.05%
+        - 220928170001_tmode3_1layer:
+                  - 94.69%
+        - 220928170001_tmode3_1layer_3heads:
+                  - 94.78%
+        - 220928170001_tmode3:
+                  - 94.80%
+        - 220928170001_tmode3_3heads:
+                  - 94.77%
+        - 220928170001_tmode3_3layers:
+                  - 94.45%
+        - 220928170001_tmode3_4layers:
+                  - 94.54%
+        - 220928170001_tmode3_gt4_var_sigmoid:
+                  - 94.60%
+        - 220928170001_tmode3_1layer_sgcnattn1:
+                  - 93.74%
+        - 220928170001_tmode3_1layer_6heads:
+                  - 94.51%
+        - 220928170001_tmode3_1layer_9heads:
+                  - 94.67%
+        - 220928170001_tmode3_1layer_3heads_1024dhead:
+                  - 94.42%
+        - 220928170001_tmode3_2layer_6heads:
+                  - 94.71%
+        - 220928170001_tmode3_2layer_9heads:
+                  - 94.52%
+        - 221006150001_tmode3_cosposenc:
+                  - 94.55%
+        - 221006150001_tmode3_absposenc:
+                  - 94.82%
+        - 221006150001_tmode3_drop2d01:
+                  - 94.55%
+
+        - 221006150001_tmode3_9heads_cosposenc:
+                  - 94.08%
+        - 221006150001_tmode3_6heads_cosposenc:
+                  - 94.21%
+        - 221006150001_tmode3_3heads_cosposenc:
+                  - 94.40%
+
+        - 221006150001_tmode3_3heads_absposenc:
+                  - 94.44%
+        - 221006150001_tmode3_6heads_absposenc:
+                  - 94.51%
+        - 221006150001_tmode3_9heads_absposenc:
+                  - 94.17%
+
+        - 221010140001_tmode3_3heads_256ffn_nosemfr:
+                  - 93.74%
+        - 221010140001_tmode3_3heads_256ffn:
+                  - 94.51%
+        - 221010140001_tmode3_256ffn:
+                  - 94.53%
+        - 221010140001_tmode3_3heads_256ffn_absposenc:
+                  - 94.53%
 
 sgn-code:
         - original sgn repo code

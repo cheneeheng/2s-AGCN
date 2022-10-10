@@ -83,7 +83,7 @@ class GCNSpatialG(Module):
                  bias: int = 0,
                  activation: T1 = nn.Softmax,
                  g_proj_shared: bool = False,
-                 ):
+                 **kwargs):
         super(GCNSpatialG, self).__init__(in_channels,
                                           out_channels,
                                           kernel_size=kernel_size,
@@ -118,7 +118,7 @@ class GCNSpatialG(Module):
             g4 = self.act(g3)
             if g is not None:
                 g4 = (g * self.alpha + g4) / (self.alpha + 1)
-            return g4
+            return g4, None
 
 
 class GCNSpatialGT(Module):
@@ -751,7 +751,9 @@ class GCNSpatialBlock(PyTorchModule):
                  ):
         super(GCNSpatialBlock, self).__init__()
 
-        if gt_mode == 1:
+        if gt_mode == 0:
+            gcn_spa_gt_cls = GCNSpatialG
+        elif gt_mode == 1:
             gcn_spa_gt_cls = GCNSpatialGT
         elif gt_mode == 2:
             gcn_spa_gt_cls = GCNSpatialGT2

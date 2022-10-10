@@ -69,7 +69,7 @@ class MHATemporal(PyTorchModule):
                             batch_first=True,
                         ))
         if pos_enc is None:
-            self.pos_enc = null_fn
+            self.pos_enc = nn.Identity()
         elif pos_enc == 'abs':
             self.pos_enc = PositionalEncoding(d_model[0], max_len=max_len)
         elif pos_enc == 'cos':

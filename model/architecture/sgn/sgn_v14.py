@@ -1004,13 +1004,14 @@ if __name__ == '__main__':
         # # int for global res, list for individual gcn
         # sgcn_residual=[0, 0, 0],
         # sgcn_prenorm=False,
-        # # sgcn_ffn=0,
+        # sgcn_ffn=1,
         # sgcn_v_kernel=0,
         sgcn_attn_mode=1,
-        sgcn_g_kernel=0,
-        sgcn_g_proj_dim=256,  # c3
+        sgcn_g_kernel=1,
+        sgcn_g_proj_dim=[256, 256, 256],  # c3
         # sgcn_g_proj_shared=False,
         # # sgcn_g_weighted=1,
+        sgcn_gt_mode=0,
 
         # sgcn2_g_proj_dim=256,  # c3
         # sgcn2_dims=[256, 256, 256],
@@ -1031,18 +1032,18 @@ if __name__ == '__main__':
         t_mode=3,
         # t_maxpool_kwargs=None,
         t_mha_kwargs={
-            'd_model': [256, 512],
+            'd_model': [256, 256],
             'nhead': [1, 1],
-            'd_head': [256*2, 512*2],
-            'dim_feedforward': [256, 512],
-            'dim_feedforward_output': [512, 1024],
-            'dropout': 0.1,
+            'd_head': [256, 256],
+            'dim_feedforward': [256, 256],
+            'dim_feedforward_output': [256, 512],
+            'dropout': 0.2,
             'activation': "relu",
             'num_layers': 2,
-            'norm': 'ln',
+            'norm': 'bn',
             'global_norm': False,
-            'pos_enc': 'abs',
-            'max_len': 20
+            # 'pos_enc': 'abs',
+            # 'max_len': 20
         },
         # multi_t=[[], [], [3, 5, 7], [3, 5, 7]],
         # multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7]],
