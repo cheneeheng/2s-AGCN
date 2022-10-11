@@ -917,6 +917,7 @@ class SGN(PyTorchModule):
                     'x_spa_list2': x_spa_list2,
                     'x_tem_list': _x_list,
                     'tem_emb': tem_emb,
+                    'spa_emb': spa_emb,
                 }
             )
         else:
@@ -929,6 +930,7 @@ class SGN(PyTorchModule):
                     'x_spa_list': x_spa_list,
                     'x_tem_list': _x_list,
                     'tem_emb': tem_emb,
+                    'spa_emb': spa_emb,
                 }
             )
 
@@ -1004,7 +1006,7 @@ if __name__ == '__main__':
         # # int for global res, list for individual gcn
         # sgcn_residual=[0, 0, 0],
         # sgcn_prenorm=False,
-        # sgcn_ffn=1,
+        sgcn_ffn=1,
         # sgcn_v_kernel=0,
         sgcn_attn_mode=1,
         sgcn_g_kernel=1,

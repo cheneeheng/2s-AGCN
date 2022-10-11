@@ -71,7 +71,7 @@ class GCNSpatialFFN(Module):
         x1 = self.ffn1(x)
         x1 = self.ffn2(x1)
         x1 = x1 + x
-        return x
+        return x1
 
 
 class GCNSpatialG(Module):
