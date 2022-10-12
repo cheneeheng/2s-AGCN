@@ -651,6 +651,7 @@ sgn_v13:
                   - 94.94%
 
 sgn_v14:
+        # GT=1 #################################################################
         - 220923140001_tmode5_9:
                   - 92.91%
         - 220923140001_tmode5_7:
@@ -726,6 +727,38 @@ sgn_v14:
                   - 94.53%
         - 221010140001_tmode3_3heads_256ffn_absposenc:
                   - 94.53%
+        # ######################################################################
+
+        - 221010140001_tmode3_3heads_256ffn_gt0:
+                  - 94.49%
+        - 221010140001_tmode3_3heads_256ffn_noshartedg_gt0:
+                  - 94.10%
+        - 221010140001_tmode3_3heads_256ffn_noshartedg:
+                  - visual inspection shows that the gcn learned to attend only at => head + shoulder + elbows, hips + toes, fingers
+                  - 94.71%
+        - 221011110001_tmode3_1layer_3heads_256ffn:
+                  - 94.60%
+        - 221011110001_gcn4layers_tmode3_1layer_3heads_256ffn:
+                  - 94.46%
+        - 221011110001_gcn5layers_tmode3_1layer_3heads_256ffn:
+                  - 93.87%
+
+        - 221011110001_tmode3_1layer_3heads_256ffn_noshartedg:
+                  - visual inspection shows that the gcn learned to attend only at => spine, arms, stomach
+                  - 94.37%
+        - 221011110001_gcn4layers_tmode3_1layer_3heads_256ffn_noshartedg:
+                  - visual inspection shows that the gcn learned to attend only at => head, hips + legs (faint-ish), upper torso, right hand only
+                  - 94.45%
+        - 221011110001_gcn5layers_tmode3_1layer_3heads_256ffn_noshartedg:
+                  - visual inspection shows that the gcn learned to attend only at => hips, legs, right hand/finger only, one side of hip when static, legs when jumping/large movement, head
+                  - 94.32%
+        - 221011110001_gcnffn1_tmode3_1layer_3heads_256ffn_noshartedg:
+                  - visual inspection shows that the gcn learned to attend only at => 0 + (faint) legs, head, legs
+                  - 94.04%
+        - 221011110001_gt0_gcnffn1_tmode3_1layer_3heads_256ffn_noshartedg:
+                  - 94.73%
+        - 221011110001_1gcn_gcnffn1_tmode3_1layer_3heads_256ffn_noshartedg:
+                  - 94.40%
 
 sgn-code:
         - original sgn repo code
