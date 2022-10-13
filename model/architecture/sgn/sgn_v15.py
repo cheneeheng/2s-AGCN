@@ -287,11 +287,11 @@ class SGN(PyTorchModule):
         x = self.smp(x)
 
         # temporal MLP
-        x, temporal_attn_list = self.temporal_mha(x)
+        temporal_featuremap, temporal_attn_list = self.temporal_mha(x)
+        x = temporal_featuremap
 
         # temporal pooling
-        temporal_featuremap = self.tmp(x)
-        y = temporal_featuremap
+        y = self.tmp(x)
 
         if cls_emb is not None:
             y += cls_emb

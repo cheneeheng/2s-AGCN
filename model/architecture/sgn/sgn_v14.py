@@ -74,7 +74,7 @@ GCN_FPN_MERGE_MODES = [0, 1, 2]
 # 0 no pool
 # 1 pool
 # 2 pool with indices
-POOLING_MODES = [0, 1, 2]
+POOLING_MODES = [0, 1, 2, 3]
 
 # Temporal branch ---
 # 0 skip -> no temporal branch
@@ -113,7 +113,7 @@ class SGN(PyTorchModule):
                  semantic_joint: int = 1,
                  semantic_frame: int = 1,
                  semantic_class: int = 0,
-                 semantic_joint_smp: int = 0,
+                 semantic_joint_smp: int = 1,
 
                  semantic_joint_fusion: int = 0,
                  semantic_frame_fusion: int = 1,
@@ -641,11 +641,21 @@ class SGN(PyTorchModule):
             self.smp = nn.AdaptiveMaxPool2d((1, self.num_segment))
         elif self.spatial_maxpool == 2:
             raise ValueError("spatial_maxpool=2 not implemented")
+        elif self.spatial_maxpool == 3:
+            self.smp = Conv(
+                in_channels=self.c3*2 if self.semantic_joint_smp > 0 else self.c3,  # noqa
+                out_channels=self.c3,
+                kernel_size=self.num_point,
+                bias=self.bias,
+                activation=self.activation_fn,
+                normalization=lambda: self.normalization_fn(
+                    out_channels)
+            )
         else:
             raise ValueError("Unknown spatial_maxpool")
 
-        if self.semantic_joint_smp > 0:
-            self.smp.return_indices = True
+        # if self.semantic_joint_smp > 0:
+        #     self.smp.return_indices = True
 
         if self.temporal_maxpool == 0:
             self.tmp = nn.Identity()
@@ -653,6 +663,8 @@ class SGN(PyTorchModule):
             self.tmp = nn.AdaptiveMaxPool2d((1, 1))
         elif self.temporal_maxpool == 2:
             self.tmp = nn.AdaptiveMaxPool2d((1, 1), return_indices=True)
+        elif self.temporal_maxpool == 3:
+            raise ValueError("temporal_maxpool=3 not implemented")
         else:
             raise ValueError("Unknown temporal_maxpool")
 
@@ -803,15 +815,15 @@ class SGN(PyTorchModule):
         # spatial pooling
         if hasattr(self, 'semantic_joint_smp_embedding'):
             smp_emb = self.semantic_joint_smp_embedding(x)[0]
-            _x_list = []
-            for _x in x_list:
-                if _x is None:
-                    _x_list.append(None)
-                else:
-                    val, idx = self.smp(_x)
-                    _x_list.append(
-                        torch.gather(smp_emb, -2, idx//_x.shape[-1]) + val)
-            x_list = _x_list
+            x_list = [torch.cat((i, smp_emb), axis=1)
+                      if i is not None else None for i in x_list]
+
+        if self.spatial_maxpool == 3:
+            x_list = [i.permute(0, 1, 3, 2).contiguous()
+                      if i is not None else None for i in x_list]
+            x_list = [self.smp(i) if i is not None else None for i in x_list]
+            x_list = [i.permute(0, 1, 3, 2).contiguous()
+                      if i is not None else None for i in x_list]
         else:
             x_list = [self.smp(i) if i is not None else None for i in x_list]
 
@@ -993,7 +1005,7 @@ if __name__ == '__main__':
         semantic_joint=1,
         semantic_frame=1,
         semantic_class=0,
-        semantic_joint_smp=0,
+        semantic_joint_smp=1,
         semantic_joint_fusion=0,
         semantic_frame_fusion=1,
         semantic_frame_location=0,
@@ -1028,17 +1040,17 @@ if __name__ == '__main__':
         # # gcn_fpn_output_merge=1,
         # # bifpn_dim=256,
         # # bifpn_layers=1,
-        # spatial_maxpool=1,
+        spatial_maxpool=3,
         # temporal_maxpool=1,
         # aspp_rates=None, 345402520
         t_mode=3,
         # t_maxpool_kwargs=None,
         t_mha_kwargs={
-            'd_model': [256, 256],
+            'd_model': [512, 512],
             'nhead': [1, 1],
-            'd_head': [256, 256],
-            'dim_feedforward': [256, 256],
-            'dim_feedforward_output': [256, 512],
+            'd_head': [512, 512],
+            'dim_feedforward': [512, 512],
+            'dim_feedforward_output': [512, 512],
             'dropout': 0.2,
             'activation': "relu",
             'num_layers': 2,
