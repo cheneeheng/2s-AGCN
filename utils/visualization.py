@@ -76,11 +76,13 @@ def visualize_3dskeleton_in_matplotlib(data,
                     a.append(
                         ax.plot(np.zeros(2), np.zeros(2), p_type[m])[0])
             pose.append(a)
-        ax.axis([-1, 1, -1, 1])
         ax.set_xlabel("x")
         ax.set_ylabel("y")
+        ax.view_init(elev=90, azim=-90)
+        ax.set_xlim(-1, 4)
+        ax.set_ylim(-2, 3)
         if is_3d:
-            ax.set_zlim3d(-1, 1)
+            ax.set_zlim3d(1, 5)
         for t in range(T):
             for m in range(M):
                 for i, (v1, v2) in enumerate(edge):

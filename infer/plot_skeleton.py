@@ -41,12 +41,13 @@ def subplot_bones(chains: Tuple[np.ndarray, ...], ax):
     return [ax.plot(*chain.T) for chain in chains]
 
 
-def plot_skeletons(skeletons: Sequence[np.ndarray], fig):
+def plot_skeletons(skeletons: Sequence[np.ndarray], fig, samples=5):
     # fig = plt.figure()
     for i, dots in enumerate(skeletons, start=1):
         chains = get_chains(dots)
-        ax = fig.add_subplot(5, 20, i, projection='3d')
+        ax = fig.add_subplot(samples, 20, i, projection='3d')
         ax.axis('off')
+        ax.figure.tight_layout()
         subplot_nodes(dots, ax)
         subplot_bones(chains, ax)
-    # plt.show()
+    fig.tight_layout()

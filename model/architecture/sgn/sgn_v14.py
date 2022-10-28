@@ -21,6 +21,7 @@ except ImportError:
     print("Warning: fvcore is not found")
 
 import math
+from collections import OrderedDict
 from typing import Tuple, Optional, Union, Type, List
 
 from model.resource.common_ntu import *
@@ -74,7 +75,9 @@ GCN_FPN_MERGE_MODES = [0, 1, 2]
 # 0 no pool
 # 1 pool
 # 2 pool with indices
-POOLING_MODES = [0, 1, 2, 3]
+# 3 conv with large kernel
+# 4 1x1 + conv with large kernel
+POOLING_MODES = [0, 1, 2, 3, 4]
 
 # Temporal branch ---
 # 0 skip -> no temporal branch
@@ -113,7 +116,7 @@ class SGN(PyTorchModule):
                  semantic_joint: int = 1,
                  semantic_frame: int = 1,
                  semantic_class: int = 0,
-                 semantic_joint_smp: int = 1,
+                 semantic_joint_smp: int = 0,
 
                  semantic_joint_fusion: int = 0,
                  semantic_frame_fusion: int = 1,
@@ -651,6 +654,32 @@ class SGN(PyTorchModule):
                 normalization=lambda: self.normalization_fn(
                     out_channels)
             )
+        elif self.spatial_maxpool == 4:
+            self.smp = nn.Sequential(
+                OrderedDict([
+                    (f'conv1', Conv(in_channels=self.c3*2 if self.semantic_joint_smp > 0 else self.c3,  # noqa
+                                    out_channels=self.c3,
+                                    kernel_size=1,
+                                    bias=self.bias,
+                                    activation=self.activation_fn,
+                                    normalization=lambda: self.normalization_fn(out_channels))),  # noqa
+                    (f'conv2', Conv(in_channels=self.c3,
+                                    out_channels=self.c3,
+                                    kernel_size=self.num_point,
+                                    bias=self.bias,
+                                    activation=self.activation_fn,
+                                    normalization=lambda: self.normalization_fn(out_channels))),  # noqa
+                ])
+            )
+            self.smp = Conv(
+                in_channels=self.c3*2 if self.semantic_joint_smp > 0 else self.c3,  # noqa
+                out_channels=self.c3,
+                kernel_size=self.num_point,
+                bias=self.bias,
+                activation=self.activation_fn,
+                normalization=lambda: self.normalization_fn(
+                    out_channels)
+            )
         else:
             raise ValueError("Unknown spatial_maxpool")
 
@@ -799,13 +828,13 @@ class SGN(PyTorchModule):
         elif self.gcn_fpn == 10:
             _x_list = [x] + x_spa_list[:-1]
             _x_list.reverse()
-            _, g_spa2, x_spa_list2, featuremap_spa_list2 = \
-                self.sgcn2(x_spa_list[-1], _x_list, g_spa[-1])
+            _, g_spa2, x_spa_list2, featuremap_spa_list2 = self.sgcn2(
+                x_spa_list[-1], _x_list, g_spa[-1])
             x_list = [None for _ in range(len(x_spa_list2)-1)] + \
-                     [x_spa_list2[-1]]
+                [x_spa_list2[-1]]
         else:
             x_list = [None for _ in range(len(x_spa_list)-1)] + \
-                     [x_spa_list[-1]]
+                [x_spa_list[-1]]
 
         # Frame-level Module ---------------------------------------------------
         # temporal fusion post gcn
@@ -818,7 +847,7 @@ class SGN(PyTorchModule):
             x_list = [torch.cat((i, smp_emb), axis=1)
                       if i is not None else None for i in x_list]
 
-        if self.spatial_maxpool == 3:
+        if self.spatial_maxpool in [3, 4]:
             x_list = [i.permute(0, 1, 3, 2).contiguous()
                       if i is not None else None for i in x_list]
             x_list = [self.smp(i) if i is not None else None for i in x_list]
@@ -829,7 +858,7 @@ class SGN(PyTorchModule):
 
         if self.gcn_fpn in [4, 5]:
             x_list = [None for _ in range(len(x_spa_list)-1)] + \
-                     [torch.cat(x_list, dim=1)]
+                [torch.cat(x_list, dim=1)]
 
         if self.sgcn_gt_mode == 6:
             x_list.append(g_spa[0][1])

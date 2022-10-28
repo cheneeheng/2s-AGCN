@@ -20,7 +20,8 @@ def pre_normalization(data,
                       verbose=False,
                       tqdm=True):
 
-    assert center_firstframe != center
+    if center or center_firstframe:
+        assert center_firstframe != center
 
     N, C, T, V, M = data.shape
     s = np.transpose(data, [0, 4, 2, 3, 1])  # N, C, T, V, M  to  N, M, T, V, C
