@@ -1040,18 +1040,18 @@ if __name__ == '__main__':
         semantic_frame_location=0,
         # sgcn_g_res_alpha=-1,
         # sgcn_gt_mode=5,
-        sgcn_dims=[128, 256, 256],  # [c2, c3, c3],
+        sgcn_dims=[256],  # [c2, c3, c3],
         sgcn_kernel=1,  # residual connection in GCN
         # sgcn_padding=0,  # residual connection in GCN
         # sgcn_dropout=0.0,  # residual connection in GCN
         # # int for global res, list for individual gcn
-        # sgcn_residual=[0, 0, 0],
+        sgcn_residual=[0],
         # sgcn_prenorm=False,
-        sgcn_ffn=2,
+        sgcn_ffn=1,
         # sgcn_v_kernel=0,
         sgcn_attn_mode=1,
         sgcn_g_kernel=1,
-        sgcn_g_proj_dim=[256, 256, 256],  # c3
+        sgcn_g_proj_dim=[256],  # c3
         # sgcn_g_proj_shared=False,
         # # sgcn_g_weighted=1,
         sgcn_gt_mode=0,
@@ -1088,6 +1088,7 @@ if __name__ == '__main__':
             # 'pos_enc': 'abs',
             # 'max_len': 20
         },
+        multi_t=[[1]]
         # multi_t=[[], [], [3, 5, 7], [3, 5, 7]],
         # multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7]],
         # multi_t_shared=2,

@@ -36,7 +36,8 @@ class MHATemporal(PyTorchModule):
                  dim_feedforward_output=None,
                  global_norm=None,
                  pos_enc=None,
-                 max_len=20):
+                 max_len=20,
+                 **kwargs):
         super(MHATemporal, self).__init__()
         if norm is not None:
             assert d_head is not None
@@ -52,7 +53,11 @@ class MHATemporal(PyTorchModule):
                 mlp_out_dim=dim_feedforward_output,
                 activation=activation,
                 norm=norm,
-                global_norm=global_norm
+                global_norm=global_norm,
+                kwargs=kwargs
+                # v_proj=kwargs.get('v_proj', True),
+                # res_proj=kwargs.get('res_proj', False),
+                # output_dim=kwargs.get('d_out', d_model)
             )
         else:
             self.num_layers = num_layers
@@ -73,7 +78,8 @@ class MHATemporal(PyTorchModule):
         elif pos_enc == 'abs':
             self.pos_enc = PositionalEncoding(d_model[0], max_len=max_len)
         elif pos_enc == 'cos':
-            self.pos_enc = CosSinPositionalEncoding(d_model[0], max_len=max_len)
+            self.pos_enc = CosSinPositionalEncoding(
+                d_model[0], max_len=max_len)
         else:
             raise ValueError("unknown pos_enc")
 

@@ -93,7 +93,8 @@ class Attention(nn.Module):
                  dim_head: int = 64,
                  dropout: float = 0.,
                  v_proj: bool = True,
-                 res_proj: bool = False):
+                 res_proj: bool = False,
+                 output_dim: int = -1):
         super().__init__()
         inner_dim = dim_head * heads
         self.heads = heads
@@ -105,16 +106,19 @@ class Attention(nn.Module):
         self.v_proj = v_proj
         if v_proj:
             self.to_kv = nn.Linear(dim, inner_dim * 2, bias=False)
+            self.to_out = nn.Sequential(OrderedDict([
+                ('linear', nn.Linear(inner_dim, output_dim)),
+                ('dropout', nn.Dropout(dropout))])
+            )
         else:
             self.to_kv = nn.Linear(dim, inner_dim, bias=False)
-
-        self.to_out = nn.Sequential(OrderedDict([
-            ('linear', nn.Linear(inner_dim, dim)),
-            ('dropout', nn.Dropout(dropout))])
-        )
+            self.to_out = nn.Sequential(OrderedDict([
+                ('linear', nn.Linear(dim, output_dim)),
+                ('dropout', nn.Dropout(dropout))])
+            )
 
         if res_proj:
-            self.residual = nn.Linear(dim, dim)
+            self.residual = nn.Linear(dim, output_dim)
         else:
             self.residual = nn.Identity()
 
@@ -184,6 +188,10 @@ class Transformer(nn.Module):
         assert isinstance(mlp_out_dim, list)
         assert isinstance(dropout, list)
 
+        v_proj = kwargs.get('v_proj', True),
+        res_proj = kwargs.get('res_proj', False),
+        output_dim = kwargs.get('d_out', dim)
+
         self.layers = nn.ModuleDict({})
         for i in range(depth):
 
@@ -191,9 +199,10 @@ class Transformer(nn.Module):
                                heads=heads[i],
                                dim_head=dim_head[i],
                                dropout=dropout[i],
-                               v_proj=kwargs['v_proj'],
-                               res_proj=kwargs['res_proj'])
-            ffnn_kwargs = dict(dim=dim[i],
+                               v_proj=v_proj,
+                               res_proj=res_proj,
+                               output_dim=output_dim[i])
+            ffnn_kwargs = dict(dim=output_dim[i],
                                hidden_dim=mlp_dim[i],
                                dropout=dropout[i],
                                activation=activation,
@@ -207,7 +216,7 @@ class Transformer(nn.Module):
                             'attn': PreNorm(dim=dim[i],
                                             fn=Attention(**attn_kwargs),
                                             norm=norm),
-                            'ffn': PreNorm(dim=dim[i],
+                            'ffn': PreNorm(dim=output_dim[i],
                                            fn=FeedForward(**ffnn_kwargs),
                                            norm=norm)
                         })
