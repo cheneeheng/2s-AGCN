@@ -188,8 +188,8 @@ class Transformer(nn.Module):
         assert isinstance(mlp_out_dim, list)
         assert isinstance(dropout, list)
 
-        v_proj = kwargs.get('v_proj', True),
-        res_proj = kwargs.get('res_proj', False),
+        v_proj = kwargs.get('v_proj', True)
+        res_proj = kwargs.get('res_proj', False)
         output_dim = kwargs.get('d_out', dim)
 
         self.layers = nn.ModuleDict({})
