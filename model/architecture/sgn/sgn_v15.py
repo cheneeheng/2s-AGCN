@@ -526,17 +526,17 @@ class MHA(PyTorchModule):
         super(MHA, self).__init__()
         if 'norm' in kwargs:
             self.transformer = Transformer(
-                dim=kwargs['d_model'],
-                depth=kwargs['num_layers'],
-                heads=kwargs['nhead'],
-                dim_head=kwargs['d_head'],
-                dropout=kwargs['dropout'],
-                mlp_dim=kwargs['dim_feedforward'],
-                mlp_out_dim=kwargs['dim_feedforward_output'],
-                activation=kwargs['activation'],
-                norm=kwargs['norm'],
-                global_norm=kwargs['global_norm'],
-                kwargs=kwargs
+                dim=kwargs.pop('d_model'),
+                depth=kwargs.pop('num_layers'),
+                heads=kwargs.pop('nhead'),
+                dim_head=kwargs.pop('d_head'),
+                dropout=kwargs.pop('dropout'),
+                mlp_dim=kwargs.pop('dim_feedforward'),
+                mlp_out_dim=kwargs.pop('dim_feedforward_output'),
+                activation=kwargs.pop('activation'),
+                norm=kwargs.pop('norm'),
+                global_norm=kwargs.pop('global_norm'),
+                **kwargs
             )
         else:
             self.num_layers = kwargs['num_layers']

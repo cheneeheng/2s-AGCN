@@ -54,7 +54,7 @@ class MHATemporal(PyTorchModule):
                 activation=activation,
                 norm=norm,
                 global_norm=global_norm,
-                kwargs=kwargs
+                **kwargs
                 # v_proj=kwargs.get('v_proj', True),
                 # res_proj=kwargs.get('res_proj', False),
                 # output_dim=kwargs.get('d_out', d_model)
