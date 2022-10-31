@@ -12,6 +12,7 @@ from .module.block import Module
 from .module.block import Conv1xN
 from .module.block import Conv
 from .module.block import Pool
+from .module.block import Linear
 
 from .module.aspp import ASPP
 from .module.bifpn import BiFPN

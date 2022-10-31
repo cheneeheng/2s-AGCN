@@ -104,6 +104,53 @@ class Module(PyTorchModule):
 #         return s.format(**self.__dict__)
 
 
+class LinearLayer(Module):
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 bias: int = 0,
+                 ):
+        super(LinearLayer, self).__init__(in_channels,
+                                          out_channels,
+                                          bias=bias)
+        self.linear = nn.Linear(self.in_channels,
+                                self.out_channels,
+                                bias=bool(self.bias))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x : N, C, *
+        x = x.transpose(1, -1)
+        x = self.linear(x)
+        x = x.transpose(1, -1)
+        return x
+
+
+class Linear(Module):
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 bias: int = 0,
+                 dropout: OTPM = None,
+                 activation: OTPM = None,
+                 normalization: OTPM = None,
+                 prenorm: bool = False
+                 ):
+        super(Linear, self).__init__(in_channels,
+                                     out_channels,
+                                     bias=bias,
+                                     dropout=dropout,
+                                     activation=activation,
+                                     normalization=normalization,
+                                     prenorm=prenorm)
+        block = OrderedDict({
+            'linear': LinearLayer(self.in_channels,
+                                  self.out_channels,
+                                  bias=bool(self.bias)),
+        })
+        block = self.update_block_dict(block)
+        self.block = Sequential(block)
+
+
 class Conv1xN(Module):
     def __init__(self,
                  in_channels: int,

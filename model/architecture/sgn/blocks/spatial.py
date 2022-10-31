@@ -11,6 +11,7 @@ from typing import Tuple, Optional, Union, Type, List
 
 from model.layers import Module
 from model.layers import Conv
+from model.layers import Linear
 from model.layers import residual as res
 from model.layers import null_fn
 from model.layers import get_activation_fn
@@ -24,9 +25,9 @@ T2 = List[Optional[Type[PyTorchModule]]]
 T3 = Union[List[int], int]
 
 # Contains:
-# - ffn layer
+# - gcn ffn layer using 1x1 conv
 # - G layer
-# - GT layer = G layer + another attention matrix for temporal
+# - GT ... GT6 layer = G layer + another attention matrix for temporal
 # - GCN unit = pure gcn operation only
 # - GCN block = gcn block that adds ffn or residual is needed
 # - GCN block2 = another gcns for the fpn mode = 10
@@ -50,15 +51,15 @@ class GCNSpatialFFN(Module):
                                             bias=bias,
                                             activation=activation,
                                             normalization=normalization)
+        inter_dim = int(self.in_channels*multiplier)
         self.ffn1 = Conv(self.in_channels,
-                         int(self.in_channels*multiplier),
+                         inter_dim,
                          bias=self.bias,
                          kernel_size=self.kernel_size,
                          padding=self.padding,
                          activation=self.activation,
-                         normalization=lambda: self.normalization(
-                             int(self.in_channels*multiplier)))
-        self.ffn2 = Conv(int(self.in_channels*multiplier),
+                         normalization=lambda: self.normalization(inter_dim))
+        self.ffn2 = Conv(inter_dim,
                          self.out_channels,
                          bias=self.bias,
                          kernel_size=self.kernel_size,
@@ -71,6 +72,124 @@ class GCNSpatialFFN(Module):
         x1 = self.ffn1(x)
         x1 = self.ffn2(x1)
         x1 = x1 + x
+        return x1
+
+
+class GCNSpatialFFNPostNorm(Module):
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 kernel_size: int = 1,
+                 padding: int = 0,
+                 bias: int = 0,
+                 activation: T1 = nn.ReLU,
+                 normalization: T1 = nn.BatchNorm2d,
+                 multiplier: float = 4.0
+                 ):
+        super(GCNSpatialFFNPostNorm, self).__init__(in_channels,
+                                                    out_channels,
+                                                    kernel_size=kernel_size,
+                                                    padding=padding,
+                                                    bias=bias,
+                                                    activation=activation,
+                                                    normalization=normalization)
+        inter_dim = int(self.in_channels*multiplier)
+        self.ffn1 = Conv(self.in_channels,
+                         inter_dim,
+                         bias=self.bias,
+                         kernel_size=self.kernel_size,
+                         padding=self.padding,
+                         activation=self.activation)
+        self.ffn2 = Conv(inter_dim,
+                         self.out_channels,
+                         bias=self.bias,
+                         kernel_size=self.kernel_size,
+                         padding=self.padding,
+                         activation=self.activation)
+        self.norm = self.normalization(self.out_channels)
+
+    def forward(self, x: Tensor) -> Tensor:
+        x1 = self.ffn1(x)
+        x1 = self.ffn2(x1)
+        x1 = x1 + x
+        x1 = self.norm(x1)
+        return x1
+
+
+class GCNSpatialFFNLinear(Module):
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 kernel_size: int = 1,
+                 padding: int = 0,
+                 bias: int = 0,
+                 activation: T1 = nn.ReLU,
+                 normalization: T1 = nn.BatchNorm2d,
+                 multiplier: float = 4.0
+                 ):
+        super(GCNSpatialFFNLinear, self).__init__(in_channels,
+                                                  out_channels,
+                                                  kernel_size=kernel_size,
+                                                  padding=padding,
+                                                  bias=bias,
+                                                  activation=activation,
+                                                  normalization=normalization)
+        inter_dim = int(self.in_channels*multiplier)
+        self.ffn1 = Linear(self.in_channels,
+                           inter_dim,
+                           bias=self.bias,
+                           activation=self.activation,
+                           normalization=lambda: self.normalization(
+                               inter_dim))
+        self.ffn2 = Linear(inter_dim,
+                           self.out_channels,
+                           bias=self.bias,
+                           activation=self.activation,
+                           normalization=lambda: self.normalization(
+                               self.out_channels))
+
+    def forward(self, x: Tensor) -> Tensor:
+        x1 = self.ffn1(x)
+        x1 = self.ffn2(x1)
+        x1 = x1 + x
+        return x1
+
+
+class GCNSpatialFFNLinearPostNorm(Module):
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 kernel_size: int = 1,
+                 padding: int = 0,
+                 bias: int = 0,
+                 activation: T1 = nn.ReLU,
+                 normalization: T1 = nn.BatchNorm2d,
+                 multiplier: float = 4.0
+                 ):
+        super(GCNSpatialFFNLinearPostNorm, self).__init__(
+            in_channels,
+            out_channels,
+            kernel_size=kernel_size,
+            padding=padding,
+            bias=bias,
+            activation=activation,
+            normalization=normalization)
+        inter_dim = int(self.in_channels*multiplier)
+        self.ffn1 = Linear(self.in_channels,
+                           inter_dim,
+                           bias=self.bias,
+                           activation=self.activation)
+        self.ffn2 = Linear(inter_dim,
+                           self.out_channels,
+                           bias=self.bias,
+                           activation=self.activation)
+        self.norm = self.normalization(self.out_channels)
+
+    def forward(self, x: Tensor) -> Tensor:
+        x1 = self.ffn1(x)
+        x1 = self.ffn2(x1)
+        x1 = x1 + x
+        x1 = self.norm(x1)
         return x1
 
 
@@ -824,14 +943,28 @@ class GCNSpatialBlock(PyTorchModule):
                 setattr(self, f'gcn_prenorm{i+1}', normalization(gcn_dims[i]))
 
         if gcn_ffn is not None:
+            if gcn_ffn//100 == 0:
+                FFN = GCNSpatialFFN
+                multiplier = gcn_ffn
+            elif gcn_ffn//100 == 1:
+                FFN = GCNSpatialFFNPostNorm
+                multiplier = gcn_ffn % 100
+            elif gcn_ffn//100 == 2:
+                FFN = GCNSpatialFFNLinear
+                multiplier = gcn_ffn % 100
+            elif gcn_ffn//100 == 3:
+                FFN = GCNSpatialFFNLinearPostNorm
+                multiplier = gcn_ffn % 100
+            else:
+                raise ValueError("Unknown `gcn_ffn` value ...")
             for i in range(self.num_blocks):
                 setattr(self, f'gcn_ffn{i+1}',
-                        GCNSpatialFFN(gcn_dims[i+1],
-                                      gcn_dims[i+1],
-                                      bias=bias,
-                                      activation=activation,
-                                      normalization=normalization,
-                                      multiplier=gcn_ffn))
+                        FFN(gcn_dims[i+1],
+                            gcn_dims[i+1],
+                            bias=bias,
+                            activation=activation,
+                            normalization=normalization,
+                            multiplier=multiplier))
 
         if isinstance(gcn_residual, list):
             assert len(gcn_residual) == self.num_blocks
