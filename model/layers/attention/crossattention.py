@@ -91,7 +91,9 @@ class Attention(nn.Module):
                  dim: int,
                  heads: int = 8,
                  dim_head: int = 64,
-                 dropout: float = 0.):
+                 dropout: float = 0.,
+                 v_proj: bool = True,
+                 res_proj: bool = False):
         super().__init__()
         inner_dim = dim_head * heads
         self.heads = heads
@@ -99,12 +101,22 @@ class Attention(nn.Module):
 
         self.attend = nn.Softmax(dim=-1)
         self.to_q = nn.Linear(dim, inner_dim, bias=False)
-        self.to_kv = nn.Linear(dim, inner_dim * 2, bias=False)
+
+        self.v_proj = v_proj
+        if v_proj:
+            self.to_kv = nn.Linear(dim, inner_dim * 2, bias=False)
+        else:
+            self.to_kv = nn.Linear(dim, inner_dim, bias=False)
 
         self.to_out = nn.Sequential(OrderedDict([
             ('linear', nn.Linear(inner_dim, dim)),
             ('dropout', nn.Dropout(dropout))])
         )
+
+        if res_proj:
+            self.residual = nn.Linear(dim, dim)
+        else:
+            self.residual = nn.Identity()
 
     def forward(self,
                 x: torch.Tensor,
@@ -117,7 +129,11 @@ class Attention(nn.Module):
             # cross attention requires CLS token includes itself as key / value
             context = torch.cat((x, context), dim=1)
 
-        qkv = (self.to_q(x), *self.to_kv(context).chunk(2, dim=-1))
+        if self.v_proj:
+            qkv = (self.to_q(x), *self.to_kv(context).chunk(2, dim=-1))
+        else:
+            qkv = (self.to_q(x), self.to_kv(context), context)
+
         q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h=h), qkv)
 
         dots = einsum('b h i d, b h j d -> b h i j', q, k) * self.scale
@@ -127,6 +143,9 @@ class Attention(nn.Module):
         out = einsum('b h i j, b h j d -> b h i d', attn, v)
         out = rearrange(out, 'b h n d -> b n (h d)')
         return self.to_out(out), attn
+
+    def res(self, x: torch.Tensor):
+        return self.residual(x)
 
 
 # transformer encoder, for small and large patches
@@ -171,7 +190,9 @@ class Transformer(nn.Module):
             attn_kwargs = dict(dim=dim[i],
                                heads=heads[i],
                                dim_head=dim_head[i],
-                               dropout=dropout[i])
+                               dropout=dropout[i],
+                               v_proj=kwargs['v_proj'],
+                               res_proj=kwargs['res_proj'])
             ffnn_kwargs = dict(dim=dim[i],
                                hidden_dim=mlp_dim[i],
                                dropout=dropout[i],
@@ -204,7 +225,7 @@ class Transformer(nn.Module):
         attn_list = []
         for _, layer in self.layers.items():
             x1, attn = layer['attn'](x)
-            x = x1 + x
+            x = x1 + layer['attn'].fn.res(x)
             x = layer['ffn'](x) + layer['ffn'].fn.res(x)
             attn_list.append(attn)
         return self.norm(x), attn_list

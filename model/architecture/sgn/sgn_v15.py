@@ -535,7 +535,9 @@ class MHA(PyTorchModule):
                 mlp_out_dim=kwargs['dim_feedforward_output'],
                 activation=kwargs['activation'],
                 norm=kwargs['norm'],
-                global_norm=kwargs['global_norm']
+                global_norm=kwargs['global_norm'],
+                v_proj=kwargs.get('v_proj', True),
+                res_proj=kwargs.get('res_proj', False)
             )
         else:
             self.num_layers = kwargs['num_layers']
@@ -627,7 +629,9 @@ if __name__ == '__main__':
             'activation': "relu",
             'num_layers': 2,
             'norm': 'ln',
-            'global_norm': False
+            'global_norm': False,
+            'v_proj': False,
+            'res_proj': True
         },
         temporal_mha_kwargs={
             'd_model': [256, 256],
