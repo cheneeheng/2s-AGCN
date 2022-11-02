@@ -120,7 +120,10 @@ class Attention(nn.Module):
         if res_proj:
             self.residual = nn.Linear(dim, output_dim)
         else:
-            self.residual = nn.Identity()
+            if dim == output_dim:
+                self.residual = nn.Identity()
+            else:
+                self.residual = nn.Linear(dim, output_dim)
 
     def forward(self,
                 x: torch.Tensor,
