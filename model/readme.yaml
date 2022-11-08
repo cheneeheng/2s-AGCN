@@ -829,8 +829,10 @@ sgn_v14:
 
         # higher ffn dim, 2 layers of temporal MHA
         - 221020170001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_256ffn_noshartedg_drop01:
+                  - SMP4
                   - 94.98%
         - 221020170001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_512ffn_512ffn_noshartedg_drop01:
+                  - SMP4
                   - 94.92%
 
         # higer fc dim. folder title is wrong
@@ -850,6 +852,10 @@ sgn_v14:
                   - 221013160001_gt0_1gcn_gcnffn1_tmode3_1layer_9heads_
                   - semjointsmp1
                   - 94.44%
+        - 221020170001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01_smp3:
+                  - 94.90%
+        - 221020170001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01_smp4:
+                  - 94.93%
 
         # Using agcn data
         - 221017160001_gt0_1gcn_gcnffn1_tmode3_1layer_9heads_256ffn_noshartedg_drop01_aagcndata:
@@ -857,7 +863,46 @@ sgn_v14:
         # using agcn + gcn data
         - 221017160001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01_sgnaagcndata:
                   - 95.03%
-        
+
+        - 221031110001_gt0_1gcn_gcnffn05_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01:
+                  - 94.63%
+        - 221031110001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01:
+                  - same as previous ... rerun
+                  - 94.90%
+        - 221031110001_gt0_1gcn_gcnffn101_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01:
+                  - 94.54%
+        - 221031110001_gt0_1gcn_gcnffn201_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01:
+                  - 94.68%
+        - 221031110001_gt0_1gcn_gcnffn301_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01:
+                  - 94.46%
+        - 221031110001_gt0_1gcn_gcnffn301_1act_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01:
+                  - FAULTY
+                  - 94.46%
+        - 221031110001_gt0_1gcn_gcnffn301_1act_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01_rerun:
+                  - 94.59%
+
+        - 221031110001_gt0_1gcn_gcnffn4_tmode3_1layer_8heads_16dim_1024ffn_noshartedg_drop01:
+                  - 94.78%
+        - 221031110001_gt0_1gcn_gcnffn4_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01:
+                  - 94.78%
+        - 221031110001_gt0_1gcn_gcnffn2_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01:
+                  - 94.67%
+
+        - 221031110001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01:
+                  - copy from above
+                  - same as previous ... rerun
+                  - 94.90%
+        - 221104130001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01_sgd_lr1e1_steps90110:
+                  - 94.47%
+        - 221104130001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01_bs128_sgd_lr1e1_steps90110:
+                  - 95.02%
+        - 221104130001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01_bs256_sgd_lr1e1_steps90110:
+                  - 94.91%
+        - 221104130001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01_bs512_sgd_lr1e1_steps90110:
+                  - 94.05%
+        - 221104130001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01_bs1024_sgd_lr1e1_steps90110:
+                  - 93.41%
+
 sgn_v15:
         - only transformers
         - 2210121800:
@@ -906,6 +951,14 @@ sgn_v15:
 
         - 2210181800_mhadimmult1_1_8heads_16dim_ln:
                   - 93.12%
+
+        - 221031120001_1head_256hdim_256out_nov_res_8head_16hdim_bn_rerun:
+                  - 93.50%
+        - 221031120001_1head_256hdim_256out_8head_16hdim_bn_rerun:
+                  - 93.41%
+
+        - 221031120001_1head_256hdim_256out_8head_16hdim_ln:
+                  - 92.70%
 
 sgn-code:
         - original sgn repo code

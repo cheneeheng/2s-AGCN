@@ -35,6 +35,8 @@ from model.layers import get_normalization_fn
 from model.layers import tensor_list_mean
 from model.layers import tensor_list_sum
 from utils.utils import to_int
+from utils.parser import get_parser
+from utils.parser import load_parser_args_from_config
 
 from model.architecture.sgn.blocks import Embedding
 from model.architecture.sgn.blocks import SemanticEmbedding
@@ -77,7 +79,8 @@ GCN_FPN_MERGE_MODES = [0, 1, 2]
 # 2 pool with indices
 # 3 conv with large kernel
 # 4 1x1 + conv with large kernel
-POOLING_MODES = [0, 1, 2, 3, 4]
+# 5 conv with large kernel + 1x1
+POOLING_MODES = [0, 1, 2, 3, 4, 5]
 
 # Temporal branch ---
 # 0 skip -> no temporal branch
@@ -671,14 +674,22 @@ class SGN(PyTorchModule):
                                     normalization=lambda: self.normalization_fn(out_channels))),  # noqa
                 ])
             )
-            self.smp = Conv(
-                in_channels=self.c3*2 if self.semantic_joint_smp > 0 else self.c3,  # noqa
-                out_channels=self.c3,
-                kernel_size=self.num_point,
-                bias=self.bias,
-                activation=self.activation_fn,
-                normalization=lambda: self.normalization_fn(
-                    out_channels)
+        elif self.spatial_maxpool == 5:
+            self.smp = nn.Sequential(
+                OrderedDict([
+                    (f'conv1', Conv(in_channels=self.c3*2 if self.semantic_joint_smp > 0 else self.c3,  # noqa
+                                    out_channels=self.c3,
+                                    kernel_size=self.num_point,
+                                    bias=self.bias,
+                                    activation=self.activation_fn,
+                                    normalization=lambda: self.normalization_fn(out_channels))),  # noqa
+                    (f'conv2', Conv(in_channels=self.c3,
+                                    out_channels=self.c3,
+                                    kernel_size=1,
+                                    bias=self.bias,
+                                    activation=self.activation_fn,
+                                    normalization=lambda: self.normalization_fn(out_channels))),  # noqa
+                ])
             )
         else:
             raise ValueError("Unknown spatial_maxpool")
@@ -694,6 +705,10 @@ class SGN(PyTorchModule):
             self.tmp = nn.AdaptiveMaxPool2d((1, 1), return_indices=True)
         elif self.temporal_maxpool == 3:
             raise ValueError("temporal_maxpool=3 not implemented")
+        elif self.temporal_maxpool == 4:
+            raise ValueError("temporal_maxpool=4 not implemented")
+        elif self.temporal_maxpool == 5:
+            raise ValueError("temporal_maxpool=5 not implemented")
         else:
             raise ValueError("Unknown temporal_maxpool")
 
@@ -1013,88 +1028,97 @@ class FeatureExtractor(PyTorchModule):
 if __name__ == '__main__':
 
     batch_size = 1
-
     inputs = torch.ones(batch_size, 20, 100)
     # subjects = torch.ones(batch_size, 40, 1)
 
-    model = SGN(
-        num_class=60,
-        num_point=25,
-        num_segment=20,
-        in_channels=3,
-        bias=1,
-        dropout=0.0,  # classifier
-        dropout2d=0.0,  # the rest
-        c_multiplier=[1.0, 1.0, 1.0, 1.0],
-        norm_type='bn',
-        act_type='relu',
-        xem_projection=0,
-        input_position=1,
-        input_velocity=1,
-        semantic_joint=1,
-        semantic_frame=1,
-        semantic_class=0,
-        semantic_joint_smp=0,
-        semantic_joint_fusion=0,
-        semantic_frame_fusion=1,
-        semantic_frame_location=0,
-        # sgcn_g_res_alpha=-1,
-        # sgcn_gt_mode=5,
-        sgcn_dims=[256],  # [c2, c3, c3],
-        sgcn_kernel=1,  # residual connection in GCN
-        # sgcn_padding=0,  # residual connection in GCN
-        # sgcn_dropout=0.0,  # residual connection in GCN
-        # # int for global res, list for individual gcn
-        sgcn_residual=[0],
-        # sgcn_prenorm=False,
-        sgcn_ffn=1,
-        # sgcn_v_kernel=0,
-        sgcn_attn_mode=1,
-        sgcn_g_kernel=1,
-        sgcn_g_proj_dim=[256],  # c3
-        # sgcn_g_proj_shared=False,
-        # # sgcn_g_weighted=1,
-        sgcn_gt_mode=0,
-
-        # sgcn2_g_proj_dim=256,  # c3
-        # sgcn2_dims=[256, 256, 256],
-        # sgcn2_kernel=1,
-        # sgcn2_g_kernel=0,
-        # sgcn2_attn_mode=10,
-        # gcn_fpn=10,
-
-        # gcn_fpn=9,
-        # gcn_fpn_kernel=[3, 5, 7],
-        # gcn_fpn_shared=0,
-        # # gcn_fpn_output_merge=1,
-        # # bifpn_dim=256,
-        # # bifpn_layers=1,
-        # spatial_maxpool=3,
-        # temporal_maxpool=1,
-        # aspp_rates=None, 345402520
-        t_mode=3,
-        # t_maxpool_kwargs=None,
-        t_mha_kwargs={
-            'd_model': [256, 256],
-            'nhead': [1, 1],
-            'd_head': [256, 256],
-            'dim_feedforward': [512, 512],
-            'dim_feedforward_output': [256, 512],
-            'dropout': 0.2,
-            'activation': "relu",
-            'num_layers': 2,
-            'norm': 'bn',
-            'global_norm': False,
-            # 'pos_enc': 'abs',
-            # 'max_len': 20
-        },
-        multi_t=[[1]]
-        # multi_t=[[], [], [3, 5, 7], [3, 5, 7]],
-        # multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7]],
-        # multi_t_shared=2,
-    )
+    base_path = "/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v14"
+    file_path = "/221031110001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01"  # noqa
+    # file_path = "/221031110001_gt0_1gcn_gcnffn201_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01"  # noqa
+    parser = get_parser()
+    parser.set_defaults(**{'config': base_path + file_path + "/config.yaml"})
+    args = load_parser_args_from_config(parser)
+    model = SGN(**args.model_args)
     model(inputs)
     print(model)
+
+    # model = SGN(
+    #     num_class=60,
+    #     num_point=25,
+    #     num_segment=20,
+    #     in_channels=3,
+    #     bias=1,
+    #     dropout=0.0,  # classifier
+    #     dropout2d=0.0,  # the rest
+    #     c_multiplier=[1.0, 1.0, 1.0, 1.0],
+    #     norm_type='bn',
+    #     act_type='relu',
+    #     xem_projection=0,
+    #     input_position=1,
+    #     input_velocity=1,
+    #     semantic_joint=1,
+    #     semantic_frame=1,
+    #     semantic_class=0,
+    #     semantic_joint_smp=0,
+    #     semantic_joint_fusion=0,
+    #     semantic_frame_fusion=1,
+    #     semantic_frame_location=0,
+    #     # sgcn_g_res_alpha=-1,
+    #     # sgcn_gt_mode=5,
+    #     sgcn_dims=[256],  # [c2, c3, c3],
+    #     sgcn_kernel=1,  # residual connection in GCN
+    #     # sgcn_padding=0,  # residual connection in GCN
+    #     # sgcn_dropout=0.0,  # residual connection in GCN
+    #     # # int for global res, list for individual gcn
+    #     sgcn_residual=[0],
+    #     # sgcn_prenorm=False,
+    #     sgcn_ffn=1,
+    #     # sgcn_v_kernel=0,
+    #     sgcn_attn_mode=1,
+    #     sgcn_g_kernel=1,
+    #     sgcn_g_proj_dim=[256],  # c3
+    #     # sgcn_g_proj_shared=False,
+    #     # # sgcn_g_weighted=1,
+    #     sgcn_gt_mode=0,
+
+    #     # sgcn2_g_proj_dim=256,  # c3
+    #     # sgcn2_dims=[256, 256, 256],
+    #     # sgcn2_kernel=1,
+    #     # sgcn2_g_kernel=0,
+    #     # sgcn2_attn_mode=10,
+    #     # gcn_fpn=10,
+
+    #     # gcn_fpn=9,
+    #     # gcn_fpn_kernel=[3, 5, 7],
+    #     # gcn_fpn_shared=0,
+    #     # # gcn_fpn_output_merge=1,
+    #     # # bifpn_dim=256,
+    #     # # bifpn_layers=1,
+    #     # spatial_maxpool=3,
+    #     # temporal_maxpool=1,
+    #     # aspp_rates=None, 345402520
+    #     t_mode=3,
+    #     # t_maxpool_kwargs=None,
+    #     t_mha_kwargs={
+    #         'd_model': [256, 256],
+    #         'nhead': [1, 1],
+    #         'd_head': [256, 256],
+    #         'dim_feedforward': [512, 512],
+    #         'dim_feedforward_output': [256, 512],
+    #         'dropout': 0.2,
+    #         'activation': "relu",
+    #         'num_layers': 2,
+    #         'norm': 'bn',
+    #         'global_norm': False,
+    #         # 'pos_enc': 'abs',
+    #         # 'max_len': 20
+    #     },
+    #     multi_t=[[1]]
+    #     # multi_t=[[], [], [3, 5, 7], [3, 5, 7]],
+    #     # multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7]],
+    #     # multi_t_shared=2,
+    # )
+    # model(inputs)
+    # print(model)
 
     try:
         flops = FlopCountAnalysis(model, inputs)
