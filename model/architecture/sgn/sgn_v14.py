@@ -862,7 +862,7 @@ class SGN(PyTorchModule):
             x_list = [torch.cat((i, smp_emb), axis=1)
                       if i is not None else None for i in x_list]
 
-        if self.spatial_maxpool in [3, 4]:
+        if self.spatial_maxpool in [3, 4, 5]:
             x_list = [i.permute(0, 1, 3, 2).contiguous()
                       if i is not None else None for i in x_list]
             x_list = [self.smp(i) if i is not None else None for i in x_list]
@@ -1031,94 +1031,94 @@ if __name__ == '__main__':
     inputs = torch.ones(batch_size, 20, 100)
     # subjects = torch.ones(batch_size, 40, 1)
 
-    base_path = "/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v14"
-    file_path = "/221031110001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01"  # noqa
-    # file_path = "/221031110001_gt0_1gcn_gcnffn201_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01"  # noqa
-    parser = get_parser()
-    parser.set_defaults(**{'config': base_path + file_path + "/config.yaml"})
-    args = load_parser_args_from_config(parser)
-    model = SGN(**args.model_args)
-    model(inputs)
-    print(model)
-
-    # model = SGN(
-    #     num_class=60,
-    #     num_point=25,
-    #     num_segment=20,
-    #     in_channels=3,
-    #     bias=1,
-    #     dropout=0.0,  # classifier
-    #     dropout2d=0.0,  # the rest
-    #     c_multiplier=[1.0, 1.0, 1.0, 1.0],
-    #     norm_type='bn',
-    #     act_type='relu',
-    #     xem_projection=0,
-    #     input_position=1,
-    #     input_velocity=1,
-    #     semantic_joint=1,
-    #     semantic_frame=1,
-    #     semantic_class=0,
-    #     semantic_joint_smp=0,
-    #     semantic_joint_fusion=0,
-    #     semantic_frame_fusion=1,
-    #     semantic_frame_location=0,
-    #     # sgcn_g_res_alpha=-1,
-    #     # sgcn_gt_mode=5,
-    #     sgcn_dims=[256],  # [c2, c3, c3],
-    #     sgcn_kernel=1,  # residual connection in GCN
-    #     # sgcn_padding=0,  # residual connection in GCN
-    #     # sgcn_dropout=0.0,  # residual connection in GCN
-    #     # # int for global res, list for individual gcn
-    #     sgcn_residual=[0],
-    #     # sgcn_prenorm=False,
-    #     sgcn_ffn=1,
-    #     # sgcn_v_kernel=0,
-    #     sgcn_attn_mode=1,
-    #     sgcn_g_kernel=1,
-    #     sgcn_g_proj_dim=[256],  # c3
-    #     # sgcn_g_proj_shared=False,
-    #     # # sgcn_g_weighted=1,
-    #     sgcn_gt_mode=0,
-
-    #     # sgcn2_g_proj_dim=256,  # c3
-    #     # sgcn2_dims=[256, 256, 256],
-    #     # sgcn2_kernel=1,
-    #     # sgcn2_g_kernel=0,
-    #     # sgcn2_attn_mode=10,
-    #     # gcn_fpn=10,
-
-    #     # gcn_fpn=9,
-    #     # gcn_fpn_kernel=[3, 5, 7],
-    #     # gcn_fpn_shared=0,
-    #     # # gcn_fpn_output_merge=1,
-    #     # # bifpn_dim=256,
-    #     # # bifpn_layers=1,
-    #     # spatial_maxpool=3,
-    #     # temporal_maxpool=1,
-    #     # aspp_rates=None, 345402520
-    #     t_mode=3,
-    #     # t_maxpool_kwargs=None,
-    #     t_mha_kwargs={
-    #         'd_model': [256, 256],
-    #         'nhead': [1, 1],
-    #         'd_head': [256, 256],
-    #         'dim_feedforward': [512, 512],
-    #         'dim_feedforward_output': [256, 512],
-    #         'dropout': 0.2,
-    #         'activation': "relu",
-    #         'num_layers': 2,
-    #         'norm': 'bn',
-    #         'global_norm': False,
-    #         # 'pos_enc': 'abs',
-    #         # 'max_len': 20
-    #     },
-    #     multi_t=[[1]]
-    #     # multi_t=[[], [], [3, 5, 7], [3, 5, 7]],
-    #     # multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7]],
-    #     # multi_t_shared=2,
-    # )
+    # base_path = "/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v14"
+    # file_path = "/221031110001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01"  # noqa
+    # # file_path = "/221031110001_gt0_1gcn_gcnffn201_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01"  # noqa
+    # parser = get_parser()
+    # parser.set_defaults(**{'config': base_path + file_path + "/config.yaml"})
+    # args = load_parser_args_from_config(parser)
+    # model = SGN(**args.model_args)
     # model(inputs)
     # print(model)
+
+    model = SGN(
+        num_class=60,
+        num_point=25,
+        num_segment=20,
+        in_channels=3,
+        bias=1,
+        dropout=0.0,  # classifier
+        dropout2d=0.0,  # the rest
+        c_multiplier=[1.0, 1.0, 1.0, 1.0],
+        norm_type='bn',
+        act_type='relu',
+        xem_projection=0,
+        input_position=1,
+        input_velocity=1,
+        semantic_joint=1,
+        semantic_frame=1,
+        semantic_class=0,
+        semantic_joint_smp=0,
+        semantic_joint_fusion=0,
+        semantic_frame_fusion=1,
+        semantic_frame_location=0,
+        # sgcn_g_res_alpha=-1,
+        # sgcn_gt_mode=5,
+        sgcn_dims=[256],  # [c2, c3, c3],
+        sgcn_kernel=1,  # residual connection in GCN
+        # sgcn_padding=0,  # residual connection in GCN
+        # sgcn_dropout=0.0,  # residual connection in GCN
+        # # int for global res, list for individual gcn
+        sgcn_residual=[0],
+        # sgcn_prenorm=False,
+        sgcn_ffn=1,
+        # sgcn_v_kernel=0,
+        sgcn_attn_mode=1,
+        sgcn_g_kernel=1,
+        sgcn_g_proj_dim=[256],  # c3
+        # sgcn_g_proj_shared=False,
+        # # sgcn_g_weighted=1,
+        sgcn_gt_mode=0,
+
+        # sgcn2_g_proj_dim=256,  # c3
+        # sgcn2_dims=[256, 256, 256],
+        # sgcn2_kernel=1,
+        # sgcn2_g_kernel=0,
+        # sgcn2_attn_mode=10,
+        # gcn_fpn=10,
+
+        # gcn_fpn=9,
+        # gcn_fpn_kernel=[3, 5, 7],
+        # gcn_fpn_shared=0,
+        # # gcn_fpn_output_merge=1,
+        # # bifpn_dim=256,
+        # # bifpn_layers=1,
+        spatial_maxpool=5,
+        # temporal_maxpool=1,
+        # aspp_rates=None, 345402520
+        t_mode=3,
+        # t_maxpool_kwargs=None,
+        t_mha_kwargs={
+            'd_model': [256, 256],
+            'nhead': [1, 1],
+            'd_head': [256, 256],
+            'dim_feedforward': [512, 512],
+            'dim_feedforward_output': [256, 512],
+            'dropout': 0.2,
+            'activation': "relu",
+            'num_layers': 2,
+            'norm': 'bn',
+            'global_norm': False,
+            # 'pos_enc': 'abs',
+            # 'max_len': 20
+        },
+        multi_t=[[1]]
+        # multi_t=[[], [], [3, 5, 7], [3, 5, 7]],
+        # multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7]],
+        # multi_t_shared=2,
+    )
+    model(inputs)
+    print(model)
 
     try:
         flops = FlopCountAnalysis(model, inputs)
