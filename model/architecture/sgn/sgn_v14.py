@@ -704,11 +704,55 @@ class SGN(PyTorchModule):
         elif self.temporal_maxpool == 2:
             self.tmp = nn.AdaptiveMaxPool2d((1, 1), return_indices=True)
         elif self.temporal_maxpool == 3:
-            raise ValueError("temporal_maxpool=3 not implemented")
+            self.tmp = nn.Sequential(
+                OrderedDict([
+                    (f'conv1', Conv(in_channels=self.c4,  # noqa
+                                    out_channels=self.c4,
+                                    kernel_size=self.num_segment,
+                                    bias=self.bias,
+                                    activation=self.activation_fn,)),
+                    (f'reshape1', nn.Flatten(-2, -1)),
+                    (f'norm1', self.normalization_fn_1d(self.c4)),
+                ])
+            )
         elif self.temporal_maxpool == 4:
-            raise ValueError("temporal_maxpool=4 not implemented")
+            self.tmp = nn.Sequential(
+                OrderedDict([
+                    (f'conv1', Conv(in_channels=self.c4,  # noqa
+                                    out_channels=self.c4,
+                                    kernel_size=1,
+                                    bias=self.bias,
+                                    activation=self.activation_fn,)),
+                    (f'norm1', self.normalization_fn(self.c4)),
+                    (f'conv2', Conv(in_channels=self.c4,
+                                    out_channels=self.c4,
+                                    kernel_size=self.num_segment,
+                                    bias=self.bias,
+                                    activation=self.activation_fn,)),
+                    (f'reshape2', nn.Flatten(-2, -1)),
+                    (f'norm2', self.normalization_fn_1d(self.c4)),
+                ])
+            )
         elif self.temporal_maxpool == 5:
-            raise ValueError("temporal_maxpool=5 not implemented")
+            self.tmp = nn.Sequential(
+                OrderedDict([
+                    (f'conv1', Conv(in_channels=self.c4,  # noqa
+                                    out_channels=self.c4,
+                                    kernel_size=self.num_segment,
+                                    bias=self.bias,
+                                    activation=self.activation_fn,)),
+                    (f'reshape0', nn.Flatten(-2, -1)),
+                    (f'norm1', self.normalization_fn_1d(self.c4)),
+                    (f'reshape1', nn.Unflatten(-1, (1, 1))),
+                    (f'conv2', Conv(in_channels=self.c4,
+                                    out_channels=self.c4,
+                                    kernel_size=1,
+                                    bias=self.bias,
+                                    activation=self.activation_fn,)),
+                    (f'reshape2', nn.Flatten(-2, -1)),
+                    (f'norm2', self.normalization_fn_1d(self.c4)),
+                ])
+            )
         else:
             raise ValueError("Unknown temporal_maxpool")
 
@@ -1027,7 +1071,7 @@ class FeatureExtractor(PyTorchModule):
 
 if __name__ == '__main__':
 
-    batch_size = 1
+    batch_size = 2
     inputs = torch.ones(batch_size, 20, 100)
     # subjects = torch.ones(batch_size, 40, 1)
 
@@ -1094,21 +1138,22 @@ if __name__ == '__main__':
         # # bifpn_dim=256,
         # # bifpn_layers=1,
         spatial_maxpool=5,
-        # temporal_maxpool=1,
+        temporal_maxpool=5,
         # aspp_rates=None, 345402520
         t_mode=3,
         # t_maxpool_kwargs=None,
         t_mha_kwargs={
-            'd_model': [256, 256],
-            'nhead': [1, 1],
-            'd_head': [256, 256],
-            'dim_feedforward': [512, 512],
-            'dim_feedforward_output': [256, 512],
+            'd_model': [256],
+            'nhead': [1],
+            'd_head': [256],
+            'dim_feedforward': [512],
+            'dim_feedforward_output': [512],
             'dropout': 0.2,
             'activation': "relu",
-            'num_layers': 2,
+            'num_layers': 1,
             'norm': 'bn',
             'global_norm': False,
+            'post_norm': True,
             # 'pos_enc': 'abs',
             # 'max_len': 20
         },
@@ -1120,10 +1165,10 @@ if __name__ == '__main__':
     model(inputs)
     print(model)
 
-    try:
-        flops = FlopCountAnalysis(model, inputs)
-        print(flops.total())
-        # print(flops.by_module_and_operator())
-        # print(flop_count_table(flops))
-    except NameError:
-        print("Warning: fvcore is not found")
+    # try:
+    #     flops = FlopCountAnalysis(model, inputs)
+    #     print(flops.total())
+    #     # print(flops.by_module_and_operator())
+    #     # print(flop_count_table(flops))
+    # except NameError:
+    #     print("Warning: fvcore is not found")
