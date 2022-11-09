@@ -51,11 +51,26 @@ class PreNorm(nn.Module):
         self.fn = fn
 
     def forward(self, x: torch.Tensor, **kwargs):
-
         return self.fn(self.norm(x), **kwargs)
 
 
+# post-layer norm
+class PostNorm(nn.Module):
+    def __init__(self, dim: int, fn: Callable, norm: str = 'ln'):
+        super().__init__()
+        self.norm = Normalize(get_normalization_fn(norm)[0](dim))
+        self.fn = fn
+
+    def forward(self, x: torch.Tensor, **kwargs):
+        out = self.fn(x, **kwargs)
+        if isinstance(out, torch.Tensor):
+            return self.norm(out)
+        else:
+            return self.norm(out[0]), *out[1:]
+
 # feedforward
+
+
 class FeedForward(nn.Module):
     def __init__(self,
                  dim: int,
@@ -168,6 +183,7 @@ class Transformer(nn.Module):
                  activation: str = 'gelu',
                  norm: str = 'ln',
                  global_norm: bool = True,
+                 post_norm: bool = False,
                  **kwargs):
         super().__init__()
 
@@ -211,21 +227,38 @@ class Transformer(nn.Module):
                                activation=activation,
                                output_dim=mlp_out_dim[i])
 
-            self.layers.update(
-                {
-                    f'l{i+1}':
-                    nn.ModuleDict(
-                        OrderedDict({
-                            'attn': PreNorm(dim=dim[i],
-                                            fn=Attention(**attn_kwargs),
-                                            norm=norm),
-                            'ffn': PreNorm(dim=output_dim[i],
-                                           fn=FeedForward(**ffnn_kwargs),
-                                           norm=norm)
-                        })
-                    )
-                }
-            )
+            if post_norm:
+                self.layers.update(
+                    {
+                        f'l{i+1}':
+                        nn.ModuleDict(
+                            OrderedDict({
+                                'attn': PostNorm(dim=output_dim[i],
+                                                 fn=Attention(**attn_kwargs),
+                                                 norm=norm),
+                                'ffn': PostNorm(dim=mlp_out_dim[i],
+                                                fn=FeedForward(**ffnn_kwargs),
+                                                norm=norm)
+                            })
+                        )
+                    }
+                )
+            else:
+                self.layers.update(
+                    {
+                        f'l{i+1}':
+                        nn.ModuleDict(
+                            OrderedDict({
+                                'attn': PreNorm(dim=dim[i],
+                                                fn=Attention(**attn_kwargs),
+                                                norm=norm),
+                                'ffn': PreNorm(dim=output_dim[i],
+                                               fn=FeedForward(**ffnn_kwargs),
+                                               norm=norm)
+                            })
+                        )
+                    }
+                )
 
         if global_norm:
             _dim = dim[-1] if mlp_out_dim[-1] == 0 else mlp_out_dim[-1]

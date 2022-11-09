@@ -35,6 +35,7 @@ class MHATemporal(PyTorchModule):
                  d_head=None,
                  dim_feedforward_output=None,
                  global_norm=None,
+                 post_norm=None,
                  pos_enc=None,
                  max_len=20,
                  **kwargs):
@@ -54,6 +55,7 @@ class MHATemporal(PyTorchModule):
                 activation=activation,
                 norm=norm,
                 global_norm=global_norm,
+                post_norm=post_norm,
                 **kwargs
                 # v_proj=kwargs.get('v_proj', True),
                 # res_proj=kwargs.get('res_proj', False),
