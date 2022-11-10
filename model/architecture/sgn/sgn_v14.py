@@ -709,10 +709,10 @@ class SGN(PyTorchModule):
                     (f'conv1', Conv(in_channels=self.c4,  # noqa
                                     out_channels=self.c4,
                                     kernel_size=self.num_segment,
-                                    bias=self.bias,
-                                    activation=self.activation_fn,)),
+                                    bias=self.bias)),
                     (f'reshape1', nn.Flatten(-2, -1)),
                     (f'norm1', self.normalization_fn_1d(self.c4)),
+                    (f'act1', self.activation_fn()),
                 ])
             )
         elif self.temporal_maxpool == 4:
@@ -721,16 +721,16 @@ class SGN(PyTorchModule):
                     (f'conv1', Conv(in_channels=self.c4,  # noqa
                                     out_channels=self.c4,
                                     kernel_size=1,
-                                    bias=self.bias,
-                                    activation=self.activation_fn,)),
+                                    bias=self.bias,)),
                     (f'norm1', self.normalization_fn(self.c4)),
+                    (f'act1', self.activation_fn()),
                     (f'conv2', Conv(in_channels=self.c4,
                                     out_channels=self.c4,
                                     kernel_size=self.num_segment,
-                                    bias=self.bias,
-                                    activation=self.activation_fn,)),
+                                    bias=self.bias,)),
                     (f'reshape2', nn.Flatten(-2, -1)),
                     (f'norm2', self.normalization_fn_1d(self.c4)),
+                    (f'act2', self.activation_fn()),
                 ])
             )
         elif self.temporal_maxpool == 5:
@@ -739,18 +739,18 @@ class SGN(PyTorchModule):
                     (f'conv1', Conv(in_channels=self.c4,  # noqa
                                     out_channels=self.c4,
                                     kernel_size=self.num_segment,
-                                    bias=self.bias,
-                                    activation=self.activation_fn,)),
+                                    bias=self.bias,)),
                     (f'reshape0', nn.Flatten(-2, -1)),
                     (f'norm1', self.normalization_fn_1d(self.c4)),
+                    (f'act1', self.activation_fn()),
                     (f'reshape1', nn.Unflatten(-1, (1, 1))),
                     (f'conv2', Conv(in_channels=self.c4,
                                     out_channels=self.c4,
                                     kernel_size=1,
-                                    bias=self.bias,
-                                    activation=self.activation_fn,)),
+                                    bias=self.bias,)),
                     (f'reshape2', nn.Flatten(-2, -1)),
                     (f'norm2', self.normalization_fn_1d(self.c4)),
+                    (f'act2', self.activation_fn()),
                 ])
             )
         else:
@@ -1137,8 +1137,8 @@ if __name__ == '__main__':
         # # gcn_fpn_output_merge=1,
         # # bifpn_dim=256,
         # # bifpn_layers=1,
-        spatial_maxpool=5,
-        temporal_maxpool=5,
+        spatial_maxpool=3,
+        temporal_maxpool=3,
         # aspp_rates=None, 345402520
         t_mode=3,
         # t_maxpool_kwargs=None,
@@ -1163,7 +1163,12 @@ if __name__ == '__main__':
         # multi_t_shared=2,
     )
     model(inputs)
-    print(model)
+    # print(model)
+
+    named_layers = dict(model.named_modules())
+    for k, v in named_layers.items():
+        if len([i for i in v.named_modules()]) == 1:
+            print(k, v)
 
     # try:
     #     flops = FlopCountAnalysis(model, inputs)
