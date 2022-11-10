@@ -43,6 +43,7 @@ from model.architecture.sgn.blocks import SemanticEmbedding
 from model.architecture.sgn.blocks import TemporalBranch
 from model.architecture.sgn.blocks import GCNSpatialBlock
 from model.architecture.sgn.blocks import GCNSpatialBlock2
+from model.architecture.sgn.blocks import FeatureExtractor
 
 
 T1 = Type[PyTorchModule]
@@ -99,7 +100,7 @@ class SGN(PyTorchModule):
     emb_modes = EMB_MODES  # [0, 1, 2, 3, 4, 5, 6, 7, 8]
     c1, c2, c3, c4 = c1, c2, c3, c4
     # g_activation_fn = nn.Identity
-    g_activation_fn = nn.Softmax
+    # g_activation_fn = nn.Softmax
 
     def __init__(self,
                  num_class: int = 60,
@@ -140,6 +141,7 @@ class SGN(PyTorchModule):
                  sgcn_g_proj_shared: bool = False,
                  sgcn_g_weighted: int = 0,
                  sgcn_g_res_alpha: float = 1.0,
+                 sgcn_g_activation: str = 'relu',
                  # 1: matmul GT @ G
                  # 2: pointwise mul post GT-softmax GT * G
                  # 3: pointwise mul post GT-softmax/sigmoid (2 layers) GT * G
@@ -228,6 +230,7 @@ class SGN(PyTorchModule):
         self.prenorm = True if 'pre' in norm_type else False
 
         self.activation_fn = get_activation_fn(act_type)
+        self.g_activation_fn = get_activation_fn(sgcn_g_activation)
 
         # Input + Semantics ----------------------------------------------------
         self.input_position = input_position
@@ -1035,40 +1038,6 @@ class SGN(PyTorchModule):
             )
 
 
-class FeatureExtractor(PyTorchModule):
-    def __init__(self,
-                 in_pos: int,
-                 in_vel: int,
-                 in_pos_emb_kwargs: dict,
-                 in_vel_emb_kwargs: dict,
-                 ):
-        super(FeatureExtractor, self).__init__()
-        self.in_pos = in_pos
-        self.in_vel = in_vel
-        if self.in_pos > 0:
-            self.pos_embed = Embedding(**in_pos_emb_kwargs)
-        if self.in_vel > 0:
-            self.vel_embed = Embedding(**in_vel_emb_kwargs)
-        if self.in_pos == 0 and self.in_vel == 0:
-            raise ValueError("Input args are faulty...")
-
-    def forward(self, x: Tensor) -> Optional[Tensor]:
-        # x : n,c,v,t
-        dif = x[:, :, :, 1:] - x[:, :, :, 0:-1]  # n,c,v,t-1
-        dif = pad_zeros(dif)
-        if self.in_pos > 0 and self.in_vel > 0:
-            pos = self.pos_embed(x)
-            dif = self.vel_embed(dif)
-            dy1 = pos + dif  # n,c,v,t
-        elif self.in_pos > 0:
-            dy1 = self.pos_embed(x)
-        elif self.in_vel > 0:
-            dy1 = self.vel_embed(dif)
-        else:
-            dy1 = None
-        return dy1
-
-
 if __name__ == '__main__':
 
     batch_size = 2
@@ -1120,9 +1089,10 @@ if __name__ == '__main__':
         sgcn_attn_mode=1,
         sgcn_g_kernel=1,
         sgcn_g_proj_dim=[256],  # c3
+        sgcn_g_activation='relu',
         # sgcn_g_proj_shared=False,
         # # sgcn_g_weighted=1,
-        sgcn_gt_mode=0,
+        # sgcn_gt_mode=0,
 
         # sgcn2_g_proj_dim=256,  # c3
         # sgcn2_dims=[256, 256, 256],
@@ -1140,23 +1110,23 @@ if __name__ == '__main__':
         spatial_maxpool=3,
         temporal_maxpool=3,
         # aspp_rates=None, 345402520
-        t_mode=3,
+        t_mode=1,
         # t_maxpool_kwargs=None,
-        t_mha_kwargs={
-            'd_model': [256],
-            'nhead': [1],
-            'd_head': [256],
-            'dim_feedforward': [512],
-            'dim_feedforward_output': [512],
-            'dropout': 0.2,
-            'activation': "relu",
-            'num_layers': 1,
-            'norm': 'bn',
-            'global_norm': False,
-            'post_norm': True,
-            # 'pos_enc': 'abs',
-            # 'max_len': 20
-        },
+        # t_mha_kwargs={
+        #     'd_model': [256],
+        #     'nhead': [1],
+        #     'd_head': [256],
+        #     'dim_feedforward': [512],
+        #     'dim_feedforward_output': [512],
+        #     'dropout': 0.2,
+        #     'activation': "relu",
+        #     'num_layers': 1,
+        #     'norm': 'bn',
+        #     'global_norm': False,
+        #     'post_norm': True,
+        #     # 'pos_enc': 'abs',
+        #     # 'max_len': 20
+        # },
         multi_t=[[1]]
         # multi_t=[[], [], [3, 5, 7], [3, 5, 7]],
         # multi_t=[[3, 5, 7], [3, 5, 7], [3, 5, 7]],
@@ -1165,6 +1135,9 @@ if __name__ == '__main__':
     model(inputs)
     # print(model)
 
+    bs, step, dim = inputs.shape
+    x = inputs.view((bs, step, 25, dim//25))  # n,t,v,c
+    x = x.permute(0, 3, 2, 1).contiguous()  # n,c,v,t
     named_layers = dict(model.named_modules())
     for k, v in named_layers.items():
         if len([i for i in v.named_modules()]) == 1:

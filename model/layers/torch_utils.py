@@ -23,6 +23,10 @@ def get_activation_fn(act_type: str) -> Type[torch.nn.Module]:
         return torch.nn.ReLU
     elif act_type == 'gelu':
         return torch.nn.GELU
+    elif act_type == 'identity':
+        return torch.nn.Identity
+    elif act_type == 'softmax':
+        return torch.nn.Softmax
     else:
         raise ValueError("Unknown act_type ...")
 

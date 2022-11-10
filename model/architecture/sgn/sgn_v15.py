@@ -22,9 +22,14 @@ from model.layers import pad_zeros
 from model.layers import get_activation_fn
 from model.layers import get_normalization_fn
 from model.layers import Transformer
+
 from utils.utils import *
 from utils.parser import get_parser
 from utils.parser import load_parser_args_from_config
+
+from model.architecture.sgn.blocks import Embedding
+from model.architecture.sgn.blocks import SemanticEmbedding
+from model.architecture.sgn.blocks import FeatureExtractor
 
 T1 = Type[PyTorchModule]
 T2 = List[Optional[Type[PyTorchModule]]]
@@ -422,105 +427,6 @@ class Embedding(Module):
         for i in range(self.num_layers):
             x = getattr(self, f'cnn{i+1}')(x) + getattr(self, f'res{i+1}')(x)
         return x
-
-
-class FeatureExtractor(PyTorchModule):
-    def __init__(self,
-                 in_pos: int,
-                 in_vel: int,
-                 in_pos_emb_kwargs: dict,
-                 in_vel_emb_kwargs: dict,
-                 ):
-        super(FeatureExtractor, self).__init__()
-        self.in_pos = in_pos
-        self.in_vel = in_vel
-        if self.in_pos > 0:
-            self.pos_embed = Embedding(**in_pos_emb_kwargs)
-        if self.in_vel > 0:
-            self.vel_embed = Embedding(**in_vel_emb_kwargs)
-        if self.in_pos == 0 and self.in_vel == 0:
-            raise ValueError("Input args are faulty...")
-
-    def forward(self, x: Tensor) -> Optional[Tensor]:
-        # x : n,c,v,t
-        dif = x[:, :, :, 1:] - x[:, :, :, 0:-1]  # n,c,v,t-1
-        dif = pad_zeros(dif)
-        if self.in_pos > 0 and self.in_vel > 0:
-            pos = self.pos_embed(x)
-            dif = self.vel_embed(dif)
-            dy1 = pos + dif  # n,c,v,t
-        elif self.in_pos > 0:
-            dy1 = self.pos_embed(x)
-        elif self.in_vel > 0:
-            dy1 = self.vel_embed(dif)
-        else:
-            dy1 = None
-        return dy1
-
-
-class OneHotTensor(PyTorchModule):
-    def __init__(self, dim_eye: int, dim_length: int, mode: int):
-        super(OneHotTensor, self).__init__()
-        onehot = torch.eye(dim_eye, dim_eye)
-        onehot = onehot.unsqueeze(0).unsqueeze(0)
-        onehot = onehot.repeat(1, dim_length, 1, 1)
-        if mode == 0:
-            onehot = onehot.permute(0, 3, 2, 1)
-        elif mode == 1:
-            onehot = onehot.permute(0, 3, 1, 2)
-        elif mode == 2:
-            pass
-        else:
-            raise ValueError("Unknown mode")
-        self.register_buffer("onehot", onehot)
-
-    def forward(self, bs: int) -> Tensor:
-        x = self.onehot.repeat(bs, 1, 1, 1)
-        return x
-
-
-class SemanticEmbedding(PyTorchModule):
-    def __init__(self,
-                 num_point: int,
-                 num_segment: int,
-                 sem_spa: int,
-                 sem_tem: int,
-                 sem_cls: int,
-                 sem_spa_emb_kwargs: dict,
-                 sem_tem_emb_kwargs: dict,
-                 sem_cls_emb_kwargs: dict,
-                 ):
-        super(SemanticEmbedding, self).__init__()
-        self.num_point = num_point
-        self.num_segment = num_segment
-        self.sem_spa = sem_spa
-        self.sem_tem = sem_tem
-        self.sem_cls = sem_cls
-        # Joint Embedding
-        if self.sem_spa > 0:
-            self.spa_onehot = OneHotTensor(
-                sem_spa_emb_kwargs['in_channels'], self.num_segment, mode=0)
-            self.spa_embedding = Embedding(**sem_spa_emb_kwargs)
-        # Frame Embedding
-        if self.sem_tem > 0:
-            self.tem_onehot = OneHotTensor(
-                sem_tem_emb_kwargs['in_channels'], self.num_point, mode=1)
-            self.tem_embedding = Embedding(**sem_tem_emb_kwargs)
-        # Class Embedding
-        if self.sem_cls > 0:
-            self.cls_onehot = OneHotTensor(
-                sem_cls_emb_kwargs['in_channels'], 1, mode=2)
-            self.cls_embedding = Embedding(**sem_cls_emb_kwargs)
-
-    def forward(self, x: Tensor) -> Tuple[Optional[Tensor], Optional[Tensor]]:
-        spa_emb, tem_emb, cls_emb = None, None, None
-        if self.sem_spa > 0:
-            spa_emb = self.spa_embedding(self.spa_onehot(x.shape[0]))
-        if self.sem_tem > 0:
-            tem_emb = self.tem_embedding(self.tem_onehot(x.shape[0]))
-        if self.sem_cls > 0:
-            cls_emb = self.cls_embedding(self.cls_onehot(x.shape[0]))
-        return spa_emb, tem_emb, cls_emb
 
 
 class MHA(PyTorchModule):

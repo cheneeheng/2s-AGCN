@@ -8,3 +8,5 @@ from .temporal import TemporalBranch
 
 from .spatial import GCNSpatialBlock
 from .spatial import GCNSpatialBlock2
+
+from .feature_extractor import FeatureExtractor
