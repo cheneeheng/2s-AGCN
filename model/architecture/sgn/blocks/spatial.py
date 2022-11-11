@@ -725,7 +725,9 @@ class GCNSpatialUnit(Module):
                                              activation=activation,
                                              normalization=normalization,
                                              prenorm=prenorm)
-        if res_alpha < 0:
+        if res_alpha == -2:
+            self.res_alpha = nn.Parameter(torch.zeros(1))
+        elif res_alpha == -1:
             self.res_alpha = nn.Parameter(torch.ones(1))
         else:
             self.res_alpha = res_alpha

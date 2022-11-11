@@ -262,7 +262,7 @@ class SGN(PyTorchModule):
             x = x[:, :self.in_channels, :, :]
 
         # Dynamic Representation -----------------------------------------------
-        x = self.feature_extractor(x)
+        x, pos_emb, vel_emb = self.feature_extractor(x)
         assert x is not None
 
         # Joint and frame embeddings -------------------------------------------

@@ -918,8 +918,10 @@ sgn_v14:
         - 221108160001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01_tmp3:
                   - 94.59%
 
+        - 221108160001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01_smp3_tmp3:
+                  - 94.53%
         - 221108160001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01_smp3_tmp3b:
-
+                  - 94.46%
 
 sgn_v15:
         - only transformers

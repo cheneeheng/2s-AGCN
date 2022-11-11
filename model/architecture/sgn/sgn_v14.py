@@ -141,7 +141,7 @@ class SGN(PyTorchModule):
                  sgcn_g_proj_shared: bool = False,
                  sgcn_g_weighted: int = 0,
                  sgcn_g_res_alpha: float = 1.0,
-                 sgcn_g_activation: str = 'relu',
+                 sgcn_g_activation: str = 'softmax',
                  # 1: matmul GT @ G
                  # 2: pointwise mul post GT-softmax GT * G
                  # 3: pointwise mul post GT-softmax/sigmoid (2 layers) GT * G
@@ -829,7 +829,7 @@ class SGN(PyTorchModule):
             x = x[:, :self.in_channels, :, :]
 
         # Dynamic Representation -----------------------------------------------
-        x = self.feature_extractor(x)
+        x, pos_emb, vel_emb = self.feature_extractor(x)
         assert x is not None
 
         # Joint and frame embeddings -------------------------------------------
@@ -1021,6 +1021,8 @@ class SGN(PyTorchModule):
                     'x_tem_list': _x_list,
                     'tem_emb': tem_emb,
                     'spa_emb': spa_emb,
+                    'pos_emb': pos_emb,
+                    'vel_emb': vel_emb,
                 }
             )
         else:
@@ -1034,6 +1036,8 @@ class SGN(PyTorchModule):
                     'x_tem_list': _x_list,
                     'tem_emb': tem_emb,
                     'spa_emb': spa_emb,
+                    'pos_emb': pos_emb,
+                    'vel_emb': vel_emb,
                 }
             )
 
@@ -1107,8 +1111,8 @@ if __name__ == '__main__':
         # # gcn_fpn_output_merge=1,
         # # bifpn_dim=256,
         # # bifpn_layers=1,
-        spatial_maxpool=3,
-        temporal_maxpool=3,
+        spatial_maxpool=1,
+        temporal_maxpool=1,
         # aspp_rates=None, 345402520
         t_mode=1,
         # t_maxpool_kwargs=None,

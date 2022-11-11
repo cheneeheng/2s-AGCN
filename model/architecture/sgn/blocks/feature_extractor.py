@@ -30,12 +30,14 @@ class FeatureExtractor(PyTorchModule):
         dif = pad_zeros(dif)
         if self.in_pos > 0 and self.in_vel > 0:
             pos = self.pos_embed(x)
-            dif = self.vel_embed(dif)
-            dy1 = pos + dif  # n,c,v,t
+            vel = self.vel_embed(dif)
+            dy1 = pos + vel  # n,c,v,t
+            return dy1, pos, vel
         elif self.in_pos > 0:
             dy1 = self.pos_embed(x)
+            return dy1, dy1, None
         elif self.in_vel > 0:
             dy1 = self.vel_embed(dif)
+            return dy1, None, dy1
         else:
-            dy1 = None
-        return dy1
+            return None, None, None
