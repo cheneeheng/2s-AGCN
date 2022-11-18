@@ -117,6 +117,7 @@ class SGN(PyTorchModule):
                  xem_projection: int = 0,
                  input_position: int = 1,
                  input_velocity: int = 1,
+                 semantic_jdiff: int = 0,
                  semantic_joint: int = 1,
                  semantic_frame: int = 1,
                  semantic_class: int = 0,
@@ -236,6 +237,7 @@ class SGN(PyTorchModule):
         self.input_position = input_position
         self.input_velocity = input_velocity
         self.semantic_joint = semantic_joint
+        self.semantic_jdiff = semantic_jdiff
         self.semantic_frame = semantic_frame
         self.semantic_class = semantic_class
         self.semantic_joint_smp = semantic_joint_smp
@@ -519,6 +521,23 @@ class SGN(PyTorchModule):
                 mode=self.semantic_class
             )
         )
+
+        if self.semantic_jdiff > 0:
+            self.semantic_jdiff_embedding = SemanticEmbedding(
+                num_point=self.num_point,
+                num_segment=self.num_segment,
+                sem_spa=self.semantic_jdiff,
+                sem_spa_emb_kwargs=dict(
+                    in_channels=self.num_point,
+                    out_channels=self.c1,
+                    bias=self.bias,
+                    dropout=self.dropout_fn,
+                    activation=self.activation_fn,
+                    normalization=self.normalization_fn,
+                    num_point=self.num_point,
+                    mode=self.semantic_jdiff
+                ),
+            )
 
         if self.semantic_joint_smp > 0:
             self.semantic_joint_smp_embedding = SemanticEmbedding(
@@ -834,15 +853,24 @@ class SGN(PyTorchModule):
 
         # Joint and frame embeddings -------------------------------------------
         spa_emb, tem_emb, cls_emb = self.semantic_embedding(x)
+        if self.semantic_jdiff > 0:
+            spa_diff_emb, _, _ = self.semantic_jdiff_embedding(x)
 
         # Joint-level Module ---------------------------------------------------
         # xyz embeddings
         if spa_emb is None:
             x = x  # n,c,v,t
         else:
-            # xyz emb (c) spa emb
-            # xyz emb + spa emb
-            x = fuse_features(x, spa_emb, self.semantic_joint_fusion)
+            if self.semantic_jdiff > 0:
+                pos_emb = fuse_features(
+                    pos_emb, spa_emb, self.semantic_joint_fusion)
+                vel_emb = fuse_features(
+                    vel_emb, spa_diff_emb, self.semantic_joint_fusion)
+                x = pos_emb + vel_emb
+            else:
+                # xyz emb (c) spa emb
+                # xyz emb + spa emb
+                x = fuse_features(x, spa_emb, self.semantic_joint_fusion)
 
         if hasattr(self, 'x_emb_projection'):
             x = self.x_emb_projection(x)
@@ -1074,6 +1102,7 @@ if __name__ == '__main__':
         xem_projection=0,
         input_position=1,
         input_velocity=1,
+        semantic_jdiff=1,
         semantic_joint=1,
         semantic_frame=1,
         semantic_class=0,
@@ -1090,15 +1119,15 @@ if __name__ == '__main__':
         # # int for global res, list for individual gcn
         sgcn_residual=[0],
         # sgcn_prenorm=False,
-        sgcn_ffn=1,
+        # sgcn_ffn=1,
         # sgcn_v_kernel=0,
         sgcn_attn_mode=1,
         sgcn_g_kernel=1,
         sgcn_g_proj_dim=[256],  # c3
-        sgcn_g_activation='relu',
+        sgcn_g_activation='softmax',
         # sgcn_g_proj_shared=False,
         # # sgcn_g_weighted=1,
-        # sgcn_gt_mode=0,
+        sgcn_gt_mode=0,
 
         # sgcn2_g_proj_dim=256,  # c3
         # sgcn2_dims=[256, 256, 256],

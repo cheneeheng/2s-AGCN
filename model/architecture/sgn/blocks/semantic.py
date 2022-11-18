@@ -150,12 +150,12 @@ class SemanticEmbedding(PyTorchModule):
     def __init__(self,
                  num_point: int,
                  num_segment: int,
-                 sem_spa: int,
-                 sem_tem: int,
-                 sem_cls: int,
-                 sem_spa_emb_kwargs: dict,
-                 sem_tem_emb_kwargs: dict,
-                 sem_cls_emb_kwargs: dict,
+                 sem_spa: int = 0,
+                 sem_tem: int = 0,
+                 sem_cls: int = 0,
+                 sem_spa_emb_kwargs: Optional[dict] = None,
+                 sem_tem_emb_kwargs: Optional[dict] = None,
+                 sem_cls_emb_kwargs: Optional[dict] = None,
                  ):
         super(SemanticEmbedding, self).__init__()
         self.num_point = num_point
