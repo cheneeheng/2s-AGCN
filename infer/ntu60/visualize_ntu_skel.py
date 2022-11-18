@@ -299,7 +299,24 @@ if __name__ == '__main__':
         # data = data.reshape((1,) + data.shape)[:, :, :, :, 0:1]
         data = data.reshape((1,) + data.shape)[:, :, :, :, :]
 
-        visualize_3dskeleton_in_matplotlib(data, graph=graph, is_3d=True)
+        import pickle
+        _data_dir = '/code/2s-AGCN/data/data/ntu_sgn/processed_data'
+        with open(_data_dir + '/NTU_CV_test.pkl', 'rb') as f:
+            data1 = pickle.load(f)
+        with open(_data_dir + '/NTU_CV_test_label.pkl', 'rb') as f:
+            data2 = pickle.load(f)
+        data = (data1[194].reshape(1, 300, 2, 25, 3)).swapaxes(1, -1).swapaxes(2, -1)  # noqa
+        data = (data1[329].reshape(1, 300, 2, 25, 3)).swapaxes(1, -1).swapaxes(2, -1)  # noqa
+        data = (data1[330].reshape(1, 300, 2, 25, 3)).swapaxes(1, -1).swapaxes(2, -1)  # noqa
+        data = (data1[332].reshape(1, 300, 2, 25, 3)).swapaxes(1, -1).swapaxes(2, -1)  # noqa
+        data = (data1[333].reshape(1, 300, 2, 25, 3)).swapaxes(1, -1).swapaxes(2, -1)  # noqa
+        data = (data1[335].reshape(1, 300, 2, 25, 3)).swapaxes(1, -1).swapaxes(2, -1)  # noqa
+        data = (data1[366].reshape(1, 300, 2, 25, 3)).swapaxes(1, -1).swapaxes(2, -1)  # noqa
+        data = (data1[403].reshape(1, 300, 2, 25, 3)).swapaxes(1, -1).swapaxes(2, -1)  # noqa
+
+        visualize_3dskeleton_in_matplotlib(data, graph=graph, is_3d=True, speed=0.1)  # noqa
+
+        print(1)
 
         # # T, VC
         # data_i = data.transpose([0, 2, 3, 1, 4]).reshape((data.shape[2], 25*3))

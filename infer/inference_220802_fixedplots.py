@@ -62,100 +62,13 @@ def get_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         '--weight-path',
         type=str,
-        # AAGCN
-        # default=J15_MODEL_PATH + '/xview/211130150001'
-        # default=J15_MODEL_PATH + '/xview/220314100001'
-        # default=J15_MODEL_PATH + '/xsub/220314090001'
-        # SGN
-        # default=J15_MODEL_PATH + '/xview/220410210001'  # v5
-        # default=J15_MODEL_PATH + '/xview/220405153001'  # v4
-        # default=J15_MODEL_PATH + '/xview/220327213001_1337'  # v2
-        # default=_PATH + '/sgn_v11/220520150001_gcnfpn0_multit333_pregcntemsem'  # noqa
-        # default=_PATH + '/sgn_v11/220601220001_gcnfpn7_multit357357357shared'  # noqa
-        # default=_PATH + '/sgn_v11/220601220001_gcnfpn7_multit357'  # noqa
-        # default=_PATH + '/sgn_v11/220520150001_rerun_orisgn'  # noqa
-        # default=_PATH + '/sgn_v11/220804140001_sgnori_smpemb'  # noqa
-        # default=_PATH + '/sgn_v11/220810140001_sgnori_nogcnres'  # noqa
-        # default=_PATH + '/sgn_v11/220810140001_sgnori_sgcnattn1'  # noqa
-        # default=_PATH + '/sgn_v11/220810140001_sgnori_sgcnattn2'  # noqa
-        # default=_PATH + '/sgn_v11/220810140001_sgnori_sgcnattn3'  # noqa
-        # default=_PATH + '/sgn_v11/220812150001_sgnori_sgcnattn10'  # noqa
-        # default=_PATH + '/sgn_v11/220816140001_sgnori_inpos11_invel11'  # noqa
-        # default=_PATH + '/sgn_v11/220819140001_sgnori_inch2'  # noqa
-        # default=_PATH + '/sgn_v11/220804140001_sgnori_tmode3'  # noqa
-        # default=_PATH + '/sgn_v11/220809140001_sgnori_tmode3_1layer'  # noqa
-        # default=_PATH + '/sgn_v11/220901130001_sgnori_flgamma1'  # noqa
-        # default=_PATH + '/sgn_v12/220714183001_bs128_sgd_lr1e1_steps90110'  # noqa
-        # default=_PATH + '/sgn_v13/220824167001'  # noqa
-        # default=_PATH + '/sgn_v13/220824167001_tmode3'  # noqa
-        # default=_PATH + '/sgn_v13/220825170001_alpha05'  # noqa
-        # default=_PATH + '/sgn_v13/220825170001_gt2_alpha01'  # noqa
-        # default=_PATH + '/sgn_v13/220826113001_gt2_alpha05_sigmoid'  # noqa
-        # default=_PATH + '/sgn_v13/220829113001_gt2_varalpha_sigmoid'  # noqa
-        # default=_PATH + '/sgn_v13/220831100001_gt2_fpn10_sigmoid'  # noqa
-        # default=_PATH + '/sgn_v13/220831170001_gt2_fpn10_sigmoid_allvaralpha'  # noqa
-        # default=_PATH + '/sgn_v13/220902150001_gt4_varalpha_sigmoid'  # noqa
-        # default=_PATH + '/sgn_v13/220902150001_gt4_varalpha_sigmoid_flgamma1'  # noqa
-        # default=_PATH + '/sgn_v13/220915120001_gt4_varalpha_sigmoid_multit357'  # noqa
-        # default=_PATH + '/sgn_v13/220906163001_gt5_varalpha'  # noqa
-        # default=_PATH + '/sgn_v13/220906163001_gt5_varalpha_allactnorm'  # noqa
-        # default=_PATH + '/sgn_v13/220908210001_gt6_varalpha_fsim1alpha1'  # noqa
-        # default=_PATH + '/sgn_v13/220908210001_gt6_varalpha_fsim2alpha1'  # noqa
-        # default=_PATH + '/sgn_v13/220909150001_gt6_varalpha_fsim1alpha1'  # noqa
-        # default=_PATH + '/sgn_v13/220909150001_gt6_varalpha_fsim2alpha1'  # noqa
-        # default=_PATH + '/sgn_v13/220920150001_tmode4_k7'  # noqa
-        # default=_PATH + '/sgn_v13/220922140001_gt4_varalpha_sigmoid_tmode4_k3'  # noqa
-        # default=_PATH + '/sgn_v13/220922140001_gt4_varalpha_sigmoid_tmode4_k5'  # noqa
-        # default=_PATH + '/sgn_v14/220923140001_tmode5_1357'  # noqa
-        # default=_PATH + '/sgn_v14/220928170001_tmode3'  # noqa
-        # default=_PATH + '/sgn_v14/220928170001_tmode3_1layer'  # noqa
-        # default=_PATH + '/sgn_v14/220928170001_tmode3_1layer_sgcnattn1'  # noqa
-        # default=_PATH + '/sgn_v14/220928170001_tmode3_1layer_3heads'  # noqa
-        # default=_PATH + '/sgn_v14/220928170001_tmode3_1layer_6heads'  # noqa
-        # default=_PATH + '/sgn_v14/220928170001_tmode3_1layer_9heads'  # noqa
-        # default=_PATH + '/sgn_v14/220928170001_tmode3_1layer_3heads_1024dhead'  # noqa
-        # default=_PATH + '/sgn_v14/220928170001_tmode3_3heads'  # noqa
-        # default=_PATH + '/sgn_v14/220928170001_tmode3_3layers'  # noqa
-        # default=_PATH + '/sgn_v14/220928170001_tmode3_4layers'  # noqa
-        # default=_PATH + '/sgn_v14/220928170001_tmode3_2layer_6heads'  # noqa
-        # default=_PATH + '/sgn_v14/220928170001_tmode3_2layer_9heads'  # noqa
-        # default=_PATH + '/sgn_v14/221006150001_tmode3_absposenc'  # noqa
-        # default=_PATH + '/sgn_v14/221006150001_tmode3_cosposenc'  # noqa
-        # default=_PATH + '/sgn_v14/221006150001_tmode3_3heads_absposenc'  # noqa
-        # default=_PATH + '/sgn_v14/221006150001_tmode3_6heads_absposenc'  # noqa
-        # default=_PATH + '/sgn_v14/221006150001_tmode3_9heads_absposenc'  # noqa
-        # default=_PATH + '/sgn_v14/221010140001_tmode3_3heads_256ffn_nosemfr'  # noqa
-        # default=_PATH + '/sgn_v14/221010140001_tmode3_3heads_256ffn'  # noqa
-        # default=_PATH + '/sgn_v14/221010140001_tmode3_256ffn'  # noqa
-        # default=_PATH + '/sgn_v14/221010140001_tmode3_3heads_256ffn_absposenc'  # noqa
-        # default=_PATH + '/sgn_v14/221010140001_tmode3_3heads_256ffn_gt0'  # noqa
-        # default=_PATH + '/sgn_v14/221010140001_tmode3_3heads_256ffn_noshartedg_gt0'  # noqa
-        # default=_PATH + '/sgn_v14/221010140001_tmode3_3heads_256ffn_noshartedg'  # noqa
-        # default=_PATH + '/sgn_v14/221011110001_tmode3_1layer_3heads_256ffn'  # noqa
-        # default=_PATH + '/sgn_v14/221011110001_gcn4layers_tmode3_1layer_3heads_256ffn'  # noqa
-        # default=_PATH + '/sgn_v14/221011110001_tmode3_1layer_3heads_256ffn_noshartedg'  # noqa
-        # default=_PATH + '/sgn_v14/221011110001_gcn4layers_tmode3_1layer_3heads_256ffn_noshartedg'  # noqa
-        # default=_PATH + '/sgn_v14/221011110001_gcn5layers_tmode3_1layer_3heads_256ffn_noshartedg'  # noqa
-        # default=_PATH + '/sgn_v14/221011110001_gcnffn1_tmode3_1layer_3heads_256ffn_noshartedg'  # noqa
-        # default=_PATH + '/sgn_v14/221011110001_gt0_gcnffn1_tmode3_1layer_3heads_256ffn_noshartedg'  # noqa
-        # default=_PATH + '/sgn_v14/221011110001_1gcn_gcnffn1_tmode3_1layer_3heads_256ffn_noshartedg'  # noqa
-        # default=_PATH + '/sgn_v14/221011110001_1gcn_gcnffn1_tmode3_1layer_9heads_256ffn_noshartedg'  # noqa
-        # default=_PATH + '/sgn_v14/221011110001_1gcn_gcnffn1_tmode3_1layer_15heads_256ffn_noshartedg'  # noqa
-        # default=_PATH + '/sgn_v14/221011110001_gt0_1gcn_gcnffn1_tmode3_1layer_3heads_256ffn_noshartedg'  # noqa
-        # default=_PATH + '/sgn_v14/221011110001_gt0_1gcn_gcnffn1_tmode3_1layer_9heads_256ffn_noshartedg'  # noqa
-        # default=_PATH + '/sgn_v14/221011110001_gt0_1gcn_gcnffn1_tmode3_1layer_12heads_256ffn_noshartedg'  # noqa
-        # default=_PATH + '/sgn_v14/221011110001_gt0_1gcn_gcnffn1_tmode3_1layer_15heads_256ffn_noshartedg'  # noqa
-        # default=_PATH + '/sgn_v14/221013160001_gt0_1gcn_gcnffn1_tmode3_1layer_9heads_256ffn_noshartedg_smp3_semjointsmp1'  # noqa
-        # default=_PATH + '/sgn_v14/221013160001_gt0_1gcn_gcnffn1_tmode3_1layer_9heads_256ffn_noshartedg_smp4_semjointsmp1'  # noqa
-        # default=_PATH + '/sgn_v14/221017160001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_32dim_256ffn_noshartedg_drop01'  # noqa
-        # default=_PATH + '/sgn_v14/221017160001_gt0_1gcn_gcnffn1_tmode3_1layer_16heads_32dim_256ffn_noshartedg_drop01'  # noqa
-        # default=_PATH + '/sgn_v14/221017160001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01_rerun'  # noqa
+        default=_PATH + '/sgn_v14/221017160001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01_rerun'  # noqa
         # default=_PATH + '/sgn_v14/221017160001_gt0_1gcn_gcnffn1_tmode3_1layer_16heads_16dim_256ffn_noshartedg_drop01'  # noqa
         # default=_PATH + '/sgn_v14/221020170001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_512ffn_noshartedg_drop01'  # noqa
         # default=_PATH + '/sgn_v14/221104130001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01_bs128_sgd_lr1e1_steps90110'  # noqa
         # default=_PATH + '/sgn_v14/221108160001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01_galpham1'  # noqa
         # default=_PATH + '/sgn_v14/221108160001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01_galpham2'  # noqa
-        default=_PATH + '/sgn_v14/221108160001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01_smp3_tmp3b'  # noqa
+        # default=_PATH + '/sgn_v14/221108160001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01_smp3_tmp3b'  # noqa
     )
     parser.add_argument(
         '--out-folder',
@@ -172,14 +85,6 @@ def init_model(arg: argparse.Namespace):
     weight_file = [i for i in os.listdir(weight_path) if '.pt' in i]
     weight_file = os.path.join(weight_path, weight_file[-1])
     weights = torch.load(weight_file)
-    # temporary hack
-#    if 'sgn' in arg.model:
-#        weights = OrderedDict([[k.replace('joint_', 'pos_'), v]
-#                               for k, v in weights.items()])
-#        weights = OrderedDict([[k.replace('dif_', 'vel_'), v]
-#                               for k, v in weights.items()])
-#        weights = OrderedDict([[k.replace('cnn.cnn2', 'cnn.cnn2.cnn'), v]
-#                               for k, v in weights.items()])
     weights['sgcn.gcn_g1.alpha'] = torch.ones(1)
     Model.load_state_dict(weights)
     if arg.gpu:
@@ -242,14 +147,14 @@ if __name__ == '__main__':
     last_skel_file = None
 
     _data_dir = '/code/2s-AGCN/data/data/ntu_sgn/processed_data'
-    with open(_data_dir + '/NTU_CV_test_180.pkl', 'rb') as f:
-        data1 = pickle.load(f)
-    with open(_data_dir + '/NTU_CV_test_label_180.pkl', 'rb') as f:
-        data2 = pickle.load(f)
-    # with open(_data_dir + '/NTU_CV_test.pkl', 'rb') as f:
+    # with open(_data_dir + '/NTU_CV_test_180.pkl', 'rb') as f:
     #     data1 = pickle.load(f)
-    # with open(_data_dir + '/NTU_CV_test_label.pkl', 'rb') as f:
+    # with open(_data_dir + '/NTU_CV_test_label_180.pkl', 'rb') as f:
     #     data2 = pickle.load(f)
+    with open(_data_dir + '/NTU_CV_test.pkl', 'rb') as f:
+        data1 = pickle.load(f)
+    with open(_data_dir + '/NTU_CV_test_label.pkl', 'rb') as f:
+        data2 = pickle.load(f)
     # with open(_data_dir + '/NTU_CV_train_180.pkl', 'rb') as f:
     #     data1 = pickle.load(f)
     # with open(_data_dir + '/NTU_CV_train_label_180.pkl', 'rb') as f:
@@ -264,61 +169,34 @@ if __name__ == '__main__':
     # skeleton -----------
     fig0 = []
     for _ in range(1):
-        fig00 = plt.figure(figsize=(16, 6))
+        fig00 = plt.figure(figsize=(14, 6))
         fig00.tight_layout()
         fig0.append(fig00)
     enable[0] = True
     # G spatial -----------
-    fig1, axes1 = plt.subplots(5, 1, figsize=(16, 6))
+    fig1, axes1 = plt.subplots(5, 1, figsize=(14, 6))
     fig1.tight_layout()
     enable[1] = True
-    fig12, axes12 = plt.subplots(5, 1, figsize=(16, 6))
-    fig12.tight_layout()
-    enable[12] = True
-    fig13, axes13 = plt.subplots(5, 1, figsize=(16, 6))
-    fig13.tight_layout()
-    enable[13] = True
-    fig15, axes15 = plt.subplots(5, 1, figsize=(16, 6))
-    fig15.tight_layout()
-    enable[15] = True
-    fig16, axes16 = plt.subplots(5, 1, figsize=(16, 6))
-    fig16.tight_layout()
-    enable[16] = True
     # A in temporal branch for t_mode=3 -----------
-    fig2, axes2 = plt.subplots(5, 3, figsize=(20, 6))
+    fig2, axes2 = plt.subplots(5, 1, figsize=(7, 6))
     fig2.tight_layout()
     enable[2] = True
-    fig11, axes11 = plt.subplots(5, 1, figsize=(2, 6))
-    fig11.tight_layout()
-    enable[11] = True
     # featuremap after each SGCN -----------
     fig3, axes3 = plt.subplots(5, 1, figsize=(2, 6))
     fig3.tight_layout()
     enable[3] = True
-    # # featuremaps (l2 in channel dimension) in each SGCN -----------
-    # fig4, axes4 = plt.subplots(5, 18, figsize=(16, 7))
-    # fig4.tight_layout()
-    # enable[4] = True
-    # GT spatial -----------
-    # fig5, axes5 = plt.subplots(5, 4, figsize=(3, 7))
-    # fig5.tight_layout()
-    # enable[5] = True
-    # # featuremap after each SGCN2 ---------------------------------
-    # fig6, axes6 = plt.subplots(5, 1, figsize=(3, 7))
-    # fig6.tight_layout()
-    # enable[6] = True
-    # # featuremaps (l2 in channel dimension) in each SGCN2 -----------
-    # fig7, axes7 = plt.subplots(5, 18, figsize=(16, 7))
-    # fig7.tight_layout()
-    # enable[7] = True
     # # input data distribution --------------------------------------------
     # fig8, axes8 = plt.subplots(1, 3, figsize=(6, 3))
     # fig8.tight_layout()
     # enable[8] = True
     # x tem list -------------------------------------------------------
-    fig9, axes9 = plt.subplots(5, 5, figsize=(2, 6))
+    fig9, axes9 = plt.subplots(5, 1, figsize=(2, 6))
     fig9.tight_layout()
     enable[9] = True
+    # x tmp list -------------------------------------------------------
+    fig7, axes7 = plt.subplots(5, 1, figsize=(2, 6))
+    fig7.tight_layout()
+    enable[7] = True
     # tem emb -------------------------------------------------------
     fig10, axes10 = plt.subplots(5, 1, figsize=(2, 6))
     fig10.tight_layout()
@@ -336,7 +214,7 @@ if __name__ == '__main__':
     fig18.tight_layout()
     enable[18] = True
 
-    fig19, axes19 = plt.subplots(6, 1, figsize=(5, 7))
+    fig19, axes19 = plt.subplots(6, 1, figsize=(2, 7))
     fig19.tight_layout()
     enable[19] = True
 
@@ -387,6 +265,7 @@ if __name__ == '__main__':
         x_spa_list2 = output_dict.get('x_spa_list2')
         featuremap_spa_list2 = output_dict.get('featuremap_spa_list2')
         x_tem_list = output_dict.get('x_tem_list')
+        x_smp_list = output_dict.get('x_smp_list')
         tem_emb = output_dict.get('tem_emb')
         spa_emb = output_dict.get('spa_emb')
         pos_emb = output_dict.get('pos_emb')
@@ -400,10 +279,10 @@ if __name__ == '__main__':
         # if logits[preds] > 0.3:
         #     loop = False
 
-        if data2[c] < 22:
-            continue
-        # if data2[c] == preds:
+        # if data2[c] < 22:
         #     continue
+        if data2[c] == preds:
+            continue
         # if data2[c] != 47:
         #     continue
         # if logits[preds]*100 > 80.0:
@@ -418,28 +297,10 @@ if __name__ == '__main__':
                 fig00.clear()
             dd = np.stack([d[:, :, 2], d[:, :, 0], d[:, :, 1]], axis=-1)
             plot_skeletons(dd, fig0[0])
-            # dd = np.stack([d[:, :, 2], d[:, :, 1], d[:, :, 0]], axis=-1)
-            # plot_skeletons(dd, fig0[1])
-            # dd = np.stack([d[:, :, 0], d[:, :, 1], d[:, :, 2]], axis=-1)
-            # plot_skeletons(dd, fig0[0])
-            # dd = np.stack([d[:, :, 0], d[:, :, 2], d[:, :, 1]], axis=-1)
-            # plot_skeletons(dd, fig0[1])
-            # dd = np.stack([d[:, :, 1], d[:, :, 0], d[:, :, 2]], axis=-1)
-            # plot_skeletons(dd, fig0[2])
-            # dd = np.stack([d[:, :, 2], d[:, :, 0], d[:, :, 1]], axis=-1)
-            # plot_skeletons(dd, fig0[3])
-            # dd = np.stack([d[:, :, 1], d[:, :, 2], d[:, :, 0]], axis=-1)
-            # plot_skeletons(dd, fig0[4])
-            # dd = np.stack([d[:, :, 2], d[:, :, 1], d[:, :, 0]], axis=-1)
-            # plot_skeletons(dd, fig0[5])
 
         # G spatial --------------------------------------------------
         if enable[1]:
-            for idx, fg, ax in [(0, fig1, axes1),
-                                (1, fig12, axes12),
-                                (2, fig13, axes13),
-                                (3, fig15, axes15),
-                                (4, fig16, axes16)]:
+            for idx, fg, ax in [(0, fig1, axes1), ]:
                 try:
                     fg.suptitle(MAPPING[preds+1] + " : " + MAPPING[data2[c]+1] +
                                 f" : {logits[preds]*100:>5.2f}")
@@ -479,20 +340,11 @@ if __name__ == '__main__':
                         img_i = tem_a[0][i][j].data.cpu().numpy()
                         img_i = img_i.swapaxes(0, 1)
                         img_i = img_i.reshape(img_i.shape[0], -1)
-                        axes2[j, i].imshow(img_i)
-                        axes2[j, i].xaxis.set_ticks(
+                        axes2[j].imshow(img_i)
+                        axes2[j].xaxis.set_ticks(
                             np.arange(0, img_i.shape[-1], 10))
-                        axes2[j, i].yaxis.set_ticks(
+                        axes2[j].yaxis.set_ticks(
                             np.arange(0, img_i.shape[0], 10))
-
-        if enable[11]:
-            try:
-                for j in range(SAMP_FREQ):
-                    img_i = Model.tem_mha_3_1.cnn.pos_enc.pe.data.cpu().numpy()
-                    img_i = np.linalg.norm(img_i, axis=-1, keepdims=True)
-                    axes11[j].imshow(img_i)
-            except:
-                pass
 
         # featuremap after each SGCN ----------------------------------
         if enable[3]:
@@ -515,39 +367,7 @@ if __name__ == '__main__':
                     axes6[j].yaxis.set_ticks(np.arange(0, 25+1, SAMP_FREQ))
 
         # featuremaps (l2 in channel dimension) in each SGCN -----------
-        # def vmin_vmax_sgcn_fm(j):
-        #     # input x
-        #     b1 = np.linalg.norm(featuremap_spa_list[j]['x'], axis=1)
-        #     vmin, vmax = b1.min(), b1.max()
-        #     # G
-        #     if isinstance(g_spa[0], tuple):
-        #         b2 = np.linalg.norm(g_spa[0][0], axis=1)  # in T dimension
-        #     else:
-        #         b2 = np.linalg.norm(g_spa[0], axis=1)  # in T dimension
-        #     vmin, vmax = min(vmin, b2.min()), max(vmax, b2.max())
-        #     # G @ x
-        #     if featuremap_spa_list[j]['x3'] is not None:
-        #         b3 = np.linalg.norm(featuremap_spa_list[j]['x3'], axis=1)
-        #         vmin, vmax = min(vmin, b3.min()), max(vmax, b3.max())
-        #     # W1 * (G @ x)
-        #     if featuremap_spa_list[j]['x4'] is not None:
-        #         b4 = np.linalg.norm(featuremap_spa_list[j]['x4'], axis=1)
-        #         vmin, vmax = min(vmin, b4.min()), max(vmax, b4.max())
-        #     # W2 * x
-        #     if isinstance(featuremap_spa_list[j]['x5'], torch.Tensor):
-        #         b5 = np.linalg.norm(featuremap_spa_list[j]['x5'], axis=1)
-        #         vmin, vmax = min(vmin, b5.min()), max(vmax, b5.max())
-        #     # output x
-        #     b6 = np.linalg.norm(featuremap_spa_list[j]['x9'], axis=1)
-        #     vmin, vmax = min(vmin, b6.min()), max(vmax, b6.max())
 
-        #     return vmin, vmax
-
-        # vmin1, vmax1 = vmin_vmax_sgcn_fm(0)
-        # vmin2, vmax2 = vmin_vmax_sgcn_fm(1)
-        # vmin3, vmax3 = vmin_vmax_sgcn_fm(2)
-        # vmin = min([vmin1, vmin2, vmin3])
-        # vmax = max([vmax1, vmax2, vmax3])
         vmin = None
         vmax = None
 
@@ -588,42 +408,6 @@ if __name__ == '__main__':
             for i in range(SAMP_FREQ):
                 ax[i, j*6+5].imshow(b6[i], vmin=vmin, vmax=vmax)
 
-        if enable[4]:
-            fig4.suptitle(MAPPING[preds+1] + " : " + MAPPING[data2[c]+1])
-            fig4.subplots_adjust(top=0.9)
-            plot_sgcn_fm(0, axes4, featuremap_spa_list)
-            plot_sgcn_fm(1, axes4, featuremap_spa_list)
-            plot_sgcn_fm(2, axes4, featuremap_spa_list)
-            for i in range(3):
-                axes4[0, 6*i+0].set_title("x")
-                axes4[0, 6*i+1].set_title("g")
-                axes4[0, 6*i+2].set_title("g @ x")
-                axes4[0, 6*i+3].set_title("g @ x @ W1")
-                axes4[0, 6*i+4].set_title("x @ W2")
-                axes4[0, 6*i+5].set_title("x out")
-
-        if enable[7]:
-            if featuremap_spa_list2 is not None:
-                fig7.suptitle(MAPPING[preds+1] + " : " + MAPPING[data2[c]+1])
-                plot_sgcn_fm(0, axes7, featuremap_spa_list2)
-                plot_sgcn_fm(1, axes7, featuremap_spa_list2)
-                plot_sgcn_fm(2, axes7, featuremap_spa_list2)
-                for i in range(3):
-                    axes7[0, 6*i+0].set_title("x")
-                    axes7[0, 6*i+1].set_title("g")
-                    axes7[0, 6*i+2].set_title("g @ x")
-                    axes7[0, 6*i+3].set_title("g @ x @ W1")
-                    axes7[0, 6*i+4].set_title("x @ W2")
-                    axes7[0, 6*i+5].set_title("x out")
-
-        # GT spatial --------------------------------------------------
-        if enable[5]:
-            if isinstance(g_spa[0], tuple):
-                for i in range(SAMP_FREQ):
-                    img_i = g_spa[0][1][i].data.cpu().numpy()
-                    img_i = img_i.swapaxes(0, -1)
-                    axes5[i, 0].imshow(img_i)
-
         # x tem list --------------------------------------------------
         if enable[9]:
             if x_tem_list is not None:
@@ -646,15 +430,30 @@ if __name__ == '__main__':
                         if img_ji.shape[-1] > 3:
                             img_ji = np.linalg.norm(img_ji, axis=-1)
                         # axes9[i, j].imshow(img_ji, vmin=vmin[i], vmax=vmax[i])
-                        axes9[i, j].imshow(img_ji)
-                # x = tensor_list_mean(x_tem_list)
-                # for i in range(SAMP_FREQ):
-                #     img_ji = x[i].data.cpu().numpy()
-                #     if img_ji.shape[-1] != 1:
-                #         img_ji = img_ji.swapaxes(0, -1)
-                #     if img_ji.shape[-1] > 3:
-                #         img_ji = np.linalg.norm(img_ji, axis=-1)
-                #     axes9[i, -1].imshow(img_ji)
+                        axes9[i].imshow(img_ji)
+
+        if enable[7]:
+            if x_smp_list is not None:
+                vmin = [100000 for _ in range(SAMP_FREQ)]
+                vmax = [0 for _ in range(SAMP_FREQ)]
+                for i in range(SAMP_FREQ):
+                    for j in range(len(x_smp_list)):
+                        img_ji = x_smp_list[j][i].data.cpu().numpy()
+                        if img_ji.shape[-1] != 1:
+                            img_ji = img_ji.swapaxes(0, -1)
+                        if img_ji.shape[-1] > 3:
+                            img_ji = np.linalg.norm(img_ji, axis=-1)
+                            vmin[i] = min(vmin[i], img_ji.min())
+                            vmax[i] = max(vmax[i], img_ji.max())
+                for i in range(SAMP_FREQ):
+                    for j in range(len(x_smp_list)):
+                        img_ji = x_smp_list[j][i].data.cpu().numpy()
+                        if img_ji.shape[-1] != 1:
+                            img_ji = img_ji.swapaxes(0, -1)
+                        if img_ji.shape[-1] > 3:
+                            img_ji = np.linalg.norm(img_ji, axis=-1)
+                        # axes7[i, j].imshow(img_ji, vmin=vmin[i], vmax=vmax[i])
+                        axes7[i].imshow(img_ji)
 
         if enable[8]:
             axes8[0].cla()
