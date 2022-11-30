@@ -35,7 +35,7 @@ T1 = Type[PyTorchModule]
 T2 = List[Optional[Type[PyTorchModule]]]
 T3 = Union[List[int], int]
 
-EMB_MODES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 11, 12]
+EMB_MODES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 101, 1001]
 
 # Maxpooling ---
 # 0 no pool
@@ -251,15 +251,15 @@ class SGN(PyTorchModule):
             g (Tensor): Attention matrix for GCN.
         """
         bs, step, dim = x.shape
-        x = x.view((bs, step, self.num_point, dim//self.num_point))  # n,t,v,c
+        x = x.view((bs, step, dim//self.in_channels, self.in_channels))  # n,t,v,c  # noqa
         x = x.permute(0, 3, 2, 1).contiguous()  # n,c,v,t
 
-        if x.shape[1] < self.in_channels:
-            raise ValueError("tensor x has lower ch dim than self.in_channels")
-        elif x.shape[-1] > self.in_channels:
-            # print("tensor x has more ch dim than self.in_channels")
-            # bs, step, dim = x.shape
-            x = x[:, :self.in_channels, :, :]
+        # if x.shape[1] < self.in_channels:
+        #     raise ValueError("tensor x has lower ch dim than self.in_channels")  # noqa
+        # elif x.shape[-1] > self.in_channels:
+        #     # print("tensor x has more ch dim than self.in_channels")
+        #     # bs, step, dim = x.shape
+        #     x = x[:, :self.in_channels, :, :]
 
         # Dynamic Representation -----------------------------------------------
         x, pos_emb, vel_emb = self.feature_extractor(x)
@@ -504,71 +504,74 @@ class TemporalMHA(MHA):
 if __name__ == '__main__':
 
     batch_size = 1
-    inputs = torch.ones(batch_size, 20, 100)
+    inputs = torch.ones(batch_size, 20, 75)
     # subjects = torch.ones(batch_size, 40, 1)
 
-    base_path = "/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v15"
-    file_path = "/221031120001_1head_256hdim_256out_nov_res_8head_16hdim_bn_rerun"  # noqa
-    parser = get_parser()
-    parser.set_defaults(**{'config': base_path + file_path + "/config.yaml"})
-    args = load_parser_args_from_config(parser)
-    model = SGN(**args.model_args)
-    model(inputs)
-    print(model)
-
-    # model = SGN(
-    #     num_class=60,
-    #     num_point=25,
-    #     num_segment=20,
-    #     in_channels=3,
-    #     bias=1,
-    #     dropout=0.0,  # classifier
-    #     dropout2d=0.2,  # the rest
-    #     c_multiplier=[1.0, 1.0, 1.0, 1.0],
-    #     norm_type='bn',
-    #     act_type='relu',
-    #     input_position=1,
-    #     input_velocity=1,
-    #     semantic_joint=1,
-    #     semantic_frame=1,
-    #     semantic_joint_fusion=0,
-    #     semantic_frame_fusion=1,
-    #     semantic_frame_location=0,
-    #     spatial_mha_kwargs={
-    #         'd_model': [128],
-    #         'nhead': [1],
-    #         'd_head': [256],
-    #         'd_out': [256],
-    #         # 'v_proj': False,
-    #         # 'res_proj': True,
-    #         'dim_feedforward': [256],
-    #         'dim_feedforward_output': [256],
-    #         'dropout': 0.1,
-    #         'activation': "relu",
-    #         'num_layers': 1,
-    #         'norm': 'bn',
-    #         'global_norm': False
-    #     },
-    #     temporal_mha_kwargs={
-    #         'd_model': [256],
-    #         'nhead': [8],
-    #         'd_head': [16],
-    #         'dim_feedforward': [256],
-    #         'dim_feedforward_output': [512],
-    #         'dropout': 0.1,
-    #         'activation': "relu",
-    #         'num_layers': 1,
-    #         'norm': 'bn',
-    #         'global_norm': False
-    #     },
-    # )
+    # base_path = "/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v15"
+    # file_path = "/221031120001_1head_256hdim_256out_nov_res_8head_16hdim_bn_rerun"  # noqa
+    # parser = get_parser()
+    # parser.set_defaults(**{'config': base_path + file_path + "/config.yaml"})
+    # args = load_parser_args_from_config(parser)
+    # model = SGN(**args.model_args)
     # model(inputs)
     # print(model)
 
+    model = SGN(
+        num_class=60,
+        num_point=8,
+        num_segment=5,
+        in_channels=3,
+        bias=1,
+        dropout=0.0,  # classifier
+        dropout2d=0.2,  # the rest
+        c_multiplier=[1.0, 1.0, 1.0, 1.0],
+        norm_type='bn',
+        act_type='relu',
+        input_position=1001,
+        input_velocity=1001,
+        semantic_joint=1,
+        semantic_frame=1,
+        semantic_joint_fusion=0,
+        semantic_frame_fusion=1,
+        semantic_frame_location=0,
+        spatial_mha_kwargs={
+            'd_model': [128],
+            'nhead': [1],
+            'd_head': [256],
+            'd_out': [256],
+            # 'v_proj': False,
+            # 'res_proj': True,
+            'dim_feedforward': [256],
+            'dim_feedforward_output': [256],
+            'dropout': 0.1,
+            'activation': "relu",
+            'num_layers': 1,
+            'norm': 'bn',
+            'global_norm': False
+        },
+        temporal_mha_kwargs={
+            'd_model': [256],
+            'nhead': [8],
+            'd_head': [16],
+            'dim_feedforward': [256],
+            'dim_feedforward_output': [512],
+            'dropout': 0.1,
+            'activation': "relu",
+            'num_layers': 1,
+            'norm': 'bn',
+            'global_norm': False
+        },
+    )
+    model(inputs)
+    print(model)
+
+    for m in model.parameters():
+        m.requires_grad = False
+
     try:
         flops = FlopCountAnalysis(model, inputs)
-        print(flops.total())
+        # print(flops.total())
         # print(flops.by_module_and_operator())
-        # print(flop_count_table(flops))
+        print(flop_count_table(flops))
     except NameError:
         print("Warning: fvcore is not found")

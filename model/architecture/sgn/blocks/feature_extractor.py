@@ -28,22 +28,22 @@ class FeatureExtractor(PyTorchModule):
         super(FeatureExtractor, self).__init__()
         self.in_pos = in_pos
         self.in_vel = in_vel
-        if self.in_pos > 100:
+        if self.in_pos > 1000:
             self.pos_embed = torch.nn.ModuleList()
             for s in SEGMENTS:
                 kwargs = in_pos_emb_kwargs.copy()
                 kwargs['in_channels'] = kwargs['in_channels']*len(s)*4
-                kwargs['mode'] = kwargs['mode'] % 100
+                kwargs['mode'] = kwargs['mode'] % 1000
                 kwargs['num_point'] = 1
                 self.pos_embed.append(Embedding(**kwargs))
         elif self.in_pos > 0:
             self.pos_embed = Embedding(**in_pos_emb_kwargs)
-        if self.in_vel > 100:
+        if self.in_vel > 1000:
             self.vel_embed = torch.nn.ModuleList()
             for s in SEGMENTS:
                 kwargs = in_vel_emb_kwargs.copy()
                 kwargs['in_channels'] = kwargs['in_channels']*len(s)*4
-                kwargs['mode'] = kwargs['mode'] % 100
+                kwargs['mode'] = kwargs['mode'] % 1000
                 kwargs['num_point'] = 1
                 self.vel_embed.append(Embedding(**kwargs))
         elif self.in_vel > 0:
@@ -55,7 +55,7 @@ class FeatureExtractor(PyTorchModule):
         n, c, v, t = x.shape
         dif = x[:, :, :, 1:] - x[:, :, :, 0:-1]  # n,c,v,t-1
         dif = pad_zeros(dif)
-        if self.in_pos > 100 and self.in_vel > 100:
+        if self.in_pos > 1000 and self.in_vel > 1000:
             x_segs = []
             for idx, s in enumerate(SEGMENTS):
                 x_s = torch.stack([x[:, :, i, :] for i in s], 2)
