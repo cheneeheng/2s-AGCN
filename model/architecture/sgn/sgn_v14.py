@@ -855,6 +855,8 @@ class SGN(PyTorchModule):
         spa_emb, tem_emb, cls_emb = self.semantic_embedding(x)
         if self.semantic_jdiff > 0:
             spa_diff_emb, _, _ = self.semantic_jdiff_embedding(x)
+        else:
+            spa_diff_emb = None
 
         # Joint-level Module ---------------------------------------------------
         # xyz embeddings
@@ -1050,6 +1052,7 @@ class SGN(PyTorchModule):
                     'x_smp_list': x_list,
                     'tem_emb': tem_emb,
                     'spa_emb': spa_emb,
+                    'spa_diff_emb': spa_diff_emb,
                     'pos_emb': pos_emb,
                     'vel_emb': vel_emb,
                 }
@@ -1066,6 +1069,7 @@ class SGN(PyTorchModule):
                     'x_smp_list': x_list,
                     'tem_emb': tem_emb,
                     'spa_emb': spa_emb,
+                    'spa_diff_emb': spa_diff_emb,
                     'pos_emb': pos_emb,
                     'vel_emb': vel_emb,
                 }
