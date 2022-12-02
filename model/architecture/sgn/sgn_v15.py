@@ -70,6 +70,7 @@ class SGN(PyTorchModule):
                  semantic_frame: int = 1,
                  semantic_class: int = 0,
 
+                 input_emb_fusion: int = 1,
                  semantic_joint_fusion: int = 0,
                  semantic_frame_fusion: int = 1,
                  semantic_frame_location: int = 0,
@@ -122,6 +123,8 @@ class SGN(PyTorchModule):
             raise ValueError("input_position is 0 but semantic_joint is not")
 
         # 0: concat, 1: sum
+        self.input_emb_fusion = input_emb_fusion
+        # 0: concat, 1: sum
         self.semantic_joint_fusion = semantic_joint_fusion
         # 0: concat, 1: sum
         self.semantic_frame_fusion = semantic_frame_fusion  # UNUSED
@@ -154,7 +157,8 @@ class SGN(PyTorchModule):
                 in_norm=self.normalization_fn_1d,
                 num_point=self.num_point,
                 mode=self.input_velocity,
-            )
+            ),
+            fusion=self.input_emb_fusion
         )
 
         # Semantic Embeddings --------------------------------------------------
@@ -507,63 +511,64 @@ if __name__ == '__main__':
     inputs = torch.ones(batch_size, 20, 75)
     # subjects = torch.ones(batch_size, 40, 1)
 
-    # base_path = "/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v15"
+    base_path = "/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v15"
     # file_path = "/221031120001_1head_256hdim_256out_nov_res_8head_16hdim_bn_rerun"  # noqa
-    # parser = get_parser()
-    # parser.set_defaults(**{'config': base_path + file_path + "/config.yaml"})
-    # args = load_parser_args_from_config(parser)
-    # model = SGN(**args.model_args)
-    # model(inputs)
-    # print(model)
-
-    model = SGN(
-        num_class=60,
-        num_point=8,
-        num_segment=5,
-        in_channels=3,
-        bias=1,
-        dropout=0.0,  # classifier
-        dropout2d=0.2,  # the rest
-        c_multiplier=[1.0, 1.0, 1.0, 1.0],
-        norm_type='bn',
-        act_type='relu',
-        input_position=1001,
-        input_velocity=1001,
-        semantic_joint=1,
-        semantic_frame=1,
-        semantic_joint_fusion=0,
-        semantic_frame_fusion=1,
-        semantic_frame_location=0,
-        spatial_mha_kwargs={
-            'd_model': [128],
-            'nhead': [1],
-            'd_head': [256],
-            'd_out': [256],
-            # 'v_proj': False,
-            # 'res_proj': True,
-            'dim_feedforward': [256],
-            'dim_feedforward_output': [256],
-            'dropout': 0.1,
-            'activation': "relu",
-            'num_layers': 1,
-            'norm': 'bn',
-            'global_norm': False
-        },
-        temporal_mha_kwargs={
-            'd_model': [256],
-            'nhead': [8],
-            'd_head': [16],
-            'dim_feedforward': [256],
-            'dim_feedforward_output': [512],
-            'dropout': 0.1,
-            'activation': "relu",
-            'num_layers': 1,
-            'norm': 'bn',
-            'global_norm': False
-        },
-    )
+    file_path = "/221124163001_8head_16hdim_128ffn_256out_8head_32hdim_256ffn_512out_qkv"  # noqa
+    parser = get_parser()
+    parser.set_defaults(**{'config': base_path + file_path + "/config.yaml"})
+    args = load_parser_args_from_config(parser)
+    model = SGN(**args.model_args)
     model(inputs)
     print(model)
+
+    # model = SGN(
+    #     num_class=60,
+    #     num_point=8,
+    #     num_segment=5,
+    #     in_channels=3,
+    #     bias=1,
+    #     dropout=0.0,  # classifier
+    #     dropout2d=0.2,  # the rest
+    #     c_multiplier=[1.0, 1.0, 1.0, 1.0],
+    #     norm_type='bn',
+    #     act_type='relu',
+    #     input_position=1001,
+    #     input_velocity=1001,
+    #     semantic_joint=1,
+    #     semantic_frame=1,
+    #     semantic_joint_fusion=0,
+    #     semantic_frame_fusion=1,
+    #     semantic_frame_location=0,
+    #     spatial_mha_kwargs={
+    #         'd_model': [128],
+    #         'nhead': [1],
+    #         'd_head': [256],
+    #         'd_out': [256],
+    #         # 'v_proj': False,
+    #         # 'res_proj': True,
+    #         'dim_feedforward': [256],
+    #         'dim_feedforward_output': [256],
+    #         'dropout': 0.1,
+    #         'activation': "relu",
+    #         'num_layers': 1,
+    #         'norm': 'bn',
+    #         'global_norm': False
+    #     },
+    #     temporal_mha_kwargs={
+    #         'd_model': [256],
+    #         'nhead': [8],
+    #         'd_head': [16],
+    #         'dim_feedforward': [256],
+    #         'dim_feedforward_output': [512],
+    #         'dropout': 0.1,
+    #         'activation': "relu",
+    #         'num_layers': 1,
+    #         'norm': 'bn',
+    #         'global_norm': False
+    #     },
+    # )
+    # model(inputs)
+    # print(model)
 
     for m in model.parameters():
         m.requires_grad = False
