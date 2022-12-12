@@ -17,16 +17,16 @@ from feeders import tools
 COLLATE_OUT_TYPE = Tuple[Tuple[torch.Tensor, torch.Tensor], torch.Tensor, list]
 
 
-class NTUDataset(Dataset):
-    def __init__(self, x, y):
-        self.x = x
-        self.y = np.array(y, dtype='int')
+# class NTUDataset(Dataset):
+#     def __init__(self, x, y):
+#         self.x = x
+#         self.y = np.array(y, dtype='int')
 
-    def __len__(self):
-        return len(self.y)
+#     def __len__(self):
+#         return len(self.y)
 
-    def __getitem__(self, index):
-        return [self.x[index], int(self.y[index])]
+#     def __getitem__(self, index):
+#         return [self.x[index], int(self.y[index])]
 
 
 class NTUDataLoaders(object):
@@ -39,6 +39,7 @@ class NTUDataLoaders(object):
                  motion_norm: int = 0,
                  center_sampler: float = 0.0,
                  midvel_sampler: int = 0,
+                 tempshift_sampler: float = 0.0,
                  **kwargs):
         self.dataset = dataset
         self.aug = aug
@@ -49,6 +50,7 @@ class NTUDataLoaders(object):
         self.motion_norm = motion_norm
         self.center_sampler = center_sampler
         self.midvel_sampler = midvel_sampler
+        self.tempshift_sampler = tempshift_sampler
 
     def get_train_loader(self, batch_size: int, num_workers: int):
         if self.aug == 0:
@@ -274,6 +276,21 @@ class NTUDataLoaders(object):
                            for i in j]
                 )
             )
+            intervals = intervals.round().astype(int)
+            intervals_check(intervals)
+            random_intervals_range_fn = partial(np.random.randint,
+                                                low=intervals[:-1],
+                                                high=intervals[1:])
+
+        # shift the range of data using sampling
+        elif self.tempshift_sampler > 0:
+            bias = int(self.tempshift_sampler * skeleton_seq.shape[0])
+            begin = np.random.randint(0, bias)
+            end = np.random.randint(0, bias)
+            biased_range = skeleton_seq.shape[0] - begin - end
+            avg_range = biased_range / self.seg
+            intervals = np.multiply(list(range(self.seg + 1)), avg_range)
+            intervals = intervals + begin
             intervals = intervals.round().astype(int)
             intervals_check(intervals)
             random_intervals_range_fn = partial(np.random.randint,
