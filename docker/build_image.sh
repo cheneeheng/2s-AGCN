@@ -1,14 +1,14 @@
 #! /bin/sh
 
-if [ ${3} == 'CPU' ]; then
+if [ ${3} = 'CPU' ]; then
     echo "Building CPU version..."
     IMAGE_NAME="2s-agcn:ubuntu20.04"
     DOCKER_FILENAME="Dockerfile.CPU"
-elif [ ${3} == 'CU111' ]; then
+elif [ ${3} = 'CU111' ]; then
     echo "Building cuda11.1.1 version..."
     IMAGE_NAME="2s-agcn:cuda11.1.1-cudnn8-devel-ubuntu20.04"
     DOCKER_FILENAME="Dockerfile.CU111"
-elif [ ${3} == 'CU113' ]; then
+elif [ ${3} = 'CU113' ]; then
     echo "Building cuda11.3.1 version..."
     IMAGE_NAME="2s-agcn:cuda11.3.1-cudnn8-devel-ubuntu20.04"
     DOCKER_FILENAME="Dockerfile.CU113"
