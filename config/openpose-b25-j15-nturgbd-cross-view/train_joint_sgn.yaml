@@ -1,0 +1,67 @@
+work_dir: ./data/data/openpose_b25_j15_ntu_result/xview/sgn/230414100001
+model_saved_name: ./data/data/openpose_b25_j15_ntu_result/xview/sgn/230414100001/op_b25_j15_ntu_cv_aagcn_joint
+
+phase: train
+save_score: True
+
+seed: 1
+log_interval: 100  # iter
+save_interval: 2  # iter
+eval_interval: 5  # iter
+print_log: true
+
+# feeder
+feeder: feeders.feeder.Feeder
+num_worker: 8
+train_feeder_args:
+  debug: False
+  data_path: ./data/data/ntu_sgn/processed_data/NTU_CV_train.pkl
+  label_path: ./data/data/ntu_sgn/processed_data/NTU_CV_train_label.pkl
+  dataset: NTU60-CV-SGN
+  joint_15: True
+
+train_dataloader_args:
+  seg: 20
+  multi_test: 1
+
+test_feeder_args:
+  debug: False
+  data_path: ./data/data/ntu_sgn/processed_data/NTU_CV_test.pkl
+  label_path: ./data/data/ntu_sgn/processed_data/NTU_CV_test_label.pkl
+  dataset: NTU60-CV-SGN
+  joint_15: True
+
+test_dataloader_args:
+  seg: 20
+  multi_test: 5
+
+# model
+model: model.sgn.SGN
+model_args:
+  num_class: 60
+  num_point: 15
+  in_channels: 3
+  seg: 20
+  bias: True
+
+#optim
+# device: [0, 1 ,2, 3]
+device: [0]
+batch_size: 64
+test_batch_size: 4
+
+optimizer: Adam
+nesterov: True
+base_lr: 0.001
+step: [60, 90, 110]
+weight_decay: 0.0001
+
+start_epoch: 0
+num_epoch: 120
+warm_up_epoch: 0
+
+only_train_part: False
+only_train_epoch: 5
+
+world_size: 1
+ddp: False
