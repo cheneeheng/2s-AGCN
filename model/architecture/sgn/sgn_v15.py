@@ -518,10 +518,12 @@ if __name__ == '__main__':
 
     # base_path = "/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v15"
     # # file_path = "/221031120001_1head_256hdim_256out_nov_res_8head_16hdim_bn_rerun"  # noqa
-    # file_path = "/221124163001_8head_16hdim_128ffn_256out_8head_32hdim_256ffn_512out_qkv"  # noqa
+    # # file_path = "/221124163001_8head_16hdim_128ffn_256out_8head_32hdim_256ffn_512out_qkv"  # noqa
+    # file_path = "/221130163001_8head_16hdim_128ffn_256out_8head_32hdim_256ffn_512out_qkv_inputconcat"  # noqa
     # parser = get_parser()
     # parser.set_defaults(**{'config': base_path + file_path + "/config.yaml"})
     # args = load_parser_args_from_config(parser)
+    # print(args.model_args)
     # model = SGN(**args.model_args)
     # model(inputs)
     # print(model)

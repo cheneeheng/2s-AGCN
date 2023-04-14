@@ -62,13 +62,14 @@ def get_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         '--weight-path',
         type=str,
-        default=_PATH + '/sgn_v14/221017160001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01_rerun'  # noqa
+        # default=_PATH + '/sgn_v14/221017160001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01_rerun'  # noqa
         # default=_PATH + '/sgn_v14/221017160001_gt0_1gcn_gcnffn1_tmode3_1layer_16heads_16dim_256ffn_noshartedg_drop01'  # noqa
         # default=_PATH + '/sgn_v14/221020170001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_512ffn_noshartedg_drop01'  # noqa
         # default=_PATH + '/sgn_v14/221104130001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01_bs128_sgd_lr1e1_steps90110'  # noqa
         # default=_PATH + '/sgn_v14/221108160001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01_galpham1'  # noqa
         # default=_PATH + '/sgn_v14/221108160001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01_galpham2'  # noqa
         # default=_PATH + '/sgn_v14/221108160001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01_smp3_tmp3b'  # noqa
+        default=_PATH + '/sgn_v14/221118180001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01'  # noqa
     )
     parser.add_argument(
         '--out-folder',
@@ -205,6 +206,10 @@ if __name__ == '__main__':
     fig14, axes14 = plt.subplots(5, 1, figsize=(2, 6))
     fig14.tight_layout()
     enable[14] = True
+    # spa diff emb -------------------------------------------------------
+    fig15, axes15 = plt.subplots(5, 1, figsize=(2, 6))
+    fig15.tight_layout()
+    enable[15] = True
     # pos emb -------------------------------------------------------
     fig17, axes17 = plt.subplots(5, 1, figsize=(2, 6))
     fig17.tight_layout()
@@ -250,7 +255,7 @@ if __name__ == '__main__':
         loop = True
 
         # while loop:
-        n_data, _, _, _ = DataProc.preprocess_fn(
+        n_data, subseq, _, _ = DataProc.preprocess_fn(
             raw_data, sampling_frequency=SAMP_FREQ)  # N,'T, MVC
         input_data = np.array(n_data, dtype=n_data[0].dtype)  # N, 'T, MVC
 
@@ -268,21 +273,31 @@ if __name__ == '__main__':
         x_smp_list = output_dict.get('x_smp_list')
         tem_emb = output_dict.get('tem_emb')
         spa_emb = output_dict.get('spa_emb')
+        spa_diff_emb = output_dict.get('spa_diff_emb')
         pos_emb = output_dict.get('pos_emb')
         vel_emb = output_dict.get('vel_emb')
 
         logits, preds = output[0].tolist(), predict_label.item()
 
         # if (logits[preds]*100 < 50) or data2[c] != preds:
-        print(f"Label : {data2[c]:3d} , Pred : {preds:3d} , Logit : {logits[preds]*100:>5.2f}, SAMP_FREQ : {SAMP_FREQ}, {c}")  # noqa
+        print(f"Label : {data2[c]:3d} , Pred : {preds:3d} , Logit : {logits[preds]*100:>5.2f}, SAMP_FREQ : {SAMP_FREQ}, {c}, {data1[c].reshape(1, 300, 2, 25, 3)[:,:,1,:,:].sum()}")  # noqa
+
+        # continue
+
+        # sub_check = np.linalg.norm(pos_emb[0], axis=0).sum(0)
+        # sub_idx = np.round(subseq[0][sub_check > sub_check.sum()/sub_check.size].mean())  # noqa
+        # a = np.zeros_like(raw_data)
+        # a[:, :, int(sub_idx)*75:int(sub_idx+1)*75] = \
+        #     raw_data[:, :, int(sub_idx)*75:int(sub_idx+1)*75]
+        # raw_data = a
 
         # if logits[preds] > 0.3:
         #     loop = False
 
-        # if data2[c] < 22:
-        #     continue
-        if data2[c] == preds:
+        if data2[c] < 22:
             continue
+        # if data2[c] == preds:
+        #     continue
         # if data2[c] != 47:
         #     continue
         # if logits[preds]*100 > 80.0:
@@ -479,6 +494,13 @@ if __name__ == '__main__':
                 axes14[j].imshow(np.expand_dims(img_j, axis=-1))
                 axes14[j].xaxis.set_ticks(np.arange(0, 20+1, SAMP_FREQ))
                 axes14[j].yaxis.set_ticks(np.arange(0, 25+1, SAMP_FREQ))
+
+        if enable[15] and spa_diff_emb is not None:
+            for j in range(SAMP_FREQ):
+                img_j = np.linalg.norm(spa_diff_emb[j], axis=0)
+                axes15[j].imshow(np.expand_dims(img_j, axis=-1))
+                axes15[j].xaxis.set_ticks(np.arange(0, 20+1, SAMP_FREQ))
+                axes15[j].yaxis.set_ticks(np.arange(0, 25+1, SAMP_FREQ))
 
         if enable[17]:
             for j in range(SAMP_FREQ):

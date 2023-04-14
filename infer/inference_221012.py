@@ -66,7 +66,13 @@ def get_parser() -> argparse.ArgumentParser:
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v15/2210121800_mhadimmult1_2layers'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v15/2210121800_mhadimmult1_3heads_2layers'  # noqa
         # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v15/2210121800_mhadimmult1_9_1heads'  # noqa
-        default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v15/2210141000_mhadimmult1_12_12heads'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v15/2210141000_mhadimmult1_12_12heads'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v15/221122163001_8head_32hdim_256out_8head_64hdim_512out'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v15/221122163001_8head_16hdim_256out_8head_32hdim_512out'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v15/221124163001_8head_16hdim_256ffn_256out_8head_32hdim_512ffn_512out'  # noqa
+        default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v15/221124163001_8head_16hdim_128ffn_256out_8head_32hdim_256ffn_512out_qkv'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v15/221128113001_2l_8head_16hdim_128ffn_256out_2l_8head_32hdim_256ffn_512out_qkv'  # noqa
+        # default='/code/2s-AGCN/data/data/ntu_result/xview/sgn/sgn_v15/221130163001_8head_16hdim_128ffn_256out_8head_32hdim_256ffn_512out_qkv_1001posvel'  # noqa
     )
     parser.add_argument(
         '--out-folder',
@@ -103,25 +109,25 @@ def model_inference(arg: argparse.Namespace,
                     input_data: np.ndarray,
                     sampling_freq: int = 5
                     ) -> Tuple[torch.Tensor, torch.Tensor]:
+
     with torch.no_grad():
         if arg.gpu:
             output = model(torch.from_numpy(input_data).cuda(0))
-            output, output_dict = output[0], output[1]
-            if 'sgn' in arg.model:
-                output = output.view((-1, sampling_freq, output.size(1)))
-                output = output.mean(1)
-            output = F.softmax(output, 1)
-            _, predict_label = torch.max(output, 1)
+        else:
+            output = model(torch.from_numpy(input_data))
+        output, output_dict = output[0], output[1]
+        if 'sgn' in arg.model:
+            output = output.view((-1, sampling_freq, output.size(1)))
+            for i in range(sampling_freq):
+                output_i = F.softmax(output[:, i, :], -1)
+                _, predict_label_i = torch.max(output_i, 1)
+                print(f"logit : {output_i[0, predict_label_i]}, label:{predict_label_i}")  # noqa
+            output = output.mean(1)
+        output = F.softmax(output, 1)
+        _, predict_label = torch.max(output, 1)
+        if arg.gpu:
             output = output.data.cpu()
             predict_label = predict_label.data.cpu()
-        else:
-            output = Model(torch.from_numpy(input_data))
-            output, output_dict = output[0], output[1]
-            if 'sgn' in arg.model:
-                output = output.view((-1, sampling_freq, output.size(1)))
-                output = output.mean(1)
-            output = F.softmax(output, 1)
-            _, predict_label = torch.max(output, 1)
     return output, predict_label, output_dict
 
 
@@ -160,6 +166,10 @@ if __name__ == '__main__':
     #     data1 = pickle.load(f)
     # with open(_data_dir + '/NTU_CV_test_label.pkl', 'rb') as f:
     #     data2 = pickle.load(f)
+    # with open(_data_dir + '/NTU_CV_train.pkl', 'rb') as f:
+    #     data1 = pickle.load(f)
+    # with open(_data_dir + '/NTU_CV_train_label.pkl', 'rb') as f:
+    #     data2 = pickle.load(f)
     # with open(_data_dir + '/NTU_CV_train_180.pkl', 'rb') as f:
     #     data1 = pickle.load(f)
     # with open(_data_dir + '/NTU_CV_train_label_180.pkl', 'rb') as f:
@@ -181,15 +191,21 @@ if __name__ == '__main__':
     enable[0] = True
     # A in spatial and temporal ------------
     fig2, axes2 = {}, {}
-    for i in range(2):
-        fig2[i], axes2[i] = plt.subplots(2, 1, figsize=(16, 6))
+    for i in range(1):
+        fig2[i], axes2[i] = plt.subplots(1, 1, figsize=(16, 6))
         fig2[i].tight_layout()
     enable[2] = True
+    fig12, axes12 = plt.subplots(5, 1, figsize=(3, 7))
+    fig12.tight_layout()
+    enable[7] = True
     fig3, axes3 = {}, {}
-    for i in range(2):
+    for i in range(1):
         fig3[i], axes3[i] = plt.subplots(5, 1, figsize=(3, 7))
         fig3[i].tight_layout()
     enable[3] = True
+    fig13, axes13 = plt.subplots(5, 1, figsize=(3, 7))
+    fig13.tight_layout()
+    enable[7] = True
     # spa emb -----------
     fig4, axes4 = plt.subplots(5, 1, figsize=(3, 7))
     fig4.tight_layout()
@@ -206,12 +222,19 @@ if __name__ == '__main__':
     fig7, axes7 = plt.subplots(5, 1, figsize=(3, 7))
     fig7.tight_layout()
     enable[7] = True
+    # # attn J@T -----------
+    # fig8, axes8 = plt.subplots(5, 1, figsize=(3, 7))
+    # fig8.tight_layout()
+    # enable[8] = True
+    # attn_list = []
 
     freq = 1
     SAMP_FREQ = 5
+    SEGMENTS = 20
+    JOINTS = 25
 
     print("Start loop...")
-    for c in range(0, 180, 1):
+    for c in range(0, data1.shape[0], 1):
         # for c in [10, 11, 70, 71, 130, 131]:
 
         # infer if
@@ -256,8 +279,8 @@ if __name__ == '__main__':
         # if (logits[preds]*100 < 50) or data2[c] != preds:
         print(f"Label : {data2[c]:3d} , Pred : {preds:3d} , Logit : {logits[preds]*100:>5.2f}, SAMP_FREQ : {SAMP_FREQ}, {c}")  # noqa
 
-        if data2[c] < 22:
-            # if data2[c] == preds:
+        # if data2[c] < 22:
+        if data2[c] == preds:
             # if data2[c] != 53:
             # if logits[preds]*100 > 80.0:
             continue
@@ -283,20 +306,36 @@ if __name__ == '__main__':
                 fig2[idx].subplots_adjust(top=0.9)
 
                 img_i = sa.data.cpu().numpy()  # NT,H,V,V
-                img_i = img_i.reshape(SAMP_FREQ, 20, img_i.shape[1],
+                img_i = img_i.reshape(SAMP_FREQ, SEGMENTS, img_i.shape[1],
                                       img_i.shape[2], img_i.shape[3])
-                for j in range(2):
+                for j in range(1):
                     img_j = []
-                    for k in range(0, 20, freq):
+                    for k in range(0, SEGMENTS, freq):
                         img_k = img_i[j][k]  # h,v,v
                         img_k = img_k.reshape(-1, img_k.shape[-1])
                         img_j.append(img_k)
                     img = np.concatenate(img_j, axis=1)
-                    axes2[idx][j].imshow(img)
-                    axes2[idx][j].xaxis.set_ticks(
-                        np.arange(0, 25*(20//freq), 25))
-                    axes2[idx][j].yaxis.set_ticks(
-                        np.arange(0, 25, SAMP_FREQ))
+                    axes2[idx].imshow(img)
+                    axes2[idx].xaxis.set_ticks(
+                        np.arange(0, JOINTS*(SEGMENTS//freq), JOINTS))
+                    axes2[idx].yaxis.set_ticks(
+                        np.arange(0, JOINTS, SAMP_FREQ))
+                    # axes2[idx][j].imshow(img)
+                    # axes2[idx][j].xaxis.set_ticks(
+                    #     np.arange(0, JOINTS*(SEGMENTS//freq), JOINTS))
+                    # axes2[idx][j].yaxis.set_ticks(
+                    #     np.arange(0, JOINTS, SAMP_FREQ))
+
+                for j in range(SAMP_FREQ):
+                    img_j = img_i[j]
+                    img_j = np.sum(img_j, axis=1)
+                    img_j = img_j.swapaxes(0, 1)
+                    img_j = img_j.reshape(img_j.shape[0], -1)
+                    axes12[j].imshow(np.expand_dims(img_j, axis=-1))
+                    axes12[j].xaxis.set_ticks(
+                        np.arange(0, JOINTS*(SEGMENTS//freq), JOINTS))
+                    axes12[j].yaxis.set_ticks(
+                        np.arange(0, SEGMENTS, SAMP_FREQ))
 
         # temporal A ---------------------------------------------------------
         if enable[3]:
@@ -306,6 +345,7 @@ if __name__ == '__main__':
                                    MAPPING[data2[c]+1] +
                                    f" : {logits[preds]*100:>5.2f}")
                 fig3[idx].subplots_adjust(top=0.9)
+
                 for j in range(SAMP_FREQ):
                     # last 0 cause spa_maxpool
                     img_i = ta[j].data.cpu().numpy()
@@ -313,40 +353,48 @@ if __name__ == '__main__':
                     img_i = img_i.reshape(img_i.shape[0], -1)
                     axes3[idx][j].imshow(img_i)
                     axes3[idx][j].xaxis.set_ticks(
-                        np.arange(0, 20, SAMP_FREQ))
+                        np.arange(0, SEGMENTS, SAMP_FREQ))
                     axes3[idx][j].yaxis.set_ticks(
-                        np.arange(0, 20, SAMP_FREQ))
+                        np.arange(0, SEGMENTS, SAMP_FREQ))
+
+                    img_i = ta[j].data.cpu().numpy()
+                    img_i = np.sum(img_i, axis=0)
+                    axes13[j].imshow(np.expand_dims(img_i, axis=-1))
+                    axes13[j].xaxis.set_ticks(
+                        np.arange(0, SEGMENTS, SAMP_FREQ))
+                    axes13[j].yaxis.set_ticks(
+                        np.arange(0, SEGMENTS, SAMP_FREQ))
 
         # spatial enb ---------------------------------------------------------
         if enable[4]:
             for j in range(SAMP_FREQ):
                 img_j = np.linalg.norm(spa_emb[j], axis=0)
                 axes4[j].imshow(np.expand_dims(img_j, axis=-1))
-                axes4[j].xaxis.set_ticks(np.arange(0, 20+1, SAMP_FREQ))
-                axes4[j].yaxis.set_ticks(np.arange(0, 25+1, SAMP_FREQ))
+                axes4[j].xaxis.set_ticks(np.arange(0, SEGMENTS+1, SAMP_FREQ))
+                axes4[j].yaxis.set_ticks(np.arange(0, JOINTS+1, SAMP_FREQ))
 
         # temporal emb ---------------------------------------------------------
         if enable[5]:
             for j in range(SAMP_FREQ):
                 img_j = np.linalg.norm(tem_emb[j], axis=0)
                 axes5[j].imshow(np.expand_dims(img_j, axis=-1))
-                axes5[j].xaxis.set_ticks(np.arange(0, 20+1, SAMP_FREQ))
-                axes5[j].yaxis.set_ticks(np.arange(0, 25+1, SAMP_FREQ))
+                axes5[j].xaxis.set_ticks(np.arange(0, SEGMENTS+1, SAMP_FREQ))
+                axes5[j].yaxis.set_ticks(np.arange(0, JOINTS+1, SAMP_FREQ))
 
         # spatial fm ---------------------------------------------------------
         if enable[6]:
             for j in range(SAMP_FREQ):
                 img_j = np.linalg.norm(spatial_featuremap[j], axis=0)
                 axes6[j].imshow(np.expand_dims(img_j, axis=-1))
-                axes6[j].xaxis.set_ticks(np.arange(0, 20+1, SAMP_FREQ))
-                axes6[j].yaxis.set_ticks(np.arange(0, 25+1, SAMP_FREQ))
+                axes6[j].xaxis.set_ticks(np.arange(0, SEGMENTS+1, SAMP_FREQ))
+                axes6[j].yaxis.set_ticks(np.arange(0, JOINTS+1, SAMP_FREQ))
 
         # temporal fm ---------------------------------------------------------
         if enable[7]:
             for j in range(SAMP_FREQ):
                 img_j = np.linalg.norm(temporal_featuremap[j], axis=0)
                 axes7[j].imshow(np.expand_dims(img_j, axis=-1))
-                axes7[j].xaxis.set_ticks(np.arange(0, 20+1, SAMP_FREQ))
+                axes7[j].xaxis.set_ticks(np.arange(0, SEGMENTS+1, SAMP_FREQ))
 
         plt.show(block=False)
 

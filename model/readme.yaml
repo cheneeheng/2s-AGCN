@@ -930,6 +930,12 @@ sgn_v14:
 
         - 221117180001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01_smp3_tmp3b_novel:
                   - 92.22%
+        - 221118180001_gt0_1gcn_gcnffn1_tmode3_1layer_8heads_16dim_256ffn_noshartedg_drop01:
+                  - semantic for both joint and vel
+                  - 94.92%
+                  
+        - 221122163001_gt0_1gcn_gcnffn1_tmode1:
+                  - 94.11%
 
 sgn_v15:
         - only transformers
@@ -987,6 +993,82 @@ sgn_v15:
 
         - 221031120001_1head_256hdim_256out_8head_16hdim_ln:
                   - 92.70%
+
+        - 221122163001_1head_128hdim_256out_1head_256hdim_512out:
+                  - 93.90%
+        - 221122163001_1head_256hdim_256out_1head_512hdim_512out:
+                  - 93.80%
+        - 221122163001_1head_256hdim_256out_8head_64hdim_512out:
+                  - 93.99%
+
+        - 221122163001_8head_16hdim_256out_8head_32hdim_512out:
+                  - 95.20% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        - 221122163001_8head_32hdim_256out_8head_64hdim_512out:
+                  - 95.00% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        - 221122163001_8head_64hdim_256out_8head_128hdim_512out:
+                  - 94.80%
+
+        - 221122163001_16head_16hdim_256out_16head_32hdim_512out:
+                  - 95.17% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        - 221122163001_16head_32hdim_256out_16head_64hdim_512out:
+                  - 94.75%
+        - 221122163001_16head_64hdim_256out_16head_128hdim_512out:
+                  - 94.58%
+
+        - 221124163001_8head_16hdim_64ffn_256out_8head_32hdim_128ffn_512out:
+                  - 94.88%
+        - 221122163001_8head_16hdim_256out_8head_32hdim_512out:
+                  - COPY OF ABOVE
+                  - 95.20% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        - 221124163001_8head_16hdim_256ffn_256out_8head_32hdim_512ffn_512out:
+                  - 95.15% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+        - 221124163001_8head_16hdim_128ffn_256out_8head_32hdim_256ffn_512out_2vlayers:
+                  - 95.23% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        - 221124163001_8head_16hdim_128ffn_256out_8head_32hdim_256ffn_512out_qkv:
+                  - 95.26% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+        - 221128113001_8head_16hdim_128ffn_256out_8head_32hdim_256ffn_512out_qkv:
+                  - 95.26%
+        - 221128113001_8head_16hdim_128ffn_256out_8head_32hdim_256ffn_512out_qkv_101frsem:
+                  - 94.48%
+        - 221128113001_8head_16hdim_128ffn_256out_8head_32hdim_256ffn_512out_qkv_101josem:
+                  - 94.75%
+        - 221128113001_8head_16hdim_128ffn_256out_8head_32hdim_256ffn_512out_qkv_101jofrsem:
+                  - 94.58%
+
+        - 221128113001_8head_16hdim_128ffn_256out_8head_32hdim_256ffn_512out_qkv_3josem:
+                  - 95.23%
+        - 221128113001_8head_16hdim_128ffn_256out_8head_32hdim_256ffn_512out_qkv_3jofrsem:
+                  - 94.96%
+        - 221128113001_8head_16hdim_128ffn_256out_8head_32hdim_256ffn_512out_qkv_3frsem:
+                  - 95.09%
+
+        - 221128113001_8head_16hdim_128ffn_256out_8head_32hdim_256ffn_1024out_qkv:
+                  - 95.31%
+        - 221128113001_8head_16hdim_128ffn_256out_8head_32hdim_256ffn_1024out_qkv_sgnaagcn:
+                  - 95.28%
+        - 221128113001_2l_8head_16hdim_128ffn_256out_2l_8head_32hdim_256ffn_512out_qkv:
+                  - 95.14%
+        - 221128113001_3l_8head_16hdim_128ffn_256out_3l_8head_32hdim_256ffn_512out_qkv:
+                  - 94.74%
+
+        - 221130163001_8head_16hdim_128ffn_256out_8head_32hdim_256ffn_512out_qkv_101posvel:
+                  - 93.77%
+        - 221130163001_8head_16hdim_128ffn_256out_8head_32hdim_256ffn_512out_qkv_101vel:
+                  - 94.60%
+        - 221130163001_8head_16hdim_128ffn_256out_8head_32hdim_256ffn_512out_qkv_101pos:
+                  - 94.56%
+
+        - 221130163001_8head_16hdim_128ffn_256out_8head_32hdim_256ffn_512out_qkv_1001posvel:
+                  - 90.99%
+        - 221130163001_8head_16hdim_128ffn_256out_8head_32hdim_256ffn_512out_qkv_inputconcat:
+                  - 95.10%
+
+        - 221212163001_8head_16hdim_128ffn_256out_8head_32hdim_256ffn_512out_qkv_02shiftsamp:
+                  - 94.34%
+        - 221212163001_8head_16hdim_128ffn_256out_8head_32hdim_256ffn_512out_qkv_01shiftsamp:
+                  - 94.79%
 
 sgn-code:
         - original sgn repo code

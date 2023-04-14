@@ -118,19 +118,44 @@ class Attention(nn.Module):
         self.attend = nn.Softmax(dim=-1)
         self.to_q = nn.Linear(dim, inner_dim, bias=False)
 
-        self.v_proj = v_proj
-        if v_proj:
-            self.to_kv = nn.Linear(dim, inner_dim * 2, bias=False)
-            self.to_out = nn.Sequential(OrderedDict([
-                ('linear', nn.Linear(inner_dim, output_dim)),
-                ('dropout', nn.Dropout(dropout))])
-            )
-        else:
-            self.to_kv = nn.Linear(dim, inner_dim, bias=False)
-            self.to_out = nn.Sequential(OrderedDict([
-                ('linear', nn.Linear(dim, output_dim)),
-                ('dropout', nn.Dropout(dropout))])
-            )
+        # 1. separate k and v projection
+        self.to_kv = None
+        self.to_k = nn.Linear(dim, inner_dim, bias=False)
+        self.to_v = nn.Linear(dim, inner_dim, bias=False)
+        self.to_out = nn.Sequential(OrderedDict([
+            ('linear', nn.Linear(inner_dim, output_dim)),
+            ('dropout', nn.Dropout(dropout))])
+        )
+
+        # # 2. 2 v projection layers
+        # self.to_kv = None
+        # self.to_k = nn.Linear(dim, inner_dim, bias=False)
+        # self.to_v = nn.Sequential(OrderedDict([
+        #     ('linear1', nn.Linear(dim, inner_dim)),
+        #     ('relu', get_activation_fn('relu')()),
+        #     ('linear2', nn.Linear(inner_dim, inner_dim))
+        # ]))
+        # self.to_out = nn.Sequential(OrderedDict([
+        #     ('linear', nn.Linear(inner_dim, output_dim)),
+        #     ('dropout', nn.Dropout(dropout))])
+        # )
+
+        # 3. kv together or no v at all.
+        # self.to_k = None
+        # self.to_v = None
+        # self.v_proj = v_proj
+        # if v_proj:
+        #     self.to_kv = nn.Linear(dim, inner_dim * 2, bias=False)
+        #     self.to_out = nn.Sequential(OrderedDict([
+        #         ('linear', nn.Linear(inner_dim, output_dim)),
+        #         ('dropout', nn.Dropout(dropout))])
+        #     )
+        # else:
+        #     self.to_kv = nn.Linear(dim, inner_dim, bias=False)
+        #     self.to_out = nn.Sequential(OrderedDict([
+        #         ('linear', nn.Linear(dim, output_dim)),
+        #         ('dropout', nn.Dropout(dropout))])
+        #     )
 
         if res_proj:
             self.residual = nn.Linear(dim, output_dim)
@@ -151,10 +176,13 @@ class Attention(nn.Module):
             # cross attention requires CLS token includes itself as key / value
             context = torch.cat((x, context), dim=1)
 
-        if self.v_proj:
-            qkv = (self.to_q(x), *self.to_kv(context).chunk(2, dim=-1))
+        if self.to_kv is not None:
+            if self.v_proj:
+                qkv = (self.to_q(x), *self.to_kv(context).chunk(2, dim=-1))
+            else:
+                qkv = (self.to_q(x), self.to_kv(context), context)
         else:
-            qkv = (self.to_q(x), self.to_kv(context), context)
+            qkv = (self.to_q(x), self.to_k(x), self.to_v(x))
 
         q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h=h), qkv)
 
