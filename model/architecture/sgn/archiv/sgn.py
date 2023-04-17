@@ -25,8 +25,14 @@ class SGN(nn.Module):
         self.c3 = 256
         self.seg = seg
 
-        self.joint_embed = embed(in_channels, self.c1, norm=True, bias=bias)
-        self.dif_embed = embed(in_channels, self.c1, norm=True, bias=bias)
+        self.joint_embed = embed(in_channels,
+                                 self.c1,
+                                 norm_dim=in_channels*num_point,
+                                 bias=bias)
+        self.dif_embed = embed(in_channels,
+                               self.c1,
+                               norm_dim=in_channels*num_point,
+                               bias=bias)
 
         # self.spa = one_hot(num_point, self.seg, 'spa')
         # self.tem = one_hot(self.seg, num_point, 'tem')
@@ -36,8 +42,8 @@ class SGN(nn.Module):
         self.tem = self.one_hot(
             1, self.seg, num_point).permute(0, 3, 1, 2).cuda()
 
-        self.tem_embed = embed(self.seg, self.c3, norm=False, bias=bias)
-        self.spa_embed = embed(num_point, self.c1, norm=False, bias=bias)
+        self.tem_embed = embed(self.seg, self.c3, norm_dim=0, bias=bias)
+        self.spa_embed = embed(num_point, self.c1, norm_dim=0, bias=bias)
 
         self.compute_g1 = compute_g_spa(self.c2, self.c3, bias=bias)
         self.gcn1 = gcn_spa(self.c2, self.c2, bias=bias)
@@ -101,7 +107,7 @@ class SGN(nn.Module):
 class norm_data(nn.Module):
     def __init__(self, dim=64):
         super(norm_data, self).__init__()
-        self.bn = nn.BatchNorm1d(dim * 25)
+        self.bn = nn.BatchNorm1d(dim)
 
     def forward(self, x):
         bs, c, num_joints, step = x.size()
@@ -112,12 +118,12 @@ class norm_data(nn.Module):
 
 
 class embed(nn.Module):
-    def __init__(self, dim=3, dim1=128, norm=True, bias=False):
+    def __init__(self, dim=3, dim1=128, norm_dim=75, bias=False):
         super(embed, self).__init__()
 
-        if norm:
+        if norm_dim > 0:
             self.cnn = nn.Sequential(
-                norm_data(dim),
+                norm_data(norm_dim),
                 cnn1x1(dim, 64, bias=bias),
                 nn.ReLU(),
                 cnn1x1(64, dim1, bias=bias),

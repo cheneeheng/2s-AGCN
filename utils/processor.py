@@ -60,6 +60,8 @@ class Processor(object):
                  arg: argparse.Namespace,
                  rank: int = 0,
                  save_arg: bool = True):
+        self.num_forward_inputs = 0
+
         self.rank = rank
         self.arg = arg
         if save_arg:
@@ -159,11 +161,16 @@ class Processor(object):
         return x.long().cuda(self.output_device, non_blocking=True)
 
     def to_cuda(self,
-                data: tuple,
+                data: Tuple[tuple, torch.Tensor],
                 label: Optional[torch.Tensor]
                 ) -> Tuple[tuple, Optional[torch.Tensor]]:
-        num_of_inputs = len(inspect.signature(self.model.forward).parameters)
-        data = tuple(self.to_float_cuda(data[i]) for i in range(num_of_inputs))
+        if isinstance(data, tuple):
+            data = tuple(self.to_float_cuda(data[i])
+                         for i in range(self.num_forward_inputs))
+        elif isinstance(data, torch.Tensor):
+            data = (self.to_float_cuda(data),)
+        else:
+            raise ValueError(f"Unknown data type : {type(data)}")
         if label is not None:
             label = self.to_long_cuda(label)
         return data, label
@@ -282,6 +289,8 @@ class Processor(object):
             # Saves a copy of the model file
             shutil.copy2(inspect.getfile(Model), self.arg.work_dir)
         self.model = Model(**self.arg.model_args).cuda(self.output_device)
+        self.num_forward_inputs = len(
+            inspect.signature(self.model.forward).parameters)
         if self.arg.ddp:
             self.model = nn.SyncBatchNorm.convert_sync_batchnorm(self.model)
             self.model = DDP(self.model, device_ids=[self.rank])
