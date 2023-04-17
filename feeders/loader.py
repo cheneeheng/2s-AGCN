@@ -12,6 +12,7 @@ from typing import Tuple, Optional
 from functools import partial
 
 from feeders import tools
+from feeders import feeder
 
 
 COLLATE_OUT_TYPE = Tuple[Tuple[torch.Tensor, torch.Tensor], torch.Tensor, list]
@@ -134,7 +135,7 @@ class NTUDataLoaders(object):
 
         if sort_data:
             # sort sequence by valid length in descending order
-            lens = np.array([x_.shape[0] for x_ in x], dtype=np.int)
+            lens = np.array([x_.shape[0] for x_ in x], dtype=int)
             idx = lens.argsort()[::-1]
             y = np.array(y)[idx]
         else:
@@ -391,3 +392,18 @@ class FeederDataLoader(NTUDataLoaders):
             collate_fn=collate_fn
         )
         return data_loader
+
+
+if __name__ == '__main__':
+    args = {
+        'dataset': 'NTU60-CV',
+        'data_path': './data/data/openpose_b25_j15_ntu/xview/train_data_joint.npy',  # noqa
+        'label_path': './data/data/openpose_b25_j15_ntu/xview/train_label.pkl'
+    }
+    ds = feeder.Feeder(**args)
+    dl = FeederDataLoader().get_loader(
+        feeder=ds,
+        batch_size=64,
+        collate_fn=None  # FeederDataLoader().collate_fn_fix_train
+    )
+    print(next(ds))
