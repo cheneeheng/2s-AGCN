@@ -5,6 +5,8 @@ import pickle
 from tqdm import tqdm
 
 from data_gen.preprocess import pre_normalization
+from data_gen.ntu_gendata import read_xyz, randomize
+
 
 training_subjects = [
     1, 2, 4, 5, 8, 9, 13, 14, 15, 16, 17, 18, 19, 25, 27, 28, 31, 34, 35, 38
@@ -35,81 +37,25 @@ joint_mapping = {
     14: 15,
 }
 
-
-def read_skeleton_filter(file):
-    with open(file, 'r') as f:
-        skeleton_sequence = {}
-        skeleton_sequence['numFrame'] = int(f.readline())
-        skeleton_sequence['frameInfo'] = []
-        # num_body = 0
-        for t in range(skeleton_sequence['numFrame']):
-            frame_info = {}
-            frame_info['numBody'] = int(f.readline())
-            frame_info['bodyInfo'] = []
-
-            for m in range(frame_info['numBody']):
-                body_info = {}
-                body_info_key = [
-                    'bodyID', 'clipedEdges', 'handLeftConfidence',
-                    'handLeftState', 'handRightConfidence', 'handRightState',
-                    'isResticted', 'leanX', 'leanY', 'trackingState'
-                ]
-                body_info = {
-                    k: float(v)
-                    for k, v in zip(body_info_key, f.readline().split())
-                }
-                body_info['numJoint'] = int(f.readline())
-                body_info['jointInfo'] = []
-                for v in range(body_info['numJoint']):
-                    joint_info_key = [
-                        'x', 'y', 'z', 'depthX', 'depthY', 'colorX', 'colorY',
-                        'orientationW', 'orientationX', 'orientationY',
-                        'orientationZ', 'trackingState'
-                    ]
-                    joint_info = {
-                        k: float(v)
-                        for k, v in zip(joint_info_key, f.readline().split())
-                    }
-                    body_info['jointInfo'].append(joint_info)
-                frame_info['bodyInfo'].append(body_info)
-            skeleton_sequence['frameInfo'].append(frame_info)
-
-    return skeleton_sequence
-
-
-def get_nonzero_std(s):  # tvc
-    index = s.sum(-1).sum(-1) != 0  # select valid frames
-    s = s[index]
-    if len(s) != 0:
-        s = s[:, :, 0].std() + s[:, :, 1].std() + \
-            s[:, :, 2].std()  # three channels
-    else:
-        s = 0
-    return s
-
-
-def read_xyz(file, max_body=4, num_joint=25):  # 取了前两个body
-    seq_info = read_skeleton_filter(file)
-    data = np.zeros((max_body, seq_info['numFrame'], num_joint, 3))
-    for n, f in enumerate(seq_info['frameInfo']):
-        for m, b in enumerate(f['bodyInfo']):
-            for j, v in enumerate(b['jointInfo']):
-                if m < max_body and j < num_joint:
-                    data[m, n, j, :] = [v['x'], v['y'], v['z']]
-                else:
-                    pass
-
-    # select two max energy body
-    energy = np.array([get_nonzero_std(x) for x in data])
-    index = energy.argsort()[::-1][0:max_body_true]
-    data = data[index]
-
-    data = data.transpose(3, 1, 2, 0)  # C, T, J, M
-    return data
+# original : new labels
+label_mapping = {
+    1: 0,
+    2: 0,
+    8: 1,
+    9: 2,
+    27: 3,
+    31: 4,
+    43: 5,
+    56: 6,
+    59: 7,
+    60: 8
+}
 
 
 def gendata(data_path, out_path, ignored_sample_path=None,
-            benchmark='xview', part='eval'):
+            benchmark='xview', part='eval', seed=None,
+            label_mapping=False):
+
     if ignored_sample_path is not None:
         with open(ignored_sample_path, 'r') as f:
             ignored_samples = [
@@ -117,9 +63,12 @@ def gendata(data_path, out_path, ignored_sample_path=None,
             ]
     else:
         ignored_samples = []
+
     sample_name = []
     sample_label = []
-    for filename in os.listdir(data_path):
+    filenames = sorted(os.listdir(data_path))
+    randomize(filenames, seed)
+    for filename in tqdm(filenames):
         if filename in ignored_samples:
             continue
         action_class = int(
@@ -128,6 +77,15 @@ def gendata(data_path, out_path, ignored_sample_path=None,
             filename[filename.find('P') + 1:filename.find('P') + 4])
         camera_id = int(
             filename[filename.find('C') + 1:filename.find('C') + 4])
+
+        if label_mapping:
+            if action_class not in label_mapping.keys():
+                continue
+
+            action_class = label_mapping[action_class]
+
+        else:
+            action_class = action_class - 1
 
         if benchmark == 'xview':
             istraining = (camera_id in training_cameras)
@@ -145,22 +103,25 @@ def gendata(data_path, out_path, ignored_sample_path=None,
 
         if issample:
             sample_name.append(filename)
-            sample_label.append(action_class - 1)
+            sample_label.append(action_class)
 
     with open('{}/{}_label.pkl'.format(out_path, part), 'wb') as f:
-        pickle.dump((sample_name, list(sample_label)), f)
+        pickle.dump((sample_name, sample_label), f)
 
-    fp = np.zeros((len(sample_label), 3, max_frame,
-                  num_joint, max_body_true), dtype=np.float32)
+    # N, C, T, V, M
+    fp = np.zeros((len(sample_label),
+                   3,
+                   max_frame,
+                   num_joint,
+                   max_body_true), dtype=np.float32)
 
     for i, s in enumerate(tqdm(sample_name)):
-        # C, T, J, M
+        # C, T, V, M
         data = read_xyz(os.path.join(data_path, s),
-                        max_body=max_body_kinect, num_joint=num_joint_ntu)
+                        max_body=max_body_kinect,
+                        num_joint=num_joint_ntu)
         for new_id, old_id in joint_mapping.items():
-            fp[i, :, 0:data.shape[1], new_id:new_id+1, :] = \
-                data[:, :, old_id-1:old_id, :]
-        break
+            fp[i, :, :data.shape[1], new_id, :] = data[:, :, old_id-1, :]
 
     fp = pre_normalization(fp, zaxis=[8, 1], xaxis=[2, 5], verbose=True)
     np.save('{}/{}_data_joint.npy'.format(out_path, part), fp)
@@ -169,28 +130,42 @@ def gendata(data_path, out_path, ignored_sample_path=None,
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='NTU-RGB-D Data Converter.')
     parser.add_argument(
-        '--data_path',
+        '--data-path',
         default='./data/data/nturgbd_raw/nturgb+d_skeletons/')
     parser.add_argument(
-        '--ignored_sample_path',
+        '--ignored-sample-path',
         default='./data/data/nturgbd_raw/samples_with_missing_skeletons.txt')
     parser.add_argument(
-        '--out_folder',
-        default='./data/data/openpose_b25_j15_ntu_delme/')
+        '--out-folder',
+        default='./data/data/openpose_b25_j15_ntu/')
+    parser.add_argument(
+        '--benchmark',
+        default=['xsub', 'xview'],
+        nargs='+',
+        help='which Top K accuracy will be shown')
+    parser.add_argument(
+        '--split',
+        default=['train', 'val'],
+        nargs='+',
+        help='which Top K accuracy will be shown')
+    parser.add_argument(
+        '--seed',
+        type=int,
+        default=1,
+        help='random seed used to select file during data generation')
+    parser.add_argument('--label_mapping', type=bool, default=False)
+    args = parser.parse_args()
 
-    benchmark = ['xsub', 'xview']
-    part = ['train', 'val']
-    arg = parser.parse_args()
-
-    for b in benchmark:
-        for p in part:
-            out_path = os.path.join(arg.out_folder, b)
-            if not os.path.exists(out_path):
-                os.makedirs(out_path)
+    for b in args.benchmark:
+        for p in args.split:
+            out_path = os.path.join(args.out_folder, b)
+            os.makedirs(out_path, exist_ok=True)
             print(b, p)
             gendata(
-                arg.data_path,
+                args.data_path,
                 out_path,
-                arg.ignored_sample_path,
+                args.ignored_sample_path,
                 benchmark=b,
-                part=p)
+                part=p,
+                seed=args.seed,
+                label_mapping=args.label_mapping)

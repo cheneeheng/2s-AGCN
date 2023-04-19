@@ -156,7 +156,7 @@ def gendata(data_path, out_path, ignored_sample_path=None,
             sample_label.append(action_class - 1)
 
     with open('{}/{}_label.pkl'.format(out_path, part), 'wb') as f:
-        pickle.dump((sample_name, list(sample_label)), f)
+        pickle.dump((sample_name, sample_label), f)
 
     fp = np.zeros((len(sample_label), 3, max_frame,
                   num_joint, max_body_true), dtype=np.float32)
@@ -202,25 +202,20 @@ if __name__ == '__main__':
         default=['train', 'val'],
         nargs='+',
         help='which Top K accuracy will be shown')
-
     parser.add_argument(
         '--stretch',
-        default=True)
-
+        default=False,
+        help='stretch the sequence to a certain length')
     parser.add_argument(
         '--seed',
         type=int,
         default=1,
-        help='random seed used to select file during data generation'
-    )
+        help='random seed used to select file during data generation')
+    args = parser.parse_args()
 
-    arg = parser.parse_args()
-    benchmark = arg.benchmark
-    part = arg.split
-
-    for b in benchmark:
-        for p in part:
-            out_path = os.path.join(arg.out_folder, b)
+    for b in args.benchmark:
+        for p in args.split:
+            out_path = os.path.join(args.out_folder, b)
             os.makedirs(out_path, exist_ok=True)
             print(b, p)
 
@@ -235,10 +230,10 @@ if __name__ == '__main__':
             # exit()
 
             gendata(
-                arg.data_path,
+                args.data_path,
                 out_path,
-                arg.ignored_sample_path,
+                args.ignored_sample_path,
                 benchmark=b,
                 part=p,
-                stretch=arg.stretch,
-                seed=arg.seed,)
+                stretch=args.stretch,
+                seed=args.seed,)

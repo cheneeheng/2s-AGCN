@@ -90,7 +90,7 @@ def evaluate_sequence(data: np.ndarray,
     logits_list = []
     prediction_list = []
 
-    preprocessor.clear_data_array()
+    preprocessor.reset_data()
 
     start = time.time()
 

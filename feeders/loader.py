@@ -397,13 +397,14 @@ class FeederDataLoader(NTUDataLoaders):
 if __name__ == '__main__':
     args = {
         'dataset': 'NTU60-CV',
-        'data_path': './data/data/openpose_b25_j15_ntu/xview/train_data_joint.npy',  # noqa
-        'label_path': './data/data/openpose_b25_j15_ntu/xview/train_label.pkl'
+        'data_path': './data/data/openpose_b25_j15_ntu/xview/val_data_joint.npy',  # noqa
+        'label_path': './data/data/openpose_b25_j15_ntu/xview/val_label.pkl'
     }
     ds = feeder.Feeder(**args)
     dl = FeederDataLoader().get_loader(
         feeder=ds,
-        batch_size=64,
+        batch_size=1,
         collate_fn=None  # FeederDataLoader().collate_fn_fix_train
     )
-    print(next(ds))
+    data = next(iter(dl))
+    print(data[0].sum(), ds.sample_name[data[-1]])
