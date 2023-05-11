@@ -38,23 +38,34 @@ joint_mapping = {
 }
 
 # original : new labels
-label_mapping = {
-    1: 0,
-    2: 0,
-    8: 1,
-    9: 2,
-    27: 3,
-    31: 4,
-    43: 5,
-    56: 6,
-    59: 7,
-    60: 8
+label_mapping_9l = {
+    1: 0,  # drink
+    2: 0,  # eat
+    8: 1,  # sit down
+    9: 2,  # standup
+    27: 3,  # jump
+    31: 4,  # pointing
+    43: 5,  # falling
+    56: 6,  # giving to another person
+    59: 7,  # waling towards each other
+    60: 8  # walking apart
+}
+
+# original : new labels
+label_mapping_5l = {
+    1: 0,  # drink
+    2: 0,  # eat
+    8: 1,  # sit down
+    9: 2,  # stand up
+    26: 3,  # hop
+    27: 3,  # jump
+    43: 4,  # falling
 }
 
 
 def gendata(data_path, out_path, ignored_sample_path=None,
             benchmark='xview', part='eval', seed=None,
-            label_mapping=False):
+            custom_label=''):
 
     if ignored_sample_path is not None:
         with open(ignored_sample_path, 'r') as f:
@@ -78,12 +89,14 @@ def gendata(data_path, out_path, ignored_sample_path=None,
         camera_id = int(
             filename[filename.find('C') + 1:filename.find('C') + 4])
 
-        if label_mapping:
-            if action_class not in label_mapping.keys():
+        if custom_label == '9l':
+            if action_class not in label_mapping_9l.keys():
                 continue
-
-            action_class = label_mapping[action_class]
-
+            action_class = label_mapping_9l[action_class]
+        elif custom_label == '5l':
+            if action_class not in label_mapping_5l.keys():
+                continue
+            action_class = label_mapping_5l[action_class]
         else:
             action_class = action_class - 1
 
@@ -153,7 +166,9 @@ if __name__ == '__main__':
         type=int,
         default=1,
         help='random seed used to select file during data generation')
-    parser.add_argument('--label_mapping', type=bool, default=False)
+    # parser.add_argument('--custom_label', default="")
+    # parser.add_argument('--custom_label', default="9l")
+    parser.add_argument('--custom_label', default="5l")
     args = parser.parse_args()
 
     for b in args.benchmark:
@@ -168,4 +183,4 @@ if __name__ == '__main__':
                 benchmark=b,
                 part=p,
                 seed=args.seed,
-                label_mapping=args.label_mapping)
+                custom_label=args.custom_label)

@@ -226,6 +226,22 @@ def get_parser() -> argparse.ArgumentParser:
                    nargs='+',
                    help='which Top K accuracy will be shown')
 
+    # for inference
+    p.add_argument('--max-frame', type=int, default=300)
+    p.add_argument('--max-num-skeleton-true', type=int, default=2)  # noqa
+    p.add_argument('--max-num-skeleton', type=int, default=4)  # noqa
+    p.add_argument('--num-joint', type=int, default=15)
+    p.add_argument('--gpu', type=bool, default=True)
+    p.add_argument('--timing', type=bool, default=False)
+    p.add_argument('--interval', type=int, default=0)
+    p.add_argument('--moving-avg', type=int, default=1)
+    p.add_argument('--aagcn-normalize', type=bool, default=True)
+    p.add_argument('--sgn-preprocess', type=bool, default=True)
+    p.add_argument('--multi-test', type=int, default=5)
+    p.add_argument('--data-path', type=str,)
+    p.add_argument('--label-mapping-file', type=str,)
+    p.add_argument('--out-folder', type=str,)
+
     return p
 
 

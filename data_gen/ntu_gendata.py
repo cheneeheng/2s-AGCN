@@ -63,7 +63,7 @@ def read_skeleton_filter(file):
                     for k, v in zip(body_info_key, f.readline().split())
                 }
                 body_info['numJoint'] = int(f.readline())
-                body_info['jointInfo'] = []
+                body_info['jointInfo'] = []  # type: ignore
                 for v in range(body_info['numJoint']):
                     joint_info_key = [
                         'x', 'y', 'z', 'depthX', 'depthY', 'colorX', 'colorY',
@@ -109,7 +109,7 @@ def read_xyz(file, max_body=4, num_joint=25):  # 取了前两个body
     data = data[index]
 
     data = data.transpose(3, 1, 2, 0)
-    return data
+    return data  # c,t,v,m
 
 
 def gendata(data_path, out_path, ignored_sample_path=None,
@@ -191,7 +191,7 @@ if __name__ == '__main__':
         default='./data/data/nturgbd_raw/samples_with_missing_skeletons.txt')
     parser.add_argument(
         '--out-folder',
-        default='./data/data/ntu_stretched/')
+        default='./data/data/delme/')
     parser.add_argument(
         '--benchmark',
         default=['xsub', 'xview'],
