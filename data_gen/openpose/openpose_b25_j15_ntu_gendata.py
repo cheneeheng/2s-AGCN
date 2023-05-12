@@ -62,6 +62,15 @@ label_mapping_5l = {
     43: 4,  # falling
 }
 
+# original : new labels
+label_mapping_4l = {
+    1: 0,  # drink
+    2: 0,  # eat
+    8: 1,  # sit down
+    9: 2,  # stand up
+    43: 4,  # falling
+}
+
 
 def gendata(data_path, out_path, ignored_sample_path=None,
             benchmark='xview', part='eval', seed=None,
@@ -97,6 +106,10 @@ def gendata(data_path, out_path, ignored_sample_path=None,
             if action_class not in label_mapping_5l.keys():
                 continue
             action_class = label_mapping_5l[action_class]
+        elif custom_label == '4l':
+            if action_class not in label_mapping_4l.keys():
+                continue
+            action_class = label_mapping_4l[action_class]
         else:
             action_class = action_class - 1
 
