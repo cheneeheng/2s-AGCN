@@ -3,6 +3,7 @@ import numpy as np
 import argparse
 import pickle
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 from data_gen.preprocess import pre_normalization
 from data_gen.ntu_gendata import read_xyz, randomize
@@ -14,12 +15,12 @@ training_subjects = [
 training_cameras = [2, 3]
 max_body_true = 2
 max_body_kinect = 4
-num_joint = 15
+# num_joint = 15
 num_joint_ntu = 25
 max_frame = 300
 
 # openpose : ntu
-joint_mapping = {
+joint_mapping_15 = {
     0: 4,
     1: 21,
     2: 9,
@@ -35,6 +36,21 @@ joint_mapping = {
     12: 13,
     13: 14,
     14: 15,
+}
+
+# openpose : ntu
+joint_mapping_11 = {
+    0: 4,
+    1: 21,
+    2: 9,
+    3: 10,
+    4: 5,
+    5: 6,
+    6: 1,
+    7: 17,
+    8: 18,
+    9: 13,
+    10: 14,
 }
 
 # original : new labels
@@ -68,13 +84,13 @@ label_mapping_4l = {
     2: 0,  # eat
     8: 1,  # sit down
     9: 2,  # stand up
-    43: 4,  # falling
+    43: 3,  # falling
 }
 
 
 def gendata(data_path, out_path, ignored_sample_path=None,
             benchmark='xview', part='eval', seed=None,
-            custom_label=''):
+            custom_label='', num_joints=15):
 
     if ignored_sample_path is not None:
         with open(ignored_sample_path, 'r') as f:
@@ -138,8 +154,15 @@ def gendata(data_path, out_path, ignored_sample_path=None,
     fp = np.zeros((len(sample_label),
                    3,
                    max_frame,
-                   num_joint,
+                   num_joints,
                    max_body_true), dtype=np.float32)
+
+    if num_joints == 15:
+        joint_mapping = joint_mapping_15
+    elif num_joints == 11:
+        joint_mapping = joint_mapping_11
+    else:
+        raise ValueError("Unknown number of joints...")
 
     for i, s in enumerate(tqdm(sample_name)):
         # C, T, V, M
@@ -149,8 +172,89 @@ def gendata(data_path, out_path, ignored_sample_path=None,
         for new_id, old_id in joint_mapping.items():
             fp[i, :, :data.shape[1], new_id, :] = data[:, :, old_id-1, :]
 
-    fp = pre_normalization(fp, zaxis=[8, 1], xaxis=[2, 5], verbose=True)
-    np.save('{}/{}_data_joint.npy'.format(out_path, part), fp)
+    # np.save(
+    #     f'output/data_{custom_label}_{benchmark}_{part}_j{num_joints}.npy',
+    #     fp)
+
+    if num_joints == 15:
+        fp = pre_normalization(fp, zaxis=[8, 1], xaxis=[2, 5], verbose=True)
+    elif num_joints == 11:
+        fp = pre_normalization(fp, zaxis=[6, 1], xaxis=[2, 4], verbose=True)
+    np.save(
+        f'output/data_{custom_label}_{benchmark}_{part}_j{num_joints}.npy',
+        fp)
+
+    # fp = np.load(
+    #     f'output/data_{custom_label}_{benchmark}_{part}_j{num_joints}.npy')
+
+    # num_labels = len(np.unique(sample_label))
+    # x, y, z = [], [], []
+    # for i in range(num_labels):
+    #     x += [fp[np.array(sample_label) == i][:, 0].reshape(-1)]
+    #     y += [fp[np.array(sample_label) == i][:, 1].reshape(-1)]
+    #     z += [fp[np.array(sample_label) == i][:, 2].reshape(-1)]
+    # for i in range(num_labels):
+    #     x[i] = x[i][z[i] > 1.0]
+    #     y[i] = y[i][z[i] > 1.0]
+    #     z[i] = z[i][z[i] > 1.0]
+
+    # fig, axes = plt.subplots(nrows=2, ncols=num_labels//2)
+    # axes = axes.flatten()
+    # for i in range(num_labels):
+    #     axes[i].hist(x[i][x[i] != 0.0], bins=100, alpha=0.5, label='x')
+    #     axes[i].hist(y[i][y[i] != 0.0], bins=100, alpha=0.5, label='y')
+    #     axes[i].hist(z[i][z[i] != 0.0], bins=100, alpha=0.5, label='z')
+    #     axes[i].legend(loc='upper right')
+    #     # axes[i].set_xlim([-2, 5])
+    #     # axes[i].set_ylim([0, 500])
+    # plt.tight_layout()
+
+    # fig, axes = plt.subplots(nrows=1, ncols=3)
+    # axes = axes.flatten()
+    # for i in range(num_labels):
+    #     axes[0].hist(x[i][x[i] != 0.0], bins=100, alpha=0.5, label=str(i))
+    #     axes[1].hist(y[i][y[i] != 0.0], bins=100, alpha=0.5, label=str(i))
+    #     axes[2].hist(z[i][z[i] != 0.0], bins=100, alpha=0.5, label=str(i))
+    # for i in range(3):
+    #     axes[i].legend(loc='upper right')
+    #     # axes[i].set_xlim([-2, 5])
+    #     # axes[i].set_ylim([0, 500])
+    # plt.tight_layout()
+
+    # fp = pre_normalization(fp, zaxis=[8, 1], xaxis=[2, 5], verbose=True)
+
+    # x, y, z = [], [], []
+    # for i in range(num_labels):
+    #     x += [fp[np.array(sample_label) == i][0].reshape(-1)]
+    #     y += [fp[np.array(sample_label) == i][1].reshape(-1)]
+    #     z += [fp[np.array(sample_label) == i][2].reshape(-1)]
+
+    # fig, axes = plt.subplots(nrows=2, ncols=num_labels//2)
+    # axes = axes.flatten()
+    # for i in range(num_labels):
+    #     axes[i].hist(x[i][x[i] != 0.0], bins=100, alpha=0.5, label='x')
+    #     axes[i].hist(y[i][y[i] != 0.0], bins=100, alpha=0.5, label='y')
+    #     axes[i].hist(z[i][z[i] != 0.0], bins=100, alpha=0.5, label='z')
+    #     axes[i].legend(loc='upper right')
+    #     axes[i].set_xlim([-5, 5])
+    #     axes[i].set_ylim([0, 500])
+    # plt.tight_layout()
+
+    # fig, axes = plt.subplots(nrows=1, ncols=3)
+    # axes = axes.flatten()
+    # for i in range(num_labels):
+    #     axes[0].hist(x[i][x[i] != 0.0], bins=100, alpha=0.5, label=str(i))
+    #     axes[1].hist(y[i][y[i] != 0.0], bins=100, alpha=0.5, label=str(i))
+    #     axes[2].hist(z[i][z[i] != 0.0], bins=100, alpha=0.5, label=str(i))
+    # for i in range(3):
+    #     axes[i].legend(loc='upper right')
+    #     axes[i].set_xlim([-2, 2])
+    #     axes[i].set_ylim([0, 800])
+    # plt.tight_layout()
+
+    # plt.show()
+
+    print("Finished")
 
 
 if __name__ == '__main__':
@@ -163,10 +267,10 @@ if __name__ == '__main__':
         default='./data/data/nturgbd_raw/samples_with_missing_skeletons.txt')
     parser.add_argument(
         '--out-folder',
-        default='./data/data/openpose_b25_j15_ntu/')
+        default='./data/data/openpose_b25_j11_5l_ntu_delme/')
     parser.add_argument(
         '--benchmark',
-        default=['xsub', 'xview'],
+        default=['xview', 'xsub'],
         nargs='+',
         help='which Top K accuracy will be shown')
     parser.add_argument(
@@ -181,7 +285,9 @@ if __name__ == '__main__':
         help='random seed used to select file during data generation')
     # parser.add_argument('--custom_label', default="")
     # parser.add_argument('--custom_label', default="9l")
-    parser.add_argument('--custom_label', default="5l")
+    # parser.add_argument('--custom_label', default="5l")
+    parser.add_argument('--custom_label', default="4l")
+    parser.add_argument('--num_joints', type=int, default=15)
     args = parser.parse_args()
 
     for b in args.benchmark:
@@ -196,4 +302,7 @@ if __name__ == '__main__':
                 benchmark=b,
                 part=p,
                 seed=args.seed,
-                custom_label=args.custom_label)
+                custom_label=args.custom_label,
+                num_joints=args.num_joints)
+
+    plt.show()

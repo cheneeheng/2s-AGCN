@@ -19,7 +19,8 @@ from data_gen.ntu_gendata import (
 from infer.data_preprocess import DataPreprocessor
 from data_gen.preprocess import pre_normalization
 from data_gen.ntu_gendata import read_xyz as reader
-from utils.utils import get_parser, import_class, init_seed
+from utils.parser import get_parser
+from utils.utils import import_class, init_seed
 
 
 def softmax(x):
@@ -89,20 +90,6 @@ if __name__ == '__main__':
     init_seed(0)
 
     parser = get_parser()
-    # parser.add_argument('--max-person', type=int, default=2)
-    parser.add_argument('--max-frame', type=int, default=max_frame)
-    parser.add_argument('--max-num-skeleton-true', type=int, default=2)  # noqa
-    parser.add_argument('--max-num-skeleton', type=int, default=4)  # noqa
-    parser.add_argument('--num-joint', type=int, default=15)
-
-    parser.add_argument('--gpu', type=bool, default=True)
-    parser.add_argument('--timing', type=bool, default=False)
-    parser.add_argument('--interval', type=int, default=0)
-
-    # parser.add_argument(
-    #     '--data-path',
-    #     type=str,
-    #     default='/data/openpose/skeleton/')
     parser.add_argument(
         '--model-path',
         type=str,
@@ -117,18 +104,24 @@ if __name__ == '__main__':
         # default='/data/2s-agcn/model/ntu_15j/xsub/220314090001/'
         default='./data/model/ntu_15j/xview/220314100001/'
     )
-    parser.add_argument(
-        '--out-folder',
-        type=str,
-        default='/data/2s-agcn/prediction/ntu_15j/')
 
-    # load arg form config file ------------------------------------------------
     arg = arg_parser(parser)
+    arg.num_joint = 15
+    # arg.model_path = '/data/2s-agcn/model/ntu_15j/'
+    arg.model_path = './data/model/ntu_15j/'
+    # arg.weight_path = './data/model/ntu_25j/'
+    # arg.weight_path = '/data/2s-agcn/model/ntu_15j/xview/211130150001/'
+    # arg.weight_path = '/data/2s-agcn/model/ntu_15j/xview/220314100001/'
+    # arg.weight_path = '/data/2s-agcn/model/ntu_15j/xsub/220314090001/'
+    arg.weight_path = './data/model/ntu_15j/xview/220314100001/'
+
     with open(os.path.join(arg.model_path, 'index_to_name.json'), 'r') as f:
         MAPPING = {int(i): j for i, j in json.load(f).items()}
 
     # LOAD DATA ----------------------------------------------------------------
-    joint_path = './data/data_tmp/220324153743'
+    # joint_path = './data/data_tmp/220324153743'
+    # joint_path = './data/data_tmp/S003C001P018R001A009_15j'
+    joint_path = './data/data_tmp/S003C001P018R001A027_15j'
     joint_files = [os.path.join(joint_path, i)
                    for i in sorted(os.listdir(joint_path))]
     data = []
@@ -144,6 +137,7 @@ if __name__ == '__main__':
         data.append(data_i)
         data_path.append(joint_file)
     data = np.concatenate(data, 1)[:, 0:, :, :]  # C, T, V, M
+    data = data*-1000
 
     # Data processor -----------------------------------------------------------
     preprocess_fn = partial(pre_normalization,
@@ -153,10 +147,10 @@ if __name__ == '__main__':
                             tqdm=False)
 
     DataProc = DataPreprocessor(num_joint=arg.num_joint,
-                                max_seq_length=100,
+                                max_seq_length=300,
                                 # max_seq_length=arg.max_frame,
                                 max_person=2,  # arg.max_num_skeleton,
-                                moving_avg=5,
+                                moving_avg=1,
                                 preprocess_fn=preprocess_fn)
 
     # Prepare model ------------------------------------------------------------
@@ -194,16 +188,14 @@ if __name__ == '__main__':
 
             # Normalization.
             input_data = DataProc.select_skeletons_and_normalize_data(
-                arg.max_num_skeleton_true)
-            input_data = np.transpose(
-                input_data, [0, 4, 2, 3, 1])  # N, C, T, V, M
+                arg.max_num_skeleton_true)  # N, C, T, V, M
             # zeros = np.zeros((*input_data.shape[0:2],
             #                   arg.max_frame,
             #                   *input_data.shape[3:]))
             # zeros[:, :, :100, :, :] = input_data
             # input_data = zeros
-            input_data = np.concatenate(
-                [input_data, input_data, input_data], axis=2)
+            # input_data = np.concatenate(
+            #     [input_data, input_data, input_data], axis=2)
 
             # Inference.
             with torch.no_grad():
@@ -225,8 +217,8 @@ if __name__ == '__main__':
             assert pred == pred_i
 
             if c % 1 == 0:
-                print(MAPPING[pred+1])
-                print(MAPPING[pred+1], file=f)
+                print(pred+1, MAPPING[int(pred+1)])
+                # print(MAPPING[int(pred+1)], file=f)
                 # print(f'frame : {c}  ::  '
                 #       f'pred  : {pred+1}  ::  '
                 #       f'logit : {logits[pred]:.4f}  ::  '
